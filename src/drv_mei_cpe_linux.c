@@ -1,0 +1,3376 @@
+/******************************************************************************
+
+                               Copyright (c) 2011
+                            Lantiq Deutschland GmbH
+                     Am Campeon 3; 85579 Neubiberg, Germany
+
+  For licensing information, see the file 'LICENSE' in the root folder of
+  this software module.
+
+******************************************************************************/
+
+/* ==========================================================================
+   Description : MEI CPE Driver, Linux part
+   ========================================================================== */
+
+#ifdef LINUX
+
+/* ==========================================================================
+   includes - LINUX
+   ========================================================================== */
+
+/* get at first the driver configuration */
+#include "drv_mei_cpe_config.h"
+
+#include "ifx_types.h"
+#include "drv_mei_cpe_os.h"
+
+#ifdef __KERNEL__
+   #include <linux/kernel.h>
+#endif
+
+#include <linux/module.h>
+#include <linux/version.h>
+
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,17))
+#include <linux/utsrelease.h>
+#endif
+#include <linux/init.h>
+
+#include <linux/ioport.h>
+#include <linux/irq.h>
+#include <asm/io.h>
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0))
+   #undef CONFIG_DEVFS_FS
+#endif
+
+#ifdef CONFIG_DEVFS_FS
+#include <linux/devfs_fs_kernel.h>
+#endif /* CONFIG_DEVFS_FS */
+
+#if CONFIG_PROC_FS
+#include <linux/proc_fs.h>
+#endif
+
+/* add MEI CPE debug/printout part */
+#include "drv_mei_cpe_dbg.h"
+
+#include "drv_mei_cpe_dbg_driver.h"
+
+#include "drv_mei_cpe_linux.h"
+
+/* project specific headers */
+#include "drv_mei_cpe_interface.h"
+#include "drv_mei_cpe_mei_interface.h"
+#include "drv_mei_cpe_api.h"
+
+#include "drv_mei_cpe_msg_process.h"
+
+#if (MEI_SUPPORT_PROCFS_CONFIG == 1)
+#include "drv_mei_cpe_linux_proc_config.h"
+#endif /* MEI_SUPPORT_PROCFS_CONFIG */
+
+#include "drv_mei_cpe_download.h"
+
+#include "drv_mei_cpe_dbg_access.h"
+
+#if (MEI_DRV_ATM_OAM_ENABLE == 1)
+#include "drv_mei_cpe_atmoam_common.h"
+#endif
+
+#if (MEI_DRV_CLEAR_EOC_ENABLE == 1)
+#include "drv_mei_cpe_clear_eoc_common.h"
+#endif
+
+#if (MEI_SUPPORT_VDSL2_ADSL_SWAP == 1)
+#include "drv_mei_cpe_device_cntrl.h"
+#endif
+
+/* ===================================
+   extern function declarations
+   =================================== */
+
+
+/* =================================== */
+/* Local function declarations (LINUX) */
+/* =================================== */
+
+static int __init MEI_module_init(void);
+static void __exit MEI_module_exit(void);
+
+static IFX_int32_t MEI_CpeDevOpen(
+                              IFX_int8_t nLineNum,
+                              struct file *filp);
+static int MEI_OpenOS(
+                     struct inode *inode,
+                     struct file *filp);
+
+static int MEI_ReleaseCpeDev(
+                     struct inode *inode,
+                     struct file *filp);
+
+static ssize_t MEI_Write(
+                     struct file *filp,
+                     const char *buf,
+                     size_t count,
+                     loff_t * ppos);
+
+static ssize_t MEI_Read(
+                     struct file * filp,
+                     char *buf,
+                     size_t length,
+                     loff_t * ppos);
+
+static int MEI_Ioctl( struct inode *inode, struct file *filp,
+                        unsigned int nCmd, unsigned long nArgument);
+
+static unsigned int MEI_Poll (struct file *filp, poll_table *table);
+
+#if (MEI_SUPPORT_IRQ == 1)
+
+static int MEI_IfxRequestIrq( unsigned int usedIrq,
+                                usedIsrHandler_t usedIsrHandler,
+                                unsigned long usedFlags,
+                                const char *pUsedDevName,
+                                void *pUsedDevId);
+
+static void MEI_IfxFreeIrq(unsigned int usedIrq, void *pUsedDevId);
+
+static irqreturn_t MEI_InterruptLinux(int irq, void *dev_id, struct pt_regs *regs);
+#endif
+
+#if CONFIG_PROC_FS
+static int MEI_GetVersionProc(char *buf);
+static int MEI_ReadProc(char *page, char **start, off_t off,
+                              int count, int *eof, void *data);
+static int MEI_GetStatusProcPerDev(char *buf, int entity, int bufSize);
+static int MEI_ReadProcPerDev(char *page, char **start, off_t off,
+                                    int count, int *eof, void *data);
+static int MEI_InstallProcEntry(unsigned char devNum);
+
+#if (MEI_SUPPORT_MEI_DEBUG == 1)
+static int MEI_GetNfcProcPerDev( char *buf, int entity, int bufSize);
+static int MEI_ReadProcNfcPerDev( char *page, char **start, off_t off,
+                                    int count, int *eof, void *data);
+#endif
+
+
+#endif
+
+
+#if (MEI_SUPPORT_DFE_DBG_ACCESS == 1)
+static int MEI_IoctlMeiDbgAccessWr_Wrap(
+                              MEI_DYN_CNTRL_T       *pMeiDynCntrl,
+                              IOCTL_MEI_dbgAccess_t *pUserArgument,
+                              IOCTL_MEI_dbgAccess_t *pLocalArgument);
+
+static int MEI_IoctlMeiDbgAccessRd_Wrap(
+                              MEI_DYN_CNTRL_T       *pMeiDynCntrl,
+                              IOCTL_MEI_dbgAccess_t *pUserArgument,
+                              IOCTL_MEI_dbgAccess_t *pLocalArgument);
+#endif
+
+static int MEI_InitModuleRegCharDev(const char *devName);
+static int MEI_InitModuleBasics(void);
+
+#if (MEI_SUPPORT_DFE_DMA_ACCESS == 1)
+static int MEI_IoctlDmaAccessWr_Wrap(
+                              MEI_DYN_CNTRL_T        *pMeiDynCntrl,
+                              IOCTL_MEI_DMA_access_t *pDmaArgument);
+
+static int MEI_IoctlDmaAccessRd_Wrap(
+                              MEI_DYN_CNTRL_T        *pMeiDynCntrl,
+                              IOCTL_MEI_DMA_access_t *pDmaArgument);
+#endif
+
+/*
+   Only for testing
+*/
+#if (MEI_MISC_TEST == 1)
+static void MEI_MemVAllocTest();
+#endif
+
+/* =================================== */
+/* Local variables (LINUX)             */
+/* =================================== */
+static IFX_uint8_t major_number = 0;
+#ifdef MODULE
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0))
+MODULE_PARM(major_number, "b");
+#else
+module_param(major_number, byte, 0);
+#endif
+MODULE_PARM_DESC(major_number, "to override automatic major number");
+#endif /* #ifdef MODULE*/
+
+/** install parameter debug_level: LOW (1), NORMAL (2), HIGH (3), OFF (4) */
+#if ((MEI_DEBUG_PRINT == 1) || (MEI_ERROR_PRINT == 1))
+static IFX_uint8_t debug_level = MEI_DRV_PRN_LEVEL_OFF;
+#else
+static IFX_uint8_t debug_level = MEI_DRV_PRN_LEVEL_OFF;
+#endif
+
+#ifdef MODULE
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0))
+MODULE_PARM(debug_level, "b");
+#else
+module_param(debug_level, byte, 0);
+#endif
+MODULE_PARM_DESC(debug_level, "set to get more (1) or fewer (4) debug outputs");
+#endif /* #ifdef MODULE*/
+
+static IFX_uint32_t fsm_set_pre_action = 0;
+
+#ifdef MODULE
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0))
+MODULE_PARM(fsm_set_pre_action, "i");
+#else
+module_param(fsm_set_pre_action, int, 0);
+#endif
+MODULE_PARM_DESC(fsm_set_pre_action, "set to activate FSM Set pre-action");
+#endif /* #ifdef MODULE*/
+
+/* the driver callbacks */
+static struct file_operations MEI_fops =
+    {
+    owner:
+        THIS_MODULE,
+    read:
+        MEI_Read,
+    write:
+        MEI_Write,
+    poll:
+        MEI_Poll,
+    ioctl:
+        MEI_Ioctl,
+    open:
+        MEI_OpenOS,
+    release:
+        MEI_ReleaseCpeDev
+    };
+
+
+#ifdef CONFIG_DEVFS_FS
+/** handles for Dev FS */
+static devfs_handle_t MEI_base_dir_handle;
+static devfs_handle_t MEI_cntrl_handle[MEI_MAX_DFEX_ENTITIES];
+static devfs_handle_t MEI_dev_handle[MEI_MAX_DFE_CHAN_DEVICES];
+#endif
+
+
+/* temp buffer for handling MEI Debug access */
+static IFX_uint32_t MEI_DbgDumpBuffer[MEI_IOCTL_MAX_DBG_COUNT_32BIT];
+
+
+/* ============================================================================
+   MEI CPE driver interrupt functions (LINUX) - wrapping
+   ========================================================================= */
+
+static int MEI_IntSetupLocked = 0;
+
+/* function ptr to the used request_irq function */
+static MEI_RequestIrq_WrapLinux_t MEI_RequestIrq_WrapLx = request_irq;
+
+/* function ptr to the used free_irq function */
+static MEI_FreeIrq_WrapLinux_t MEI_FreeIrq_WrapLx = free_irq;
+
+
+/* function ptr to the used Interrupt Enable Routine */
+
+
+/* function ptr to the used Interrupt Enable Routine */
+
+
+
+/* ============================================================================
+   Local function declaration (LINUX)
+   ========================================================================= */
+
+/**
+   Open a MEI CPE device to control a device channel
+
+\param
+   deviceNum   number of the MEI CPE device
+\param
+   filp        pointer to the file descriptor
+
+*/
+static IFX_int32_t MEI_CpeDevOpen( IFX_int8_t nLineNum, struct file *filp)
+{
+   IFX_int32_t          retVal;
+   MEI_DYN_CNTRL_T   *pDynCntrl = NULL;
+
+   if ((retVal = MEI_DevLineAlloc(nLineNum)) != IFX_SUCCESS)
+   {
+      return retVal;
+   }
+
+   if ((retVal = MEI_InstanceLineAlloc(nLineNum, &pDynCntrl)) != IFX_SUCCESS)
+   {
+      return retVal;
+   }
+
+   /* NOTE: open success
+      - The device number (channel) was set within the device structure
+        for new memory allocations.
+      - Now replace the device number within the private data with
+        the VINAX dynamic control structure to provide open specific data.
+   */
+   filp->private_data = (void*)pDynCntrl;
+
+   #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0))
+   /* increment module use counter */
+   MOD_INC_USE_COUNT;
+   #endif
+
+   return IFX_SUCCESS;
+}
+
+/**
+   Open a device from the OS open call.
+
+\param
+   inode pointer to the inode
+\param
+   filp pointer to the file descriptor
+
+\return
+   0:    open SUCCESSFULL
+   -1:   Error while open device.
+
+*/
+static int MEI_OpenOS(struct inode *inode, struct file *filp)
+{
+   int result, deviceNum;
+
+   /*
+      device number = minor number
+      The minor number is set via instmod (without devfs)
+      or while device registeration
+   */
+
+   deviceNum = MINOR(inode->i_rdev);
+   filp->private_data = (void*)deviceNum;
+
+   result = MEI_CpeDevOpen(deviceNum, filp);
+
+   return result;
+}
+
+/**
+   Release the device.
+
+\param
+   inode pointer to the inode
+\param
+   filp pointer to the file descriptor
+
+\return
+   0 - on success
+*/
+static int MEI_ReleaseCpeDev(struct inode *inode, struct file *filp)
+{
+   MEI_DYN_CNTRL_T   *pDynCntrl = (MEI_DYN_CNTRL_T *)filp->private_data;
+
+   MEI_DevLineClose(pDynCntrl);
+
+   #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0))
+   /* decrement use counter */
+   MOD_DEC_USE_COUNT;
+   #endif
+
+   return 0;
+}
+
+
+/**
+   Writes data to the device.
+
+   \param filp pointer to the file descriptor
+   \param buf source buffer
+   \param count data length
+   \param ppos unused
+
+   \return
+   length or a negative error code
+*/
+static ssize_t MEI_Write(struct file *filp, const char *buf,
+                                 size_t count, loff_t * ppos)
+{
+   PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_WRN,
+         ("MEI_DRV: write(..., %d, ..) not supported" MEI_DRV_CRLF,
+            count));
+
+   return -e_MEI_ERR_INVAL_CMD;
+}
+
+/**
+   Reads data from the device.
+
+   \param filp pointer to the file descriptor
+   \param buf destination buffer
+   \param count max size of data to read
+   \param ppos unused
+
+   \return
+   len - data length
+*/
+static ssize_t MEI_Read(struct file *filp, char *buf, size_t count, loff_t * ppos)
+{
+   /* While open-time: VINAX dynamic struct is stored in filp->private_data */
+   MEI_DYN_CNTRL_T    *pDynCntrl = (MEI_DYN_CNTRL_T *)filp->private_data;
+   MEI_DEV_T          *pMeiDev;
+   MEI_DYN_CMD_DATA_T *pDynCmd;
+
+   /* get the MEI CPE device structure */
+   if (pDynCntrl == NULL)
+   {
+      PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_WRN,
+             ("MEI_DRV: Error read - invalid dyn device struct" MEI_DRV_CRLF));
+      return -e_MEI_ERR_INVAL_CMD;
+   }
+
+   pMeiDev = pDynCntrl->pMeiDev;
+   pDynCmd   = pDynCntrl->pInstDynCmd;
+
+   PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_WRN,
+          ("MEI_DRV[0x%02X]: read(.., %d, ..) not supported" MEI_DRV_CRLF,
+           MEI_DRV_LINENUM_GET(pMeiDev), count));
+
+   return -e_MEI_ERR_INVAL_CMD;
+}
+
+/**
+   Configuration / Control for the device.
+
+\param
+   inode pointer to the inode
+\param
+   filp pointer to the file descriptor
+\param
+   nCmd function id's
+\param
+   nArgument optional argument
+
+\return
+   0 and positive values - success,
+   negative value - ioctl failed
+*/
+static int MEI_Ioctl( struct inode *inode, struct file *filp,
+                            unsigned int nCmd, unsigned long nArgument)
+{
+   int ret = 0, retSize = sizeof(IOCTL_MEI_ioctl_t);
+   /* While open-time: MEI CPE dynamic struct is stored in filp->private_data */
+   MEI_DYN_CNTRL_T *pMeiDynCntrl = (MEI_DYN_CNTRL_T *)filp->private_data;
+   MEI_DEV_T    *pMeiDev;
+   IOCTL_MEI_arg_t local_args, *pUserArgs;
+
+   /* require an argument (ptr ioctl struct) */
+   if (nArgument == 0)
+   {
+      PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+             ("MEI_DRV[??] Error ioctl - invalid argument ptr" MEI_DRV_CRLF));
+      return -e_MEI_ERR_INVAL_ARG;
+   }
+
+   pUserArgs = (IOCTL_MEI_arg_t *)nArgument;
+
+   /* get the MEI CPE device structure */
+   if (pMeiDynCntrl == NULL)
+   {
+      PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+             ("MEI_DRV[??] Error ioctl - invalid dyn device struct" MEI_DRV_CRLF));
+
+      ret = -e_MEI_ERR_DEV_NOT_EXIST;
+      goto MEI_IOCTL_RETURN;
+   }
+
+   pMeiDev = pMeiDynCntrl->pMeiDev;
+
+   /*
+      Check for valid commands if driver still not init.
+   */
+   if ( (ret = MEI_CheckIoctlCmdInitState( pMeiDynCntrl, (IFX_uint32_t)nCmd ))
+        != IFX_SUCCESS )
+   {
+      goto MEI_IOCTL_RETURN;
+   }
+
+
+   /* poll all devices in POLLING mode */
+   MEI_DevPollAllIrq(e_MEI_DEV_ACCESS_MODE_PASSIV_POLL);
+
+   /*
+      check correct driver state for send modem message.
+   */
+   if ( (ret = MEI_CheckIoctlCmdSendState(pMeiDynCntrl, (IFX_uint32_t)nCmd))
+        != IFX_SUCCESS )
+   {
+      goto MEI_IOCTL_RETURN;
+   }
+
+   switch (nCmd)
+   {
+      case FIO_MEI_DEBUGLEVEL:
+         MEI_DRVOS_CpyFromUser(
+            &local_args, pUserArgs, sizeof(IOCTL_MEI_dbgLevel_t) );
+
+         ret = MEI_IoctlDebugLevelSet(pMeiDynCntrl, &local_args.dbg_level);
+         break;
+
+      case FIO_MEI_VERSION_GET:
+         MEI_DRVOS_CpyFromUser(
+            &local_args, pUserArgs, sizeof(IOCTL_MEI_drvVersion_t) );
+
+         ret = MEI_IoctlDrvVersionGet(pMeiDynCntrl, &local_args.drv_vers, IFX_FALSE);
+         retSize = sizeof(IOCTL_MEI_drvVersion_t);
+         #if (MEI_MISC_TEST == 1)
+         MEI_MemVAllocTest();
+         #endif
+         break;
+
+      case FIO_MEI_DEV_INIT:
+         MEI_DRVOS_CpyFromUser(
+            &local_args, pUserArgs, sizeof(IOCTL_MEI_devInit_t) );
+
+         ret = (int)MEI_IoctlInitDevice(pMeiDynCntrl, &local_args.init_dev);
+         break;
+
+      case FIO_MEI_DRV_INIT:
+         MEI_DRVOS_CpyFromUser(
+            &local_args, pUserArgs, sizeof(IOCTL_MEI_drvInit_t) );
+
+         MEI_IoctlDrvInit(pMeiDynCntrl, &local_args.init_drv);
+         retSize = sizeof(IOCTL_MEI_drvInit_t);
+         break;
+
+      case FIO_MEI_RESET:
+         MEI_DRVOS_CpyFromUser(
+            &local_args, pUserArgs, sizeof(IOCTL_MEI_reset_t) );
+
+         ret = MEI_DrvAndDevReset(
+               pMeiDev, local_args.rst.rstMode, local_args.rst.rstSelMask, 1);
+         break;
+
+      case FIO_MEI_REQ_CONFIG:
+         MEI_IoctlRequestConfig(pMeiDynCntrl, &local_args.req_cfg);
+         retSize = sizeof(IOCTL_MEI_reqCfg_t);
+         break;
+
+#if (MEI_SUPPORT_VDSL2_ADSL_SWAP == 1)
+      case FIO_MEI_FW_MODE_SELECT:
+         MEI_DRVOS_CpyFromUser(
+            &local_args, pUserArgs, sizeof(IOCTL_MEI_fwMode_t) );
+
+         ret = MEI_IoctlDevCfgFwModeSwap(
+               pMeiDynCntrl, &local_args.fw_mode);
+         break;
+#endif      /* #if (MEI_SUPPORT_VDSL2_ADSL_SWAP == 1) */
+
+#if (MEI_SUPPORT_DEVICE_VR9 == 1)
+      case FIO_MEI_FW_MODE_CTRL_SET:
+         MEI_DRVOS_CpyFromUser(
+            &local_args, pUserArgs, sizeof(IOCTL_MEI_FwModeCtrlSet_t) );
+
+         ret = MEI_IoctlFwModeCtrlSet(
+               pMeiDynCntrl, &local_args.fw_mode_ctrl);
+         break;
+
+      case FIO_MEI_FW_MODE_STAT_GET:
+         ret = MEI_IoctlFwModeStatGet(
+               pMeiDynCntrl, &local_args.fw_mode_stat);
+
+         MEI_DRVOS_CpyToUser(
+            pUserArgs, &local_args, sizeof(IOCTL_MEI_FwModeStatGet_t) );
+         break;
+#endif /* #if (MEI_SUPPORT_DEVICE_VR9 == 1)*/
+
+#if (MEI_SUPPORT_STATISTICS == 1)
+      case FIO_MEI_REQ_STAT:
+         MEI_IoctlRequestStat(pMeiDynCntrl, &local_args.req_stat);
+         retSize = sizeof(IOCTL_MEI_statistic_t);
+         break;
+#endif
+
+#if (MEI_SUPPORT_REGISTER == 1)
+      case FIO_MEI_REG_SET:
+         MEI_DRVOS_CpyFromUser(
+            &local_args.reg_io, &pUserArgs->reg_io, sizeof(IOCTL_MEI_regInOut_t) );
+
+         if( MEI_Set_Register(
+               pMeiDev, local_args.reg_io.addr, local_args.reg_io.value) != IFX_SUCCESS )
+         {
+            ret = -e_MEI_ERR_OP_FAILED;
+         }
+         break;
+
+      case FIO_MEI_REG_GET:
+         MEI_DRVOS_CpyFromUser(
+            &local_args.reg_io.addr, &pUserArgs->reg_io.addr, sizeof(local_args.reg_io.addr) );
+
+         if( MEI_Get_Register(
+               pMeiDev, local_args.reg_io.addr, (IFX_uint32_t*)&local_args.reg_io.value)
+             != IFX_SUCCESS )
+         {
+            ret = -e_MEI_ERR_OP_FAILED;
+         }
+         else
+         {
+            retSize = sizeof(IOCTL_MEI_regInOut_t);
+         }
+         break;
+#endif      /* #if (MEI_SUPPORT_REGISTER == 1) */
+
+#if (MEI_SUPPORT_DRV_LOOPS == 1)
+      case FIO_MEI_DRV_LOOP:
+         MEI_DRVOS_CpyFromUser(
+            &local_args, pUserArgs, sizeof(IOCTL_MEI_drvLoop_t) );
+
+         MEI_MailboxLoop( pMeiDev,
+                            (local_args.drv_loop.loopEnDis) ? IFX_TRUE:IFX_FALSE);
+         break;
+#endif
+
+      case FIO_MEI_FW_DL:
+         MEI_DRVOS_CpyFromUser(
+            &local_args, pUserArgs, sizeof(IOCTL_MEI_fwDownLoad_t) );
+
+         PRN_DBG_USR( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL, MEI_DRV_DYN_LINENUM_GET(pMeiDynCntrl),
+                ("MEI_DRV: ioctl - FIO_MEI_FW_DL: size = %d bytes" MEI_DRV_CRLF,
+                 (unsigned int)local_args.fw_dl.size_byte));
+
+         ret = MEI_IoctlFirmwareDownload(pMeiDynCntrl, &local_args.fw_dl, IFX_FALSE);
+         break;
+
+#if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_AR9 == 1)
+      case FIO_MEI_OPT_FW_DL:
+         MEI_DRVOS_CpyFromUser(
+            &local_args, pUserArgs, sizeof(IOCTL_MEI_fwOptDownLoad_t) );
+
+         PRN_DBG_USR( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL, MEI_DRV_DYN_LINENUM_GET(pMeiDynCntrl),
+                ("MEI_DRV: ioctl - FIO_MEI_OPT_FW_DL: size = %d bytes" MEI_DRV_CRLF,
+                 (unsigned int)local_args.fw_dl_opt.size_byte));
+
+         ret = MEI_IoctlOptFirmwareDownload(pMeiDynCntrl, &local_args.fw_dl_opt, IFX_FALSE);
+         break;
+#endif /* (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_AR9 == 1)*/
+
+#if (MEI_SUPPORT_DFE_DMA_ACCESS == 1)
+      case FIO_MEI_DMA_WRITE:
+         MEI_DRVOS_CpyFromUser(
+            &local_args.dma_access, &pUserArgs->dma_access, sizeof(IOCTL_MEI_DMA_access_t) );
+
+         ret = MEI_IoctlDmaAccessWr_Wrap( pMeiDynCntrl,
+                                            &local_args.dma_access);
+         retSize = sizeof(IOCTL_MEI_DMA_access_t);
+         break;
+      case FIO_MEI_DMA_READ:
+         MEI_DRVOS_CpyFromUser(
+            &local_args.dma_access, &pUserArgs->dma_access, sizeof(IOCTL_MEI_DMA_access_t) );
+
+         ret = MEI_IoctlDmaAccessRd_Wrap( pMeiDynCntrl,
+                                            &local_args.dma_access);
+         retSize = sizeof(IOCTL_MEI_DMA_access_t);
+         break;
+#endif
+
+#if (MEI_SUPPORT_DFE_GPA_ACCESS == 1)
+      case FIO_MEI_GPA_WRITE:
+         MEI_DRVOS_CpyFromUser(
+            &local_args.gpa_access, &pUserArgs->gpa_access, sizeof(IOCTL_MEI_GPA_accessInOut_t) );
+
+         ret = MEI_GpaWrAccess(
+                  pMeiDynCntrl, local_args.gpa_access.dest,
+                  local_args.gpa_access.addr, local_args.gpa_access.value);
+         break;
+
+      case FIO_MEI_GPA_READ:
+         MEI_DRVOS_CpyFromUser(
+            &local_args.gpa_access, &pUserArgs->gpa_access, sizeof(IOCTL_MEI_GPA_accessInOut_t) );
+
+         ret = MEI_GpaRdAccess(
+                  pMeiDynCntrl, local_args.gpa_access.dest,
+                  local_args.gpa_access.addr, (IFX_uint32_t *)&local_args.gpa_access.value);
+         if (ret != 0)
+         {
+            PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+                   ("MEI_DRV[%02d]: ERROR ioctl - FIO_MEI_GPA_READ" MEI_DRV_CRLF,
+                     MEI_DRV_LINENUM_GET(pMeiDev)));
+
+            ret = -e_MEI_ERR_OP_FAILED;
+         }
+         else
+         {
+            retSize = sizeof(IOCTL_MEI_GPA_accessInOut_t);
+         }
+         break;
+#endif      /* #if (MEI_SUPPORT_DFE_GPA_ACCESS == 1) */
+
+#if (MEI_SUPPORT_DFE_DBG_ACCESS == 1)
+      case FIO_MEI_DBG_WRITE:
+         MEI_DRVOS_CpyFromUser(
+            &local_args.dbg_access, &pUserArgs->dbg_access, sizeof(IOCTL_MEI_dbgAccess_t) );
+
+         ret = MEI_IoctlMeiDbgAccessWr_Wrap(
+            pMeiDynCntrl, &pUserArgs->dbg_access, &local_args.dbg_access);
+         break;
+
+      case FIO_MEI_DBG_READ:
+         MEI_DRVOS_CpyFromUser(
+            &local_args.dbg_access, &pUserArgs->dbg_access, sizeof(IOCTL_MEI_dbgAccess_t) );
+
+         ret = MEI_IoctlMeiDbgAccessRd_Wrap(
+                  pMeiDynCntrl, &pUserArgs->dbg_access, &local_args.dbg_access);
+         break;
+
+      case FIO_MEI_DBG_AUX_WRITE:
+         MEI_DRVOS_CpyFromUser(
+            &local_args.dbg_access, &pUserArgs->dbg_access, sizeof(IOCTL_MEI_dbgAccess_t) );
+
+         local_args.dbg_access.dbgDest = MEI_IOCTL_DEBUG_AUX;
+         ret = MEI_IoctlMeiDbgAccessWr_Wrap(
+                  pMeiDynCntrl, &pUserArgs->dbg_access, &local_args.dbg_access);
+         break;
+
+      case FIO_MEI_DBG_AUX_READ:
+         MEI_DRVOS_CpyFromUser(
+            &local_args.dbg_access, &pUserArgs->dbg_access, sizeof(IOCTL_MEI_dbgAccess_t) );
+
+         local_args.dbg_access.dbgDest = MEI_IOCTL_DEBUG_AUX;
+         ret = MEI_IoctlMeiDbgAccessRd_Wrap(
+                  pMeiDynCntrl, &pUserArgs->dbg_access, &local_args.dbg_access);
+         break;
+
+      case FIO_MEI_DBG_CORE_WRITE:
+         MEI_DRVOS_CpyFromUser(
+            &local_args.dbg_access, &pUserArgs->dbg_access, sizeof(IOCTL_MEI_dbgAccess_t) );
+
+         /* set CORE destination and do it */
+         local_args.dbg_access.dbgDest = MEI_IOCTL_DEBUG_CORE;
+         ret = MEI_IoctlMeiDbgAccessWr_Wrap(
+                  pMeiDynCntrl, &pUserArgs->dbg_access, &local_args.dbg_access);
+         break;
+
+      case FIO_MEI_DBG_CORE_READ:
+         MEI_DRVOS_CpyFromUser(
+            &local_args.dbg_access, &pUserArgs->dbg_access, sizeof(IOCTL_MEI_dbgAccess_t) );
+
+         /* set CORE destination and do it */
+         local_args.dbg_access.dbgDest = MEI_IOCTL_DEBUG_CORE;
+         ret = MEI_IoctlMeiDbgAccessRd_Wrap(
+                  pMeiDynCntrl, &pUserArgs->dbg_access, &local_args.dbg_access);
+         break;
+
+      case FIO_MEI_DBG_LS_WRITE:
+         MEI_DRVOS_CpyFromUser(
+            &local_args.dbg_access, &pUserArgs->dbg_access, sizeof(IOCTL_MEI_dbgAccess_t) );
+
+         local_args.dbg_access.dbgDest = MEI_IOCTL_DEBUG_LDST;
+         ret = MEI_IoctlMeiDbgAccessWr_Wrap(
+                  pMeiDynCntrl, &pUserArgs->dbg_access, &local_args.dbg_access);
+         break;
+      case FIO_MEI_DBG_LS_READ:
+         MEI_DRVOS_CpyFromUser(
+            &local_args.dbg_access, &pUserArgs->dbg_access, sizeof(IOCTL_MEI_dbgAccess_t) );
+
+         local_args.dbg_access.dbgDest = MEI_IOCTL_DEBUG_LDST;
+         ret = MEI_IoctlMeiDbgAccessRd_Wrap(
+                  pMeiDynCntrl, &pUserArgs->dbg_access, &local_args.dbg_access);
+         break;
+#endif      /* #if (MEI_SUPPORT_DFE_DBG_ACCESS == 1) */
+
+      case FIO_MEI_MBOX_NFC_ENABLE:
+         /* Setup the receive NFC feature */
+         if (pMeiDynCntrl->pInstDynNfc == IFX_NULL)
+         {
+            ret = MEI_IoctlNfcEnable(pMeiDynCntrl, 0, 0);
+            pMeiDynCntrl->pInstDynNfc->msgProcessCtrl = MEI_MSG_CNTRL_MODEM_MSG_MASK_DEFAULT;
+         }
+         break;
+
+      case FIO_MEI_MBOX_NFC_DISABLE:
+         ret = MEI_IoctlNfcDisable(pMeiDynCntrl);
+
+         break;
+
+      case FIO_MEI_AUTO_MSG_CTRL_SET:
+         PRN_DBG_USR( MEI_DRV, MEI_DRV_PRN_LEVEL_LOW, MEI_DRV_LINENUM_GET(pMeiDev),
+                ("MEI_DRV[%02d]: ioctl - FIO_MEI_AUTO_MSG_CTRL_SET" MEI_DRV_CRLF,
+                  MEI_DRV_LINENUM_GET(pMeiDev)));
+
+         MEI_DRVOS_CpyFromUser(
+            &local_args.autoMsgCtrl, &pUserArgs->autoMsgCtrl, sizeof(IOCTL_MEI_autoMsgCtrl_t) );
+
+         ret = MEI_IoctlAutoMsgCtlSet(pMeiDynCntrl, &local_args.autoMsgCtrl);
+         retSize = sizeof(IOCTL_MEI_autoMsgCtrl_t);
+         break;
+
+      case FIO_MEI_AUTO_MSG_CTRL_GET:
+         ret = MEI_IoctlAutoMsgCtlGet(pMeiDynCntrl, &local_args.autoMsgCtrl);
+         retSize = sizeof(IOCTL_MEI_autoMsgCtrl_t);
+         break;
+
+      case FIO_MEI_MBOX_MSG_SEND:
+         PRN_DBG_USR( MEI_DRV, MEI_DRV_PRN_LEVEL_LOW, MEI_DRV_LINENUM_GET(pMeiDev),
+                ("MEI_DRV[%02d]: ioctl - FIO_MEI_MBOX_MSG_SEND" MEI_DRV_CRLF,
+                  MEI_DRV_LINENUM_GET(pMeiDev)));
+
+         MEI_DRVOS_CpyFromUser(
+            &local_args.ifx_msg_send, &pUserArgs->ifx_msg_send, sizeof(IOCTL_MEI_messageSend_t) );
+
+         ret = MEI_IoctlMsgSend(pMeiDynCntrl, &local_args.ifx_msg_send, IFX_FALSE);
+         retSize = sizeof(IOCTL_MEI_messageSend_t);
+         break;
+
+      case FIO_MEI_MBOX_MSG_WR:
+            PRN_DBG_USR( MEI_DRV, MEI_DRV_PRN_LEVEL_LOW, MEI_DRV_LINENUM_GET(pMeiDev),
+                   ("MEI_DRV[%02d]: ioctl - FIO_MEI_MBOX_MSG_WR" MEI_DRV_CRLF,
+                     MEI_DRV_LINENUM_GET(pMeiDev)));
+
+            MEI_DRVOS_CpyFromUser(
+               &local_args.ifx_msg, &pUserArgs->ifx_msg, sizeof(IOCTL_MEI_message_t) );
+
+            MEI_DRVOS_SemaphoreLock(&pMeiDynCntrl->pInstanceRWlock);
+            ret = MEI_IoctlCmdMsgWrite(
+                     pMeiDynCntrl, &local_args.ifx_msg, IFX_FALSE);
+            MEI_DRVOS_SemaphoreUnlock(&pMeiDynCntrl->pInstanceRWlock);
+            retSize = sizeof(IOCTL_MEI_message_t);
+         break;
+
+      case FIO_MEI_MBOX_ACK_RD:
+         PRN_DBG_USR( MEI_DRV, MEI_DRV_PRN_LEVEL_LOW, MEI_DRV_LINENUM_GET(pMeiDev),
+                ("MEI_DRV[%02d]: ioctl - FIO_MEI_MBOX_ACK_RD" MEI_DRV_CRLF,
+                  MEI_DRV_LINENUM_GET(pMeiDev)));
+
+         MEI_DRVOS_CpyFromUser(
+            &local_args.ifx_msg, &pUserArgs->ifx_msg, sizeof(IOCTL_MEI_message_t) );
+
+         MEI_DRVOS_SemaphoreLock(&pMeiDynCntrl->pInstanceRWlock);
+         ret = MEI_IoctlAckMsgRead( pMeiDynCntrl,
+                                   &local_args.ifx_msg,
+                                   IFX_FALSE);
+
+         MEI_DRVOS_SemaphoreUnlock(&pMeiDynCntrl->pInstanceRWlock);
+         if (ret < 0)
+         {
+            local_args.ifx_msg.paylSize_byte = 0;
+         }
+         retSize = sizeof(IOCTL_MEI_message_t);
+         break;
+
+      case FIO_MEI_MBOX_NFC_RD:
+         MEI_DRVOS_CpyFromUser(
+            &local_args.ifx_msg, &pUserArgs->ifx_msg, sizeof(IOCTL_MEI_message_t) );
+
+         ret = MEI_IoctlNfcMsgRead( pMeiDynCntrl,
+                                       &local_args.ifx_msg, IFX_FALSE);
+         if (ret < 0)
+         {
+            local_args.ifx_msg.paylSize_byte = 0;
+         }
+         retSize = sizeof(IOCTL_MEI_message_t);
+         break;
+
+#if (MEI_SUPPORT_RAW_MSG == 1)
+      case FIO_MEI_MBOX_MSG_RAW_SEND:
+         MEI_DRVOS_CpyFromUser(
+            &local_args.mbox_send, &pUserArgs->mbox_send, sizeof(IOCTL_MEI_mboxSend_t) );
+
+         ret = MEI_IoctlRawMsgSend(pMeiDynCntrl, &local_args.mbox_send);
+         retSize = sizeof(IOCTL_MEI_mboxSend_t);
+         break;
+
+      case FIO_MEI_MBOX_MSG_RAW_WR:
+         MEI_DRVOS_CpyFromUser(
+            &local_args.mbox_msg, &pUserArgs->mbox_msg, sizeof(IOCTL_MEI_mboxMsg_t) );
+
+         ret = MEI_IoctlRawMsgWrite(
+                  pMeiDynCntrl, local_args.mbox_msg.pData_16, local_args.mbox_msg.count_16bit);
+
+         local_args.mbox_msg.count_16bit = (ret < 0) ? 0 : ret >> 1;
+         retSize = sizeof(IOCTL_MEI_mboxMsg_t);
+         break;
+
+      case FIO_MEI_MBOX_ACK_RAW_RD:
+         MEI_DRVOS_CpyFromUser(
+            &local_args.mbox_msg, &pUserArgs->mbox_msg, sizeof(IOCTL_MEI_mboxMsg_t) );
+
+         ret = MEI_IoctlRawAckRead(
+                  pMeiDynCntrl, local_args.mbox_msg.pData_16, local_args.mbox_msg.count_16bit);
+
+         local_args.mbox_msg.count_16bit = (ret < 0) ? 0 : ret >> 1;
+         retSize = sizeof(IOCTL_MEI_mboxMsg_t);
+         break;
+
+      case FIO_MEI_MBOX_NFC_RAW_RD:
+         MEI_DRVOS_CpyFromUser(
+            &local_args.mbox_msg, &pUserArgs->mbox_msg, sizeof(IOCTL_MEI_mboxMsg_t) );
+
+         ret = MEI_IoctlRawNfcRead(
+                  pMeiDynCntrl, local_args.mbox_msg.pData_16, local_args.mbox_msg.count_16bit);
+
+         local_args.mbox_msg.count_16bit = (ret < 0) ? 0 : ret >> 1;
+         retSize = sizeof(IOCTL_MEI_mboxMsg_t);
+         break;
+#endif      /* #if (MEI_SUPPORT_RAW_MSG == 1) */
+
+#if (MEI_DRV_ATM_OAM_ENABLE == 1)
+      case FIO_MEI_ATMOAM_INIT:
+         PRN_DBG_USR( MEI_DRV, MEI_DRV_PRN_LEVEL_LOW, MEI_DRV_LINENUM_GET(pMeiDev),
+                ("MEI_DRV[%02d]: ioctl - FIO_MEI_ATMOAM_INIT" MEI_DRV_CRLF,
+                  MEI_DRV_LINENUM_GET(pMeiDev)));
+
+         MEI_DRVOS_CpyFromUser(
+            &local_args.atmoam_init, &pUserArgs->atmoam_init, sizeof(IOCTL_MEI_ATMOAM_init_t) );
+
+         ret = MEI_ATMOAM_IoctlDrvInit(pMeiDynCntrl, &local_args.atmoam_init);
+         retSize = sizeof(IOCTL_MEI_ATMOAM_init_t);
+         break;
+
+      case FIO_MEI_ATMOAM_CNTRL:
+         PRN_DBG_USR( MEI_DRV, MEI_DRV_PRN_LEVEL_LOW, MEI_DRV_LINENUM_GET(pMeiDev),
+                ("MEI_DRV[%02d]: ioctl - FIO_MEI_ATMOAM_CNTRL" MEI_DRV_CRLF,
+                  MEI_DRV_LINENUM_GET(pMeiDev)));
+
+         MEI_DRVOS_CpyFromUser(
+            &local_args.atmoam_cntrl, &pUserArgs->atmoam_cntrl, sizeof(IOCTL_MEI_ATMOAM_cntrl_t) );
+
+         ret = MEI_ATMOAM_IoctlCntrl(pMeiDynCntrl, &local_args.atmoam_cntrl);
+         retSize = sizeof(IOCTL_MEI_ATMOAM_cntrl_t);
+         break;
+
+      case FIO_MEI_ATMOAM_REQ_DEV_COUNTER:
+         PRN_DBG_USR( MEI_DRV, MEI_DRV_PRN_LEVEL_LOW, MEI_DRV_LINENUM_GET(pMeiDev),
+                ("MEI_DRV[%02d]: ioctl - FIO_MEI_ATMOAM_REQ_DEV_COUNTER" MEI_DRV_CRLF,
+                  MEI_DRV_LINENUM_GET(pMeiDev)));
+
+         ret = MEI_ATMOAM_IoctlCounterGet(pMeiDynCntrl, &local_args.atmoam_counter);
+         retSize = sizeof(IOCTL_MEI_ATMOAM_counter_t);
+         break;
+
+      case FIO_MEI_ATMOAM_REQ_DRV_STATUS:
+         PRN_DBG_USR( MEI_DRV, MEI_DRV_PRN_LEVEL_LOW, MEI_DRV_LINENUM_GET(pMeiDev),
+                ("MEI_DRV[%02d]: ioctl - FIO_MEI_ATMOAM_REQ_DRV_STATUS" MEI_DRV_CRLF,
+                  MEI_DRV_LINENUM_GET(pMeiDev)));
+
+         ret = MEI_ATMOAM_IoctlStatusGet(pMeiDynCntrl, &local_args.atmoam_status);
+         retSize = sizeof(IOCTL_MEI_ATMOAM_status_t);
+         break;
+
+      case FIO_MEI_ATMOAM_CELL_INSERT:
+         PRN_DBG_USR( MEI_DRV, MEI_DRV_PRN_LEVEL_LOW, MEI_DRV_LINENUM_GET(pMeiDev),
+                ("MEI_DRV[%02d]: ioctl - FIO_MEI_ATMOAM_CELL_INSERT" MEI_DRV_CRLF,
+                  MEI_DRV_LINENUM_GET(pMeiDev)));
+
+         MEI_DRVOS_CpyFromUser(
+            &local_args.atmoam_cells, &pUserArgs->atmoam_cells, sizeof(IOCTL_MEI_ATMOAM_drvAtmCells_t) );
+
+         ret = MEI_ATMOAM_IoctlCellInsert(pMeiDynCntrl, &local_args.atmoam_cells);
+         break;
+
+#endif      /* #if (MEI_DRV_ATM_OAM_ENABLE == 1) */
+
+#if (MEI_DRV_CLEAR_EOC_ENABLE == 1)
+      case FIO_MEI_CEOC_INIT:
+         PRN_DBG_USR( MEI_DRV, MEI_DRV_PRN_LEVEL_LOW, MEI_DRV_LINENUM_GET(pMeiDev),
+                ("MEI_DRV[%02d]: ioctl - FIO_MEI_CEOC_INIT" MEI_DRV_CRLF,
+                  MEI_DRV_LINENUM_GET(pMeiDev)));
+
+         MEI_DRVOS_CpyFromUser(
+            &local_args.ceoc_init, &pUserArgs->ceoc_init, sizeof(IOCTL_MEI_CEOC_init_t) );
+
+         ret = MEI_CEOC_IoctlDrvInit(pMeiDynCntrl, &local_args.ceoc_init);
+         retSize = sizeof(IOCTL_MEI_CEOC_init_t);
+         break;
+
+      case FIO_MEI_CEOC_CNTRL:
+         PRN_DBG_USR( MEI_DRV, MEI_DRV_PRN_LEVEL_LOW, MEI_DRV_LINENUM_GET(pMeiDev),
+                ("MEI_DRV[%02d]: ioctl - FIO_MEI_CEOC_CNTRL" MEI_DRV_CRLF,
+                  MEI_DRV_LINENUM_GET(pMeiDev)));
+
+         MEI_DRVOS_CpyFromUser(
+            &local_args.ceoc_cntrl, &pUserArgs->ceoc_cntrl, sizeof(IOCTL_MEI_CEOC_cntrl_t) );
+
+         ret = MEI_CEOC_IoctlCntrl(pMeiDynCntrl, &local_args.ceoc_cntrl);
+         retSize = sizeof(IOCTL_MEI_CEOC_cntrl_t);
+         break;
+
+      case FIO_MEI_CEOC_STATS:
+         PRN_DBG_USR( MEI_DRV, MEI_DRV_PRN_LEVEL_LOW, MEI_DRV_LINENUM_GET(pMeiDev),
+                ("MEI_DRV[%02d]: ioctl - FIO_MEI_CEOC_STATS" MEI_DRV_CRLF,
+                  MEI_DRV_LINENUM_GET(pMeiDev)));
+
+         ret = MEI_CEOC_IoctlStatusGet(pMeiDynCntrl, &local_args.ceoc_statistic);
+         retSize = sizeof(IOCTL_MEI_CEOC_statistic_t);
+         break;
+
+      case FIO_MEI_CEOC_FRAME_WR:
+         PRN_DBG_USR( MEI_DRV, MEI_DRV_PRN_LEVEL_LOW, MEI_DRV_LINENUM_GET(pMeiDev),
+                ("MEI_DRV[%02d]: ioctl - FIO_MEI_CEOC_FRAME_WR" MEI_DRV_CRLF,
+                  MEI_DRV_LINENUM_GET(pMeiDev)));
+
+         MEI_DRVOS_CpyFromUser(
+            &local_args.ceoc_frame, &pUserArgs->ceoc_frame, sizeof(IOCTL_MEI_CEOC_frame_t) );
+
+         ret = MEI_CEOC_IoctlFrameWrite(pMeiDynCntrl, &local_args.ceoc_frame, IFX_FALSE);
+         retSize = sizeof(IOCTL_MEI_CEOC_frame_t);
+         break;
+
+      case FIO_MEI_CEOC_FRAME_RD:
+         PRN_DBG_USR( MEI_DRV, MEI_DRV_PRN_LEVEL_LOW, MEI_DRV_LINENUM_GET(pMeiDev),
+                ("MEI_DRV[%02d]: ioctl - FIO_MEI_CEOC_FRAME_RD" MEI_DRV_CRLF,
+                  MEI_DRV_LINENUM_GET(pMeiDev)));
+
+         MEI_DRVOS_CpyFromUser(
+            &local_args.ceoc_frame, &pUserArgs->ceoc_frame, sizeof(IOCTL_MEI_CEOC_frame_t) );
+
+         ret = MEI_CEOC_IoctlFrameRead(pMeiDynCntrl, &local_args.ceoc_frame, IFX_FALSE);
+         retSize = sizeof(IOCTL_MEI_CEOC_frame_t);
+         break;
+#endif      /* #if (MEI_DRV_CLEAR_EOC_ENABLE == 1) */
+
+
+#if (MEI_SUPPORT_TEST_DEBUG == 1)
+      case FIO_MEI_MEI_REGS_SHOW:
+         MEI_MeiRegsShow(pMeiDev);
+         break;
+
+      case FIO_MEI_DRV_BUF_SHOW:
+         /* not further supported with driver version > 0.1.5.x */
+         MEI_DRVOS_CpyFromUser(
+            &local_args.show_drv_buf, (IOCTL_MEI_drvBufShow_t *)nArgument, sizeof(IOCTL_MEI_drvBufShow_t) );
+         MEI_ShowDrvBuffer(
+            pMeiDynCntrl, (IFX_int8_t)local_args.show_drv_buf.bufNum, local_args.show_drv_buf.count );
+         ret = -e_MEI_ERR_INVAL_CMD;
+         retSize = sizeof(IOCTL_MEI_drvBufShow_t);
+         break;
+
+      case FIO_MEI_DMA_TEST:
+         PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_WRN,
+                ("MEI_DRV: ioctl - FIO_MEI_DMA_TEST" MEI_DRV_CRLF));
+         /* get arguments use
+            dbgAddr: DMA dest address
+            count:   DMA range
+            dbgDest: test loop count*/
+         MEI_DRVOS_CpyFromUser(
+            &local_args.dbg_access, (IOCTL_MEI_dbgAccess_t *)nArgument, sizeof(IOCTL_MEI_dbgAccess_t) );
+
+         /* execute access */
+         ret = MEI_MeiDmaTest(
+                  pMeiDev, local_args.dbg_access.dbgAddr,
+                  local_args.dbg_access.count, local_args.dbg_access.dbgDest);
+         break;
+
+#endif
+
+      default:
+         PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_WRN,
+              ("MEI_DRV[%02d-%02d] Unknown IoCtl (0x%08X), arg 0x%08lX." MEI_DRV_CRLF,
+               MEI_DRV_LINENUM_GET(pMeiDev), pMeiDynCntrl->openInstance, nCmd, nArgument));
+         ret = -e_MEI_ERR_UNKNOWN_CMD;
+   }
+
+
+MEI_IOCTL_RETURN:
+
+   local_args.drv_ioctl.retCode = ret;
+   copy_to_user( ((IOCTL_MEI_arg_t *)nArgument), &local_args, retSize);
+
+   return (ret < 0) ? -1 : 0;
+}
+
+
+/**
+   LINUX: The select function of the driver.
+   A user space program may sleep until the driver wakes it up.
+
+\param
+      file_p - pointer to the file descriptor
+\param
+      wait   -
+
+\return
+   \li POLLIN - data available
+   \li 0 - no data
+   \li POLLERR - device pointer is zero
+*/
+static unsigned int MEI_Poll (struct file *filp, poll_table *wait)
+{
+   /* While open-time: MEI CPE dynamic struct is stored in filp->private_data */
+   MEI_DYN_CNTRL_T    *pDynCntrl  = (MEI_DYN_CNTRL_T *)filp->private_data;
+   MEI_DEV_T          *pMeiDev  = (pDynCntrl) ? pDynCntrl->pMeiDev : NULL;
+   MEI_DYN_NFC_DATA_T *pDynNfc    = (pDynCntrl) ? pDynCntrl->pInstDynNfc : NULL;
+
+   /* check device pointer */
+   if (pMeiDev == NULL)
+   {
+      PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+             ("MEI_DRV: Internal error - NULL device pointer" MEI_DRV_CRLF));
+      return POLLERR;
+   }
+
+   /* check NFC dynamic control pointer */
+   if (pDynNfc == NULL)
+   {
+      /* receive NFC is not supported */
+      PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+             ("MEI_DRV[%02d-%02d]: NFC not enabled - poll failed" MEI_DRV_CRLF,
+             MEI_DRV_LINENUM_GET(pMeiDev), (pDynCntrl) ? pDynCntrl->openInstance : 0xff));
+      return POLLERR;
+   }
+
+   MEI_DRVOS_SelectQueueAddTask(
+               (MEI_DRVOS_select_OSArg_t*) filp,
+               (MEI_DRVOS_selectQueue_t*)  &(pMeiDev->selNfcWakeupList),
+               (MEI_DRVOS_selectTable_t*)  wait);
+
+   if (pDynNfc->pRecvDataCntrl[pDynNfc->rdIdxRd].bufCtrl != MEI_RECV_BUF_CTRL_FREE)      /* buffer in use */
+   {
+      /* data available */
+      return POLLIN;
+   }
+   else
+   {
+      pMeiDev->bNfcNeedWakeUp = IFX_TRUE;
+   }
+
+   return 0;
+}
+
+
+
+#if (MEI_SUPPORT_IRQ == 1)
+
+/**
+   Calls the wrapped request_irq() and locks for further updates of
+   the interrupt wrapper functions.
+
+\param
+   usedIrq        - This is the interrupt number being requested.
+\param
+   usedIsrHandler - The pointer to the handling function being installed.
+\param
+   usedFlags      - A bit mask of options related to interrupt management.
+\param
+   pUsedDevName   - The string passed to request_irq is used in /proc/interrupts
+\param
+   pUsedDevId     - This pointer is used for shared interrupt lines.
+
+\return
+   0       in case of success.
+   else    if something goes wrong.
+
+\remark
+   Per default the LINUX standard request_irq() function is used.
+*/
+static int MEI_IfxRequestIrq( unsigned int usedIrq,
+                                usedIsrHandler_t usedIsrHandler,
+                                unsigned long usedFlags,
+                                const char *pUsedDevName,
+                                void *pUsedDevId)
+{
+
+   int ret;
+
+   /* here call the wrapped request_irq() function */
+   if ( (ret = MEI_RequestIrq_WrapLx( usedIrq,
+                                        usedIsrHandler, usedFlags,
+                                        pUsedDevName,  pUsedDevId) ) < 0 )
+   {
+      /* error while register ISR */
+      PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+             ("MEI_DRV: ERROR - WRAPPER request_irq() = %d" MEI_DRV_CRLF,
+               ret));
+
+      return ret;
+   }
+
+   /* from now on no further update is possible */
+   MEI_IntSetupLocked++;
+
+   PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_HIGH,
+          ("MEI_DRV: MEI_IfxRequestIrq(IRQ = %d, .., ), lock = %d" MEI_DRV_CRLF,
+          usedIrq, MEI_IntSetupLocked));
+
+   return ret;
+}
+
+/**
+   Calls the wrapped free_irq function and unlock for further updates of
+   the interrupt wrapper functions
+
+\param
+   usedIrq        - This is the interrupt number being requested.
+\param
+   pUsedDevId     - This pointer is used for shared interrupt lines.
+
+\return
+   none
+
+\remark
+   Per default the LINUX standard free_irq() function is used.
+*/
+static void MEI_IfxFreeIrq(unsigned int usedIrq, void *pUsedDevId)
+{
+   MEI_FreeIrq_WrapLx(usedIrq, pUsedDevId);
+
+   if (MEI_IntSetupLocked > 0)
+      MEI_IntSetupLocked--;
+
+   PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_WRN,
+          ("MEI_DRV: MEI_IfxFreeIrq(IRQ = %d, .., ), lock = %d" MEI_DRV_CRLF,
+          usedIrq, MEI_IntSetupLocked));
+
+   return;
+}
+
+
+/**
+   The driver interrupt shell.
+
+\param
+   irq - irq number
+\param
+   dev_id - private device data
+\param
+   regs - not used
+
+\return
+   None.
+
+\remark
+   None.
+*/
+static irqreturn_t MEI_InterruptLinux(int irq, void *dev_id, struct pt_regs *regs)
+{
+   IFX_int32_t    meiIntCnt = 0;
+   MEIX_CNTRL_T *pMeiXCntrlList = (MEIX_CNTRL_T*)dev_id;
+
+   pMeiXCntrlList->IRQ_Count++;
+
+   /* PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_LOW,
+            ("MEI_DRV: interrupt!" MEI_DRV_CRLF));*/
+
+   meiIntCnt = MEI_ProcessIntPerIrq(pMeiXCntrlList);
+
+   if (meiIntCnt)
+      pMeiXCntrlList->IRQ_Protection = MEI_IrqProtectCount;
+   else
+      pMeiXCntrlList->IRQ_Protection--;
+
+   if (pMeiXCntrlList->IRQ_Protection <= 0)
+   {
+      /* The OS signals available IRQ's but no interrupt found for processing */
+      PRN_ERR_INT_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_HIGH, (MEI_DRV_CRLF));
+      PRN_ERR_INT_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_HIGH,
+            ("MEI_DRV: IRQ setup - !!! FATAL ERROR !!!" MEI_DRV_CRLF));
+      PRN_ERR_INT_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_HIGH, (MEI_DRV_CRLF));
+      PRN_ERR_INT_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_HIGH,
+            ("MEI_DRV: +++  R I P   R I P   R I P  +++" MEI_DRV_CRLF));
+      PRN_ERR_INT_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_HIGH,
+            ("MEI_DRV: +++        - IRQ %02d  -      +++" MEI_DRV_CRLF,
+             pMeiXCntrlList->IRQ_Num));
+      PRN_ERR_INT_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_HIGH,
+            ("MEI_DRV: +++ -------- R I P -------- +++" MEI_DRV_CRLF));
+      PRN_ERR_INT_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_HIGH, (MEI_DRV_CRLF));
+
+      MEI_IfxFreeIrq(pMeiXCntrlList->IRQ_Num, pMeiXCntrlList);
+
+      /* mark all devices with config error */
+      MEI_DisableDevsPerIrq(pMeiXCntrlList);
+   }
+
+   return IRQ_RETVAL(1);
+}
+#endif
+
+
+#if CONFIG_PROC_FS
+/**
+   Read the version information from the driver.
+
+\param
+   buf destination buffer.
+
+\return
+   length
+*/
+static int MEI_GetVersionProc(char *buf)
+{
+    int len;
+
+    len = sprintf(buf, "%s" MEI_DRV_CRLF, &MEI_WHATVERSION[4]);
+
+    len += sprintf(buf + len, "Compiled on %s, %s for Linux kernel %s (jiffies: %ld)" MEI_DRV_CRLF,
+                   __DATE__, __TIME__, UTS_RELEASE, jiffies);
+
+    return len;
+}
+
+
+/**
+   Read the status information from the driver.
+
+\param
+   buf   destination buffer
+
+\param
+   entity MEIx device
+
+\return
+  length
+*/
+static int MEI_GetStatusProcPerDev(char *buf, int entity, int bufSize)
+{
+   int devNum, len=0;
+   MEI_DEV_T *pMeiDev;
+
+   if (entity < MEI_MAX_DFEX_ENTITIES)
+   {
+      len += sprintf(buf+len, "********************************" MEI_DRV_CRLF);
+      len += sprintf(buf+len, "pMEIX(%d) = 0x%08X" MEI_DRV_CRLF, entity, (int)MEIX_Cntrl[entity]);
+      len += sprintf(buf+len, "++++++++++++++++++++++++++++++++" MEI_DRV_CRLF);
+      if (MEIX_Cntrl[entity] != NULL)
+      {
+#if (MEI_SUPPORT_IRQ == 1)
+         len += sprintf(buf+len, "IRQ Count = %d" MEI_DRV_CRLF MEI_DRV_CRLF,
+                        MEIX_Cntrl[entity]->IRQ_Count);
+#endif
+         for (devNum=0; devNum < MEI_MAX_DFE_INSTANCE_PER_ENTITY; devNum++)
+         {
+
+            len += sprintf(buf+len, MEI_DRV_CRLF "pMeiCh[%d] = 0x%08X" MEI_DRV_CRLF,
+                                     (entity*MEI_MAX_DFE_INSTANCE_PER_ENTITY) + devNum,
+                                     (int)MEIX_Cntrl[entity]->MeiDevice[devNum]);
+            len += sprintf(buf+len, "--------------------------------" MEI_DRV_CRLF);
+
+            if (MEIX_Cntrl[entity]->MeiDevice[devNum] != NULL)
+            {
+               pMeiDev = MEIX_Cntrl[entity]->MeiDevice[devNum];
+
+               len += sprintf(buf+len, "HW Vers    = %5d\tMEI State   = %s" MEI_DRV_CRLF,
+                              pMeiDev->modemData.hwVersion,
+                              (MEI_DRV_MEI_IF_STATE_GET(pMeiDev))?
+                                 ((MEI_DRV_MEI_IF_STATE_GET(pMeiDev) == e_MEI_MEI_HW_STATE_UP)? "UP":"DOWN") : "unknown");
+
+               len += sprintf(buf+len, "bOpen      = %5d\tDrv State   = %5d\tModemFSM = %d" MEI_DRV_CRLF,
+                              pMeiDev->openCount,
+                              MEI_DRV_STATE_GET(pMeiDev),
+                              MEI_DRV_MODEM_STATE_GET(pMeiDev));
+
+#if (MEI_SUPPORT_STATISTICS == 1)
+               len += sprintf(buf+len, "DrvSwRst   = %5d\tMeiHwRst    = %5d" MEI_DRV_CRLF,
+                              pMeiDev->statistics.drvSwRstCount,
+                              pMeiDev->statistics.meiHwRstCount);
+               len += sprintf(buf+len, "GP1 Int    = %5d\tMsgAv Int   = %5d" MEI_DRV_CRLF,
+                              pMeiDev->statistics.dfeGp1IntCount,
+                              pMeiDev->statistics.dfeMsgAvIntCount);
+               len += sprintf(buf+len, "FwDownl    = %5d\tCodeSwap(%s) = %5d" MEI_DRV_CRLF,
+                              pMeiDev->statistics.fwDlCount,
+                              (MEI_BM7_CODESWAP_MEIDBG == 1) ? "M" : "D",
+                              pMeiDev->statistics.dfeCodeSwapCount);
+#if ((MEI_SUPPORT_TIME_TRACE == 1) && (MEI_SUPPORT_ROM_CODE == 1) && (MEI_SUPPORT_DL_DMA_CS == 1))
+               len += sprintf(buf+len, "FwDownlErr = %5d\tCS max Time = %5d [ms]" MEI_DRV_CRLF,
+                              pMeiDev->statistics.fwDlErrCount,
+                              pMeiDev->timeStat.processCsMax_ms);
+#else
+               len += sprintf(buf+len, "FwDownlErr = %5d" MEI_DRV_CRLF,
+                              pMeiDev->statistics.fwDlErrCount);
+#endif
+
+               len += sprintf(buf+len, "TxMsg      = %5d\tRxAck       = %5d" MEI_DRV_CRLF,
+                              pMeiDev->statistics.sendMsgCount,
+                              pMeiDev->statistics.recvAckCount);
+               len += sprintf(buf+len, "RxMsg      = %5d\tRxMsgDisc   = %5d" MEI_DRV_CRLF,
+                              pMeiDev->statistics.recvMsgCount,
+                              pMeiDev->statistics.recvMsgDiscardCount);
+               len += sprintf(buf+len, "RxMsgErr   = %5d\tTxMsgErr    = %5d" MEI_DRV_CRLF,
+                              pMeiDev->statistics.recvMsgErrCount,
+                              pMeiDev->statistics.errorCount);
+               len += sprintf(buf+len, "Nfc        = %5d\tNfcDisc     = %5d" MEI_DRV_CRLF,
+                              pMeiDev->statistics.recvNfcCount,
+                              pMeiDev->statistics.recvNfcDiscardCount);
+               len += sprintf(buf+len, "NfcDist    = %5d\tNfcDistDisc = %5d" MEI_DRV_CRLF MEI_DRV_CRLF,
+                              pMeiDev->statistics.recvNfcDistCount,
+                              pMeiDev->statistics.recvNfcDistDiscardCount);
+#endif   /* #if (MEI_SUPPORT_STATISTICS == 1) */
+
+#if (MEI_SUPPORT_TIME_TRACE == 1)
+               len += sprintf(buf+len, "WSendMin   = %5d\tWSendMax    = %5d [ms]" MEI_DRV_CRLF,
+                              pMeiDev->timeStat.waitSendMin_ms,
+                              pMeiDev->timeStat.waitSendMax_ms);
+               len += sprintf(buf+len, "WAckMin    = %5d\tWAckMax     = %5d [ms]" MEI_DRV_CRLF MEI_DRV_CRLF,
+                              pMeiDev->timeStat.waitAckMin_ms,
+                              pMeiDev->timeStat.waitAckMax_ms);
+
+#endif   /* #ifdef MEI_SUPPORT_TIME_TRACE */
+
+            }
+         }        /* for ( ; devNum<MEI_MAX_DFE_INSTANCE_PER_ENTITY; ) {...} */
+      }        /* if (MEIX_Cntrl[entity] != NULL) {...} */
+   }        /* if (entity < MEI_MAX_DFEX_ENTITIES) {...} */
+
+   return len;
+}
+
+
+
+#if (MEI_SUPPORT_DRV_NFC_DEBUG == 1)
+/**
+   Read the status information from the driver.
+
+\param
+   buf   destination buffer
+
+\param
+   entity MEIx device
+
+\return
+  length
+*/
+static int MEI_GetNfcProcPerDev(char *buf, int entity, int bufSize)
+{
+   int devNum, len=0;
+   MEI_DEV_T *pMeiDev;
+
+   if (entity < MEI_MAX_DFEX_ENTITIES)
+   {
+      len += sprintf(buf+len, "********************************" MEI_DRV_CRLF);
+      len += sprintf(buf+len, "pMEIX(%d) = 0x%08X" MEI_DRV_CRLF, entity, (int)MEIX_Cntrl[entity]);
+      len += sprintf(buf+len, "++++++++++++++++++++++++++++++++" MEI_DRV_CRLF);
+      if (MEIX_Cntrl[entity] != NULL)
+      {
+         for (devNum=0; devNum<MEI_MAX_DFE_INSTANCE_PER_ENTITY; devNum++)
+         {
+            if (MEIX_Cntrl[entity]->MeiDevice[devNum] != NULL)
+            {
+               pMeiDev = MEIX_Cntrl[entity]->MeiDevice[devNum];
+
+               len += MEI_ShowNfcData(pMeiDev, buf+len, bufSize - len);
+               len += sprintf(buf+len, MEI_DRV_CRLF MEI_DRV_CRLF);
+            }
+         }        /* for ( ; devNum<MEI_MAX_DFE_INSTANCE_PER_ENTITY; ) {...} */
+      }        /* if (MEIX_Cntrl[entity] != NULL) {...} */
+   }        /* if (entity < MEI_MAX_DFEX_ENTITIES) {...} */
+
+   return len;
+}
+#endif
+
+/**
+   The proc filesystem: function to read and entry.
+
+\param
+   page
+\param
+   start
+\param
+   off
+\param
+   count
+\param
+   eof
+\param
+   data
+
+\return
+   length
+*/
+static int MEI_ReadProc(char *page, char **start, off_t off,
+                              int count, int *eof, void *data)
+{
+   int len;
+
+   int (*fn)(char *buf);
+
+   if (data != NULL)
+   {
+       fn = (int (*)(char*))data;
+       len = fn(page);
+   }
+   else
+       return 0;
+
+   if (len <= off+count)
+       *eof = 1;
+   *start = page + off;
+   len -= off;
+   if (len>count)
+       len = count;
+   if (len<0)
+       len = 0;
+
+   return len;
+}
+
+/**
+   The proc filesystem: function to read an status entry (per MEIx device).
+
+\param
+   page
+\param
+   start
+\param
+   off
+\param
+   count
+\param
+   eof
+\param
+   data
+
+\return
+   length
+*/
+static int MEI_ReadProcPerDev(char *page, char **start, off_t off,
+                                    int count, int *eof, void *data)
+{
+   int len = 0, entity = (int)data;
+
+   /* check if device is valid */
+   if (entity >= MEI_MAX_DFEX_ENTITIES)
+      return 0;
+
+   /* get status per device */
+   len = MEI_GetStatusProcPerDev(page, entity, count-off);
+
+   if (len <= off+count)
+       *eof = 1;
+
+   *start = page + off;
+   len -= off;
+
+   if (len>count)
+       len = count;
+
+   if (len<0)
+       len = 0;
+
+   return len;
+}
+
+#if (MEI_SUPPORT_DRV_NFC_DEBUG == 1)
+/**
+   The proc filesystem: function to read NFC status (per MEIx device).
+
+\param
+   page
+\param
+   start
+\param
+   off
+\param
+   count
+\param
+   eof
+\param
+   data
+
+\return
+   length
+*/
+static int MEI_ReadProcNfcPerDev(char *page, char **start, off_t off,
+                                   int count, int *eof, void *data)
+{
+   int len = 0, entity = (int)data;
+
+   /* check if device is valid */
+   if (entity >= MEI_MAX_DFEX_ENTITIES)
+      return 0;
+
+   /* get status per device */
+   len = MEI_GetNfcProcPerDev(page, entity, count-off);
+
+   if (len <= off+count)
+       *eof = 1;
+
+   *start = page + off;
+   len -= off;
+
+   if (len>count)
+       len = count;
+
+   if (len<0)
+       len = 0;
+
+   return len;
+}
+#endif
+
+
+/**
+   Initialize and install the proc entry
+
+\param
+   devName
+
+\return
+   -1 or 0 on success
+\remark
+   Called by the kernel.
+*/
+static int MEI_InstallProcEntry(unsigned char devNum)
+{
+   int entity;
+   struct proc_dir_entry *driver_proc_node;
+   struct proc_dir_entry *driver_status_proc_node;
+
+   /* install the proc entry */
+   PRN_DBG_USR_NL( MEI_DRV,MEI_DRV_PRN_LEVEL_LOW,
+         ("MEI_DRV: using proc fs" MEI_DRV_CRLF));
+
+   driver_proc_node = proc_mkdir( "driver/" DRV_MEI_NAME, NULL);
+   if (driver_proc_node != NULL)
+   {
+      create_proc_read_entry( "version" , S_IFREG|S_IRUGO,
+                             driver_proc_node, MEI_ReadProc, (void *)MEI_GetVersionProc );
+
+#if (MEI_SUPPORT_PROCFS_CONFIG == 1)
+      MEI_InstallProcEntryConfig(driver_proc_node);
+#endif
+   }
+   else
+   {
+      PRN_DBG_USR_NL( MEI_DRV,MEI_DRV_PRN_LEVEL_HIGH,
+            ("MEI_DRV: cannot create proc entry version" MEI_DRV_CRLF));
+      return -e_MEI_ERR_DEV_INIT;
+   }
+
+   driver_status_proc_node = proc_mkdir( "driver/" DRV_MEI_NAME "/status", NULL);
+   if (driver_status_proc_node != NULL)
+   {
+      for (entity = 0; entity < MEI_MAX_DFEX_ENTITIES; entity++)
+      {
+         char buf[8];
+         sprintf(buf,"%02d",entity);
+         create_proc_read_entry( buf , S_IFREG|S_IRUGO,
+                                 driver_status_proc_node, MEI_ReadProcPerDev, (void *)entity );
+      }
+   }
+   else
+   {
+      PRN_DBG_USR_NL( MEI_DRV,MEI_DRV_PRN_LEVEL_HIGH,
+            ("MEI_DRV: cannot create proc entry status" MEI_DRV_CRLF));
+      return -e_MEI_ERR_DEV_INIT;
+   }
+
+
+#if (MEI_SUPPORT_DRV_NFC_DEBUG == 1)
+   driver_status_proc_node = proc_mkdir( "driver/" DRV_MEI_NAME "/nfc", NULL);
+   if (driver_status_proc_node != NULL)
+   {
+      for (entity = 0; entity < MEI_MAX_DFEX_ENTITIES; entity++)
+      {
+         char buf[8];
+         sprintf(buf,"%02d",entity);
+         create_proc_read_entry( buf , S_IFREG|S_IRUGO,
+                                 driver_status_proc_node, MEI_ReadProcNfcPerDev, (void *)entity );
+      }
+   }
+   else
+   {
+      PRN_DBG_USR_NL( MEI_DRV,MEI_DRV_PRN_LEVEL_HIGH,
+            ("MEI_DRV: cannot create proc entry nfc" MEI_DRV_CRLF));
+      return -e_MEI_ERR_DEV_INIT;
+   }
+#endif
+
+   return 0;
+}
+#endif
+
+/**
+   Initialize the module (support devfs - device file system)
+
+   \return
+   Error code or 0 on success
+   \remark
+   Called by the kernel.
+*/
+static int __init MEI_module_init (void)
+{
+   int result;
+
+   printk(KERN_INFO "%s" MEI_DRV_CRLF, &MEI_WHATVERSION[4]);
+   printk(KERN_INFO "(c) Copyright 2009, Infineon Technologies AG" MEI_DRV_CRLF);
+
+   printk(KERN_INFO "### MEI CPE - MEI CPE - MEI CPE - MEI CPE ###" MEI_DRV_CRLF);
+
+   MEI_DRV_PRN_USR_LEVEL_SET(MEI_DRV, debug_level);
+   MEI_DRV_PRN_INT_LEVEL_SET(MEI_DRV, debug_level);
+
+#if (MEI_SUPPORT_ROM_CODE == 1)
+   MEI_DRV_PRN_USR_LEVEL_SET(MEI_ROM, debug_level);
+   MEI_DRV_PRN_INT_LEVEL_SET(MEI_ROM, debug_level);
+#endif
+
+   MEI_DRV_PRN_USR_LEVEL_SET(MEI_MEI_ACCESS, debug_level);
+   MEI_DRV_PRN_INT_LEVEL_SET(MEI_MEI_ACCESS, debug_level);
+
+   MEI_FsmStateSetMsgPreAction = (IFX_uint32_t)(fsm_set_pre_action & MEI_FSM_STATE_SET_PRE_ACT_ALL);
+
+   /* ============================================
+      register device
+      ============================================ */
+   result = MEI_InitModuleRegCharDev(DRV_MEI_NAME);
+   if (result != 0)
+   {
+      MEI_module_exit();
+      return (result);
+   }
+
+   /* ============================================
+      Do common init_module() stuff
+      ============================================ */
+   result = MEI_InitModuleBasics();
+   if (result != 0)
+   {
+      MEI_module_exit();
+      return (result);
+   }
+
+   return 0;
+}
+
+/**
+   Clean up the module if unloaded.
+
+   \remark
+   Called by the kernel.
+*/
+static void __exit MEI_module_exit (void)
+{
+   int entity;
+   int channel_num;
+   char path[255];
+
+#if (MEI_SUPPORT_PERIODIC_TASK == 1)
+   if ( MEI_DrvCntrlThreadParams.bValid == IFX_TRUE)
+   {
+      PRN_DBG_USR_NL( MEI_DRV,MEI_DRV_PRN_LEVEL_HIGH,
+            ("MEI_DRV: stop Periodic Task" MEI_DRV_CRLF));
+
+      MEI_DRVOS_ThreadDelete(&MEI_DrvCntrlThreadParams);
+   }
+#endif   /* #if (MEI_SUPPORT_PERIODIC_TASK == 1) */
+
+   PRN_DBG_USR_NL( MEI_DRV,MEI_DRV_PRN_LEVEL_HIGH,
+         ("MEI_DRV: MEI IRQ list" MEI_DRV_CRLF));
+
+   /* release the MEIx IRQ list */
+   for (entity = 0; entity < MEI_MAX_DFEX_ENTITIES; entity++)
+   {
+      if (!MEIX_Cntrl[entity])
+         continue;
+
+      if ( (MEIX_Cntrl[entity]->IRQ_Base != 0) &&
+           (MEIX_Cntrl[entity]->IRQ_Base != 99) )
+      {
+         PRN_DBG_USR_NL( MEI_DRV,MEI_DRV_PRN_LEVEL_HIGH,
+               ("MEI_DRV: MEIx[%02d] free IRQ %d (%s)" MEI_DRV_CRLF,
+                entity, MEIX_Cntrl[entity]->IRQ_Base,
+                DRV_MEI_NAME));
+
+         /* free interrupt and clear list */
+         MEI_IfxFreeIrq( (int)MEIX_Cntrl[entity]->IRQ_Base,
+                         (void *)MEIX_Cntrl[entity] );
+         MEIX_Cntrl[entity]->IRQ_Base = 0;
+
+         MEI_VnxXDevFromIrqListClear(MEIX_Cntrl[entity]);
+      }
+   }
+
+   PRN_DBG_USR_NL( MEI_DRV,MEI_DRV_PRN_LEVEL_HIGH,
+         ("MEI_DRV: free dynamic data" MEI_DRV_CRLF));
+
+   /* Free the dynamic allocated memory and memory mapping */
+   for (channel_num = 0; channel_num < MEI_MAX_DFE_CHAN_DEVICES; channel_num++)
+   {
+      MEI_DevLineStructFree(channel_num);
+   }
+
+   PRN_DBG_USR_NL( MEI_DRV,MEI_DRV_PRN_LEVEL_HIGH,
+         ("MEI_DRV: free static data" MEI_DRV_CRLF));
+
+   for (entity = 0; entity < MEI_MAX_DFEX_ENTITIES; entity++)
+   {
+      MEI_DevXCntrlStructFree(entity);
+   }
+
+#ifdef CONFIG_DEVFS_FS
+
+   PRN_DBG_USR_NL( MEI_DRV,MEI_DRV_PRN_LEVEL_HIGH,
+         ("MEI_DRV: remove MEI devs" MEI_DRV_CRLF));
+
+   /* remove MEI CPE channel devices */
+   for (channel_num=0; channel_num < MEI_MAX_DFE_CHAN_DEVICES; channel_num++)
+   {
+      if (MEI_dev_handle[channel_num])
+      {
+         PRN_DBG_USR( MEI_DRV,MEI_DRV_PRN_LEVEL_HIGH, channel_num,
+               ("MEI_DRV: removing device /%s/%d/" MEI_DRV_CRLF,
+                DRV_MEI_NAME,
+                channel_num));
+         devfs_unregister (MEI_dev_handle[channel_num]);
+      }
+   }
+
+   PRN_DBG_USR_NL( MEI_DRV,MEI_DRV_PRN_LEVEL_HIGH,
+         ("MEI_DRV: remove control devs" MEI_DRV_CRLF));
+
+   /* remove MEI CPE chip control devices */
+   for (entity=0; entity < MEI_MAX_DFEX_ENTITIES; entity++)
+   {
+      if (MEI_cntrl_handle[entity])
+      {
+         PRN_DBG_USR_NL( MEI_DRV,MEI_DRV_PRN_LEVEL_HIGH,
+               ("MEI_DRV: removing device /%s/%s%d/" MEI_DRV_CRLF,
+                DRV_MEI_NAME,
+                DRV_MEI_CNTRL_PREFIX,
+                entity));
+         devfs_unregister (MEI_cntrl_handle[entity]);
+      }
+   }
+
+   PRN_DBG_USR_NL( MEI_DRV,MEI_DRV_PRN_LEVEL_HIGH,
+         ("MEI_DRV: remove devfs handles" MEI_DRV_CRLF));
+
+   /* remove chip base directory /dev/MEIX/<chip_no> from dev fs*/
+   if (MEI_base_dir_handle)
+   {
+      PRN_DBG_USR_NL( MEI_DRV,MEI_DRV_PRN_LEVEL_HIGH,
+            ("MEI_DRV: removing device dir /%s" MEI_DRV_CRLF, DRV_MEI_NAME));
+      devfs_unregister (MEI_base_dir_handle);
+   }
+
+#else
+   unregister_chrdev ( major_number , DRV_MEI_NAME );
+#endif
+
+#if CONFIG_PROC_FS
+
+   PRN_DBG_USR_NL( MEI_DRV,MEI_DRV_PRN_LEVEL_HIGH,
+         ("MEI_DRV: cleanup procfs: /%s" MEI_DRV_CRLF, DRV_MEI_NAME) );
+
+   sprintf(path, "%s%s%s", "driver/", DRV_MEI_NAME, "/version");
+   PRN_DBG_USR_NL( MEI_DRV,MEI_DRV_PRN_LEVEL_HIGH,
+         ("MEI_DRV: remove procfs entry: %s" MEI_DRV_CRLF, path));
+   remove_proc_entry(path ,0);
+   for (entity = 0; entity < MEI_MAX_DFEX_ENTITIES; entity++)
+   {
+      sprintf(path, "%s%s%s/%02d", "driver/", DRV_MEI_NAME, "/status", entity);
+      PRN_DBG_USR_NL( MEI_DRV,MEI_DRV_PRN_LEVEL_HIGH,
+            ("MEI_DRV: remove procfs entry: %s" MEI_DRV_CRLF, path));
+      remove_proc_entry(path ,0);
+   }
+   sprintf(path, "%s%s%s", "driver/", DRV_MEI_NAME, "/status");
+   PRN_DBG_USR_NL( MEI_DRV,MEI_DRV_PRN_LEVEL_HIGH,
+         ("MEI_DRV: remove procfs entry: %s" MEI_DRV_CRLF, path));
+   remove_proc_entry(path ,0);
+#if (MEI_SUPPORT_DRV_NFC_DEBUG == 1)
+   for (entity = 0; entity < MEI_MAX_DFEX_ENTITIES; entity++)
+   {
+      sprintf(path, "%s%s%s/%02d", "driver/", DRV_MEI_NAME, "/nfc", entity);
+      PRN_DBG_USR_NL( MEI_DRV,MEI_DRV_PRN_LEVEL_HIGH,
+            ("MEI_DRV: remove procfs entry: %s" MEI_DRV_CRLF, path));
+      remove_proc_entry(path ,0);
+   }
+   sprintf(path, "%s%s%s", "driver/", DRV_MEI_NAME, "/nfc");
+   PRN_DBG_USR_NL( MEI_DRV,MEI_DRV_PRN_LEVEL_HIGH,
+         ("MEI_DRV: remove procfs entry: %s" MEI_DRV_CRLF, path));
+   remove_proc_entry(path ,0);
+#endif /* (MEI_SUPPORT_DRV_NFC_DEBUG == 1) */
+
+   sprintf(path, "%s%s%s", "driver/", DRV_MEI_NAME, "/config");
+   PRN_DBG_USR_NL( MEI_DRV,MEI_DRV_PRN_LEVEL_HIGH,
+         ("MEI_DRV: remove procfs entry: %s" MEI_DRV_CRLF, path));
+   remove_proc_entry(path ,0);
+
+   sprintf(path, "%s%s", "driver/", DRV_MEI_NAME);
+   PRN_DBG_USR_NL( MEI_DRV,MEI_DRV_PRN_LEVEL_HIGH,
+         ("MEI_DRV: remove procfs entry: %s" MEI_DRV_CRLF, path));
+   remove_proc_entry(path ,0);
+#endif
+
+   PRN_DBG_USR_NL( MEI_DRV,MEI_DRV_PRN_LEVEL_NORMAL,
+         ("MEI_DRV: cleanup successful" MEI_DRV_CRLF));
+
+   if (MEI_BasicChipExit() != IFX_SUCCESS)
+   {
+      PRN_DBG_USR_NL( MEI_DRV,MEI_DRV_PRN_LEVEL_ERR,
+            ("MEI_DRV: Chipset Basic Exit failed" MEI_DRV_CRLF));
+   }
+
+   /* touch one time this variable to avoid that the linker will remove it */
+   debug_level = MEI_DRV_PRN_LEVEL_OFF;
+   return;
+}
+
+
+/**
+   Register the given device to the device node.
+
+\param
+   devName  device name
+
+\return
+   0: success
+   <0 in case of errors
+*/
+static int MEI_InitModuleRegCharDev(const char *devName)
+{
+#ifdef CONFIG_DEVFS_FS
+   /* ============================================
+      create and setup devfs, register device
+      ============================================ */
+
+   int entity, dfe_ch;
+   char buf[10];
+
+   /* clear devfs structures */
+   memset (&(MEI_cntrl_handle), 0x00, sizeof (MEI_cntrl_handle));
+   memset (&(MEI_dev_handle), 0x00, sizeof(MEI_dev_handle));
+
+   if (!(MEI_base_dir_handle = devfs_mk_dir(NULL, devName, NULL)))
+   {
+      PRN_DBG_USR_NL( MEI_DRV,MEI_DRV_PRN_LEVEL_HIGH,
+            ("MEI_DRV: Unable to create %s base directory in dev_fs" MEI_DRV_CRLF,
+              DRV_MEI_NAME));
+      return -e_MEI_ERR_DEV_INIT;
+   }
+
+   /* create MEI CPE chip control devices */
+   for (entity=0; entity < MEI_MAX_DFEX_ENTITIES; entity++)
+   {
+      /* add MEI CPE chip control devices to dev fs */
+      sprintf (buf, "%s%d", DRV_MEI_CNTRL_PREFIX, entity);
+
+      /* private_data contains device number for open function
+         instead of minor number (dynamically assigned by dev_fs) */
+      if ( ( MEI_cntrl_handle[entity] = devfs_register(
+                  MEI_base_dir_handle,
+                  buf,
+                  DEVFS_FL_DEFAULT /* DEVFS_FL_AUTO_DEVNUM */,
+                  major_number,
+                  entity | MEI_ENTITY_CNTRL_DEVICE,
+                  S_IFCHR | S_IRUGO | S_IWUGO,
+                  &MEI_fops,
+                  (void*)( 0 ) )
+           ) == NULL)
+      {
+         PRN_DBG_USR_NL( MEI_DRV,MEI_DRV_PRN_LEVEL_HIGH,
+                ("MEI_DRV: unable to add device %s/%s to dev_fs" MEI_DRV_CRLF,
+                 devName, buf));
+         return -e_MEI_ERR_DEV_INIT;
+      }
+   }
+
+   /* create MEI CPE channel devices */
+   for (dfe_ch=0; dfe_ch < MEI_MAX_DFE_CHAN_DEVICES; dfe_ch++)
+   {
+      /* add MEI CPE channel devices to dev fs */
+      sprintf (buf, "%d", dfe_ch);
+
+      /* private_data contains device number for open function
+         instead of minor number (dynamically assigned by dev_fs) */
+      if ( ( MEI_dev_handle[dfe_ch] = devfs_register(
+                  MEI_base_dir_handle,
+                  buf,
+                  DEVFS_FL_DEFAULT /* DEVFS_FL_AUTO_DEVNUM */,
+                  major_number,
+                  dfe_ch & MEI_CHANNEL_DEVICE_MASK,
+                  S_IFCHR | S_IRUGO | S_IWUGO,
+                  &MEI_fops,
+                  (void*)( 0 ) )
+           ) == NULL)
+      {
+         PRN_DBG_USR_NL( MEI_DRV,MEI_DRV_PRN_LEVEL_HIGH,
+                ("MEI_DRV: unable to add device %s/%s to dev_fs" MEI_DRV_CRLF,
+                 devName, buf));
+         return -e_MEI_ERR_DEV_INIT;
+      }
+   }
+
+   return 0;
+
+#else       /* CONFIG_DEVFS_FS */
+   /* ============================================
+      register device
+      ============================================ */
+
+   int result;
+
+   result = register_chrdev( major_number , DRV_MEI_NAME, &MEI_fops);
+   if ( result < 0 )
+   {
+      PRN_DBG_USR_NL( MEI_DRV,MEI_DRV_PRN_LEVEL_HIGH,
+            ("MEI_DRV: device %s - can't get major %d" MEI_DRV_CRLF,
+              devName, major_number));
+      return result;
+   }
+   /* dynamic major                       */
+   if ( major_number == 0 )
+   {
+      major_number = result;
+      PRN_DBG_USR_NL( MEI_DRV,MEI_DRV_PRN_LEVEL_HIGH,
+            ("Using major number %d" MEI_DRV_CRLF, major_number));
+   }
+
+   return 0;
+#endif      /* CONFIG_DEVFS_FS */
+}
+
+/**
+   Do the common init module stuff (with or without devfs).
+*/
+static int MEI_InitModuleBasics(void)
+{
+   /* reset the chip control structure */
+   memset(MEIX_Cntrl, 0x00, sizeof(MEIX_Cntrl));
+
+#if (MEI_SUPPORT_DL_DMA_CS == 1)
+   /* Reset firmware image cntrl block */
+   memset(&ChipFwImage, 0x00, sizeof(ChipFwImage[MEI_MAX_FW_IMAGES]));
+#endif /* #if (MEI_SUPPORT_DL_DMA_CS == 1)*/
+
+   if (MEI_DRVOS_SemaphoreInit(&pFwDlCntrlLock) != IFX_SUCCESS)
+   {
+      PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+            ("MEI_DRV: ERROR - Init FW DL control lock" MEI_DRV_CRLF));
+      return -1;
+   }
+
+#if CONFIG_PROC_FS
+   /* create and install proc file system */
+   MEI_InstallProcEntry(0);
+#endif
+
+   if (MEI_BasicChipInit() != IFX_SUCCESS)
+   {
+      PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+            ("MEI_DRV: ERROR - Chipset Basic Init failed!" MEI_DRV_CRLF));
+      return -1;
+   }
+
+   return 0;
+}
+
+
+/**
+   Init the corresponding device.
+
+\param
+   pMeiDynCntrl   - private dynamic device data (per open instance)
+\param
+   pInitDev       - init information data
+
+\return
+   0: success
+   else < 0 in case of error
+
+*/
+IFX_int32_t MEI_IoctlInitDevice(
+                              MEI_DYN_CNTRL_T     *pMeiDynCntrl,
+                              IOCTL_MEI_devInit_t *pInitDev)
+{
+   int ret = 0;
+   MEI_DEV_T    *pMeiDev = pMeiDynCntrl->pMeiDev;
+
+   PRN_DBG_USR( MEI_DRV, MEI_DRV_PRN_LEVEL_LOW, MEI_DRV_LINENUM_GET(pMeiDev),
+          ("MEI_DRV[%02d]: ioctl - FIO_MEI_DEV_INIT "
+           "base addr = 0x%08X, IRQ = %d" MEI_DRV_CRLF,
+            MEI_DRV_LINENUM_GET(pMeiDev),
+            (IFX_uint32_t)pInitDev->meiBaseAddr, (IFX_uint32_t)pInitDev->usedIRQ));
+
+   MEI_MsgIntSet(pMeiDev);
+
+#if (MEI_MAX_DFE_INSTANCE_PER_ENTITY != MEI_MAX_MEI_IF_PER_DEVICE)
+   /* Check for SLAVE lines (VRx related only)*/
+   if (MEI_DRV_LINENUM_GET(pMeiDev) % MEI_MAX_DFE_INSTANCE_PER_ENTITY)
+   {
+      MEIX_CNTRL_T *pXCntrl = NULL;
+      MEI_DEV_T    *pMeiDevMaster = NULL;
+      int entity;
+
+      entity = MEI_GET_ENTITY_FROM_DEVNUM(MEI_DRV_LINENUM_GET(pMeiDev));
+
+      if ( (pXCntrl = MEIX_Cntrl[entity]) == NULL)
+      {
+         PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+               ("MEI_DRV[%02d]: ERROR Line Struct Allocate - "
+                "missing MEIX[%d] entity struct" MEI_DRV_CRLF,
+                MEI_DRV_LINENUM_GET(pMeiDev), entity));
+
+         return -e_MEI_ERR_DEV_INIT;
+      }
+
+      if ( pXCntrl->MeiDevice[0] == NULL)
+      {
+         PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+               ("MEI_DRV[%02d]: MASTER line not exists yet" MEI_DRV_CRLF,
+               MEI_DRV_LINENUM_GET(pMeiDev)));
+
+         return -e_MEI_ERR_DEV_INIT;
+      }
+
+      pMeiDevMaster = pXCntrl->MeiDevice[0];
+
+      /* Check for the MASTER line INIT_DONE and copy config to the SLAVE line*/
+      if (MEI_DRV_STATE_GET(pMeiDevMaster) == e_MEI_DRV_STATE_NOT_INIT)
+      {
+         PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+               ("MEI_DRV[%02d]: MASTER line not initialized yet, please init it first"
+               MEI_DRV_CRLF, MEI_DRV_LINENUM_GET(pMeiDev)));
+
+         return -e_MEI_ERR_DEV_INIT;
+      }
+
+      MEI_DRV_MEI_VIRT_ADDR_SET(pMeiDev, MEI_DRV_MEI_VIRT_ADDR_GET(pMeiDevMaster));
+
+      MEI_DRV_MEI_PHY_ADDR_SET(pMeiDev, MEI_DRV_MEI_PHY_ADDR_GET(pMeiDevMaster));
+
+      MEI_DRV_MEI_IF_STATE_SET(pMeiDev, MEI_DRV_MEI_IF_STATE_GET(pMeiDevMaster));
+
+      pMeiDev->eModePoll = pMeiDevMaster->eModePoll;
+      pMeiDev->intMask   = pMeiDevMaster->intMask;
+
+      MEI_DRV_STATE_SET(pMeiDev,  MEI_DRV_STATE_GET(pMeiDevMaster));
+
+      return ret;
+   }
+#endif /* #if (MEI_MAX_DFE_INSTANCE_PER_ENTITY != MEI_MAX_MEI_IF_PER_DEVICE)*/
+
+
+   /*
+      Do IO remap
+   */
+   if ( (ret = MEI_DRVOS_Phy2VirtMap( pInitDev->meiBaseAddr,
+                                      sizeof(MEI_MEI_REG_IF_U),
+                                      (IFX_char_t*)DRV_MEI_NAME,
+                                      (IFX_uint8_t **)(&pMeiDev->meiDrvCntrl.pMeiIfCntrl->pVirtMeiRegIf) )
+        ) != IFX_SUCCESS)
+   {
+      PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+             ("MEI_DRV[%02d]: ERROR - INIT DEVICE, IO remap" MEI_DRV_CRLF,
+             MEI_DRV_LINENUM_GET(pMeiDev)));
+
+      return -e_MEI_ERR_DEV_IO_MAP;
+   }
+
+   MEI_DRV_MEI_PHY_ADDR_SET(pMeiDev, pInitDev->meiBaseAddr);
+
+   /* check HW access */
+   if ( (ret = MEI_MeiRegisterDetect(pMeiDev)) != IFX_SUCCESS)
+   {
+      PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+             ("MEI_DRV[%02d]: ERROR - INIT DEVICE, HW failure" MEI_DRV_CRLF,
+             MEI_DRV_LINENUM_GET(pMeiDev)));
+
+      goto MEI_IOCTL_INITDEV_BASIC_ERROR;
+   }
+
+   PRN_DBG_USR( MEI_DRV, MEI_DRV_PRN_LEVEL_LOW, MEI_DRV_LINENUM_GET(pMeiDev),
+          ("MEI_DRV[%02d]: PHY2VIRT MAP, phy addr = 0x%08X, virt addr = 0x%08X" MEI_DRV_CRLF,
+            MEI_DRV_LINENUM_GET(pMeiDev), MEI_DRV_MEI_PHY_ADDR_GET(pMeiDev),
+            (IFX_uint32_t)(MEI_DRV_MEI_VIRT_ADDR_GET(pMeiDev))));
+
+   /*
+      Init device
+      - MEI reset
+      - mask interrupts, clear interrupts
+      - get Device info
+      NOTE:
+         MEI Block reset and clear interrupts depends on the
+         resetMode param.
+   */
+   if ( (ret = MEI_DefaultInitDevice(pMeiDev, 0)) < 0 )
+   {
+      PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+             ("MEI_DRV[%02d]: ERROR - INIT DEVICE, Reset device, get device info" MEI_DRV_CRLF,
+             MEI_DRV_LINENUM_GET(pMeiDev)));
+
+      goto MEI_IOCTL_INITDEV_BASIC_ERROR;
+   }
+
+   if ( (pInitDev->usedIRQ == 0) || (pInitDev->usedIRQ == 99) )
+   {
+      PRN_DBG_USR( MEI_DRV, MEI_DRV_PRN_LEVEL_HIGH, MEI_DRV_LINENUM_GET(pMeiDev),
+             ("MEI_DRV[%02d]: INIT DEVICE - NO INTERUPTS --> %s POLL MODE" MEI_DRV_CRLF,
+             MEI_DRV_LINENUM_GET(pMeiDev), (pInitDev->usedIRQ == 0) ? "PASSIVE" : "ACTIVE" ));
+   }
+
+   switch (pInitDev->usedIRQ)
+   {
+      case 0:
+         /* IRQ = 0: passive poll mode */
+         pMeiDynCntrl->pDfeX->IRQ_Num = 0;
+         pMeiDev->eModePoll = e_MEI_DEV_ACCESS_MODE_PASSIV_POLL;
+         pMeiDev->intMask = 0;
+         break;
+
+      case 99:
+#if (MEI_SUPPORT_PERIODIC_TASK == 1)
+         /* IRQ = 99: active poll mode */
+         pMeiDynCntrl->pDfeX->IRQ_Num = 99;
+         pMeiDev->eModePoll = e_MEI_DEV_ACCESS_MODE_ACTIV_POLL;
+         pMeiDev->intMask   = 0;
+
+         /* check if the periodic task is already running */
+         if ( MEI_DrvCntrlThreadParams.bValid == IFX_FALSE)
+         {
+            PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_HIGH,
+                  ("MEI_DRV[%02d]: Start Driver Control Thread" MEI_DRV_CRLF,
+                   MEI_DRV_LINENUM_GET(pMeiDev)));
+
+            if (MEI_DRVOS_ThreadInit(&MEI_DrvCntrlThreadParams,
+                                    "VnxCtrl",
+                                    MEI_DrvCntrlThr,
+                                    0, 0) != IFX_SUCCESS)
+            {
+               PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+                     ("MEI_DRV[%02d]: ERROR - start Driver Control Thread" MEI_DRV_CRLF,
+                       MEI_DRV_LINENUM_GET(pMeiDev)));
+            }
+         }
+         else
+         {
+            PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_HIGH,
+                  ("MEI_DRV[%02d]: Driver Control Thread - already running" MEI_DRV_CRLF,
+                    MEI_DRV_LINENUM_GET(pMeiDev)));
+
+         }
+#else
+         PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+               ("MEI_DRV[%02d]: ERROR - IRQ 99 not supported without periodical task" MEI_DRV_CRLF,
+                 MEI_DRV_LINENUM_GET(pMeiDev)));
+
+         ret = -e_MEI_ERR_INVAL_BASE_CFG;
+         goto MEI_IOCTL_INITDEV_BASIC_ERROR;
+#endif   /* #if (MEI_SUPPORT_PERIODIC_TASK == 1) */
+         break;
+
+      default:
+#if (MEI_SUPPORT_IRQ == 1)
+         {
+            /*
+               Check if the given IRQ already in use
+               - add to existing list (return NULL already registered)
+               - create a new list and return the list root
+            */
+            MEIX_CNTRL_T *pTmpXCntrl;
+
+            pMeiDev->eModePoll = e_MEI_DEV_ACCESS_MODE_IRQ;
+            pMeiDev->intMask   = ME_ARC2ME_INTERRUPT_UNMASK_ALL;
+
+            pTmpXCntrl = MEI_VnxXDevToIrqListAdd(
+                                          MEI_DRV_LINENUM_GET(pMeiDev),
+                                          (IFX_uint32_t)pInitDev->usedIRQ,
+                                          pMeiDynCntrl->pDfeX);
+            if (pTmpXCntrl)
+            {
+               if ( (ret = MEI_IfxRequestIrq( pTmpXCntrl->IRQ_Num,
+                                              MEI_InterruptLinux,
+                                              MEI_DRVOS_IRQ_FLAGS_GET(pInitDev->usedIRQ),
+                                              DRV_MEI_NAME,
+                                              (void *)pTmpXCntrl)
+                    ) < 0 )
+               {
+                  /* error while register ISR */
+                  PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+                        ("MEI_DRV[%02d]: ERROR - INIT DEVICE, ifx_request_irq() = %d" MEI_DRV_CRLF,
+                          MEI_DRV_LINENUM_GET(pMeiDev), ret));
+
+                  ret = -e_MEI_ERR_INVAL_BASE_CFG;
+                  goto MEI_IOCTL_INITDEV_BASIC_ERROR;
+               }
+            }
+         }
+#else
+         PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+               ("MEI_DRV[%02d]: ERROR - MEI CPE Driver IRQ Support not enabled" MEI_DRV_CRLF,
+                 MEI_DRV_LINENUM_GET(pMeiDev)));
+
+         MEI_DRV_STATE_SET(pMeiDev, e_MEI_DRV_STATE_CFG_ERROR);
+#endif
+         break;
+   }
+
+   if (MEI_DRV_STATE_GET(pMeiDev) == e_MEI_DRV_STATE_CFG_ERROR)
+   {
+      PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+      ("MEI_DRV[%02d]: ERROR - INIT DEVICE, IRQ = %d already blocked !!!" MEI_DRV_CRLF,
+       MEI_DRV_LINENUM_GET(pMeiDev), pInitDev->usedIRQ));
+
+      ret = -e_MEI_ERR_INVAL_BASE_CFG;
+   }
+   else
+   {
+      PRN_DBG_USR( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL, MEI_DRV_LINENUM_GET(pMeiDev),
+             ("MEI_DRV[%02d]: INIT DEVICE, phy addr = 0x%08X, virt addr = 0x%08X IRQ = %d" MEI_DRV_CRLF,
+               MEI_DRV_LINENUM_GET(pMeiDev), MEI_DRV_MEI_PHY_ADDR_GET(pMeiDev),
+               (IFX_uint32_t)(MEI_DRV_MEI_VIRT_ADDR_GET(pMeiDev)),
+               (IFX_uint32_t)pInitDev->usedIRQ));
+
+      /*
+         next state
+      */
+      MEI_DRV_STATE_SET(pMeiDev, e_MEI_DRV_STATE_SW_INIT_DONE);
+
+      MEI_EnableDeviceInt(pMeiDev);
+
+      if (pMeiDev->eModePoll == e_MEI_DEV_ACCESS_MODE_PASSIV_POLL)
+      {
+         MEI_PollIntPerVnxLine(pMeiDev, e_MEI_DEV_ACCESS_MODE_PASSIV_POLL);
+      }
+   }
+
+   return ret;
+
+MEI_IOCTL_INITDEV_BASIC_ERROR:
+
+   /* unmap memory and release memory region */
+   MEI_DRVOS_Phy2VirtUnmap(
+                  &(MEI_DRV_MEI_PHY_ADDR_GET(pMeiDev)),
+                  sizeof(MEI_MEI_REG_IF_U),
+                  (IFX_uint8_t **)(&pMeiDev->meiDrvCntrl.pMeiIfCntrl->pVirtMeiRegIf));
+
+
+   /* reset init done */
+   MEI_DRV_STATE_SET(pMeiDev, e_MEI_DRV_STATE_NOT_INIT);
+
+   pInitDev->ictl.retCode = ret;
+   return ret;
+}
+
+
+
+#if (MEI_SUPPORT_DFE_DMA_ACCESS == 1)
+
+/**
+   DMA write to the target via the MEI interface.
+
+\param
+   pMeiDynCntrl - private dynamic device data (per open instance)
+\param
+   pDmaArgument   - points to the DMA user information data
+
+\return
+   In case of success number of written 32 bit units
+   else negative value
+   - e_MEI_ERR_INVAL_ARG: max size exceeded
+   - e_MEI_ERR_NOT_COMPLETE: not all units have been written.
+
+\remark
+   Under Linux a temporary buffer will be allocated for transfer data between
+   user and kernel space.
+
+*/
+static int MEI_IoctlDmaAccessWr_Wrap(
+                              MEI_DYN_CNTRL_T        *pMeiDynCntrl,
+                              IOCTL_MEI_DMA_access_t *pDmaArgument)
+{
+   IFX_uint32_t *pBuf, *pUserData = (IFX_uint32_t *)pDmaArgument->pData_32;
+   IFX_uint32_t ret;
+   MEI_DRV_PRN_LOCAL_VAR_CREATE(MEI_DEV_T, *pMeiDev, pMeiDynCntrl->pMeiDev);
+
+   /*
+      - allocate memory and get the test pattern (max size 0x3FE (1024-2) byte)
+   */
+
+   if (pDmaArgument->count_32bit > MEI_MAX_DMA_COUNT_32BIT)
+   {
+      /* ERROR: invalid buffer size - max 0x3FF */
+      PRN_DBG_USR( MEI_DRV, MEI_DRV_PRN_LEVEL_HIGH, MEI_DRV_LINENUM_GET(pMeiDev),
+            ("MEI_DRV[0x%02X]: DMA write - invalid buffer size (max 0x%X 16bit)!" MEI_DRV_CRLF,
+             MEI_DRV_LINENUM_GET(pMeiDev), MEI_MAX_DMA_COUNT_32BIT));
+
+      return -e_MEI_ERR_INVAL_ARG;
+   }
+
+   PRN_DBG_USR( MEI_DRV, MEI_DRV_PRN_LEVEL_LOW, MEI_DRV_LINENUM_GET(pMeiDev),
+         ("MEI_DRV[0x%02X]: DMA write - addr = 0x%08X, count = 0x%X (buf 0x%08X)" MEI_DRV_CRLF,
+          MEI_DRV_LINENUM_GET(pMeiDev), (IFX_uint32_t)pDmaArgument->dmaAddr, (IFX_uint32_t)pDmaArgument->count_32bit,
+          (IFX_uint32_t)pDmaArgument->pData_32));
+
+   /* allocate memory */
+   ret = (MEI_PARAM_COUNT_32_TO_16(pDmaArgument->count_32bit) * 2) + 3;
+   pBuf = MEI_DRVOS_Malloc( (MEI_PARAM_COUNT_32_TO_16(pDmaArgument->count_32bit) * 2) + 3);
+   if (!pBuf)
+   {
+      PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+            ("MEI_DRV[0x%02X]: no memory for load DMA write data." MEI_DRV_CRLF,
+              MEI_DRV_LINENUM_GET(pMeiDev)));
+      return -e_MEI_ERR_NO_MEM;
+   }
+
+   /* align memory block to 32 bit, get user data */
+   pDmaArgument->pData_32 = (unsigned int *)
+      ( (((IFX_uint32_t)pBuf & 0x00000003)) ?
+         ((IFX_uint32_t*)((IFX_uint32_t)pBuf & 0x00000003) + 1) : pBuf );
+
+   /* copy data to kernel space */
+   if ( MEI_DRVOS_CpyFromUser( pDmaArgument->pData_32, pUserData,
+                        (MEI_PARAM_COUNT_32_TO_16(pDmaArgument->count_32bit) * 2) ) == IFX_NULL)
+   {
+      PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+            ("MEI_DRV[0x%02X]: DMA write - copy_from_user(DMA data) failed!" MEI_DRV_CRLF,
+             MEI_DRV_LINENUM_GET(pMeiDev)));
+
+      /* free the mem again */
+      MEI_DRVOS_Free(pBuf);
+      pBuf = IFX_NULL;
+
+      return -e_MEI_ERR_GET_ARG;
+   }
+
+   ret = MEI_IoctlDmaAccessWr( pMeiDynCntrl, pDmaArgument);
+
+   /* free the mem, set return values */
+   MEI_DRVOS_Free(pBuf);
+   pBuf = IFX_NULL;
+
+   /* Restore User Pointer*/
+   pDmaArgument->pData_32 = (unsigned int*)pUserData;
+
+   return ret;
+}
+
+
+/**
+   DMA read from the target via the MEI interface.
+
+\param
+   pMeiDynCntrl - private dynamic device data (per open instance)
+\param
+   pDmaArgument   - points to the DMA user information data
+
+\return
+   Number of read 32 bit units.
+   0: in case of not complete read, the number of read 32 bit units are returned
+      via the argument structure.
+   else negative value
+   - e_MEI_ERR_INVAL_ARG: max size exceeded
+   - e_MEI_ERR_OP_FAILED: read operation failed
+
+\remark
+   Under Linux a temporary buffer will be allocated for transfer data between
+   user and kernel space.
+
+*/
+static int MEI_IoctlDmaAccessRd_Wrap(
+                              MEI_DYN_CNTRL_T        *pMeiDynCntrl,
+                              IOCTL_MEI_DMA_access_t *pDmaArgument)
+{
+
+   IFX_uint32_t   *pBuf, *pUserData = (IFX_uint32_t *)pDmaArgument->pData_32;
+   IFX_uint32_t   ret;
+   MEI_DRV_PRN_LOCAL_VAR_CREATE(MEI_DEV_T, *pMeiDev, pMeiDynCntrl->pMeiDev);
+
+   /*
+      - allocate memory and get the test pattern (max size 0x3FE (1024-2) byte)
+   */
+
+   if (pDmaArgument->count_32bit > MEI_MAX_DMA_COUNT_32BIT)
+   {
+      /* ERROR: invalid buffer size - max 0x3FF */
+      PRN_DBG_USR( MEI_DRV, MEI_DRV_PRN_LEVEL_HIGH, MEI_DRV_LINENUM_GET(pMeiDev),
+            ("MEI_DRV[0x%02X]: DMA read - invalid buffer size (max 0x%X 32bit)!" MEI_DRV_CRLF,
+             MEI_DRV_LINENUM_GET(pMeiDev), MEI_MAX_DMA_COUNT_32BIT));
+
+      return -e_MEI_ERR_INVAL_ARG;
+   }
+
+   /* allocate memory */
+   pBuf = MEI_DRVOS_Malloc( (MEI_PARAM_COUNT_32_TO_16(pDmaArgument->count_32bit) * 2) + 3);
+   if (!pBuf)
+   {
+      PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+            ("MEI_DRV[0x%02X]: no memory for load DMA read data." MEI_DRV_CRLF,
+              MEI_DRV_LINENUM_GET(pMeiDev)));
+      return -e_MEI_ERR_NO_MEM;
+   }
+
+   /* align memory block to 32 bit, get user data */
+   pDmaArgument->pData_32 = (unsigned int *)
+      ( (((IFX_uint32_t)pBuf & 0x00000003)) ?
+         ((IFX_uint32_t*)((IFX_uint32_t)pBuf & 0x00000003) + 1) : pBuf );
+
+   /* read DMA */
+   ret = MEI_IoctlDmaAccessRd(pMeiDynCntrl, pDmaArgument);
+
+   if (ret == IFX_SUCCESS)
+   {
+      /* some data has been read */
+      if ( copy_to_user( pUserData,
+                         pDmaArgument->pData_32,
+                         (MEI_PARAM_COUNT_32_TO_16(pDmaArgument->count_32bit) * 2)) )
+      {
+         PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+               ("MEI_DRV[%02d]: Read DMA - copy_to_user() failed!" MEI_DRV_CRLF,
+                MEI_DRV_LINENUM_GET(pMeiDev)));
+         /* error during copy */
+         pDmaArgument->count_32bit = 0;
+         ret = -e_MEI_ERR_RETURN_ARG;
+      }
+   }
+
+   /* free the mem */
+   MEI_DRVOS_Free(pBuf);
+   pBuf = IFX_NULL;
+
+   /* Restore User Pointer*/
+   pDmaArgument->pData_32 = (unsigned int *)pUserData;
+
+   return ret;
+}
+
+#endif      /* #if (MEI_SUPPORT_DFE_DMA_ACCESS == 1) */
+
+
+#if (MEI_SUPPORT_DFE_DBG_ACCESS == 1)
+/**
+   Do an MEI debug write access.
+*/
+static int MEI_IoctlMeiDbgAccessWr_Wrap(
+                              MEI_DYN_CNTRL_T       *pMeiDynCntrl,
+                              IOCTL_MEI_dbgAccess_t *pUserArgument,
+                              IOCTL_MEI_dbgAccess_t *pLocalArgument)
+{
+   IFX_uint32_t singleBuf, *pUserBuf = (IFX_uint32_t *)pLocalArgument->pData_32;
+   int ret;
+
+
+   /*
+      check count
+   */
+   if (pLocalArgument->count == 1)
+   {
+      pLocalArgument->pData_32 = (unsigned int *)&singleBuf;
+   }
+   else
+   {
+      /* Attention: dump buffer is not protected (this is only for debug) */
+      pLocalArgument->pData_32 = (unsigned int *)MEI_DbgDumpBuffer;
+      pLocalArgument->count = (pLocalArgument->count > MEI_IOCTL_MAX_DBG_COUNT_32BIT) ?
+                               MEI_IOCTL_MAX_DBG_COUNT_32BIT : pLocalArgument->count;
+   }
+
+   /* get the buffer */
+   MEI_DRVOS_CpyFromUser( (void *)pLocalArgument->pData_32,
+                   (void *)pUserBuf,
+                   pLocalArgument->count * sizeof(IFX_uint32_t) ) ;
+
+   ret =  MEI_IoctlMeiDbgAccessWr( pMeiDynCntrl, pLocalArgument);
+
+   /* return arguments - count */
+   copy_to_user( (void *)&pUserArgument->count,
+                 (void *)&pLocalArgument->count,
+                 sizeof(pUserArgument->count) ) ;
+
+   return ret;
+}
+
+/**
+   Do an MEI debug read access.
+*/
+static int MEI_IoctlMeiDbgAccessRd_Wrap(
+                              MEI_DYN_CNTRL_T       *pMeiDynCntrl,
+                              IOCTL_MEI_dbgAccess_t *pUserArgument,
+                              IOCTL_MEI_dbgAccess_t *pLocalArgument)
+{
+   IFX_uint32_t singleBuf, *pUserBuf = (IFX_uint32_t *)pLocalArgument->pData_32;
+   int ret;
+   /*
+      check count
+   */
+   if (pLocalArgument->count == 1)
+   {
+      pLocalArgument->pData_32 = (unsigned int *)&singleBuf;
+   }
+   else
+   {
+      /* Attention: dump buffer is not protected (this is only for debug) */
+      pLocalArgument->pData_32 = (unsigned int *)MEI_DbgDumpBuffer;
+      pLocalArgument->count = (pLocalArgument->count > MEI_IOCTL_MAX_DBG_COUNT_32BIT) ?
+                               MEI_IOCTL_MAX_DBG_COUNT_32BIT : pLocalArgument->count;
+   }
+
+   ret = MEI_IoctlMeiDbgAccessRd( pMeiDynCntrl, pLocalArgument);
+
+   /* return data of something in the buffer */
+   if ( pLocalArgument->count )
+   {
+      /* return the buffer */
+      copy_to_user( pUserBuf,
+                    pLocalArgument->pData_32,
+                    pLocalArgument->count * sizeof(IFX_uint32_t) ) ;
+
+   }
+
+   /* return count argument */
+   copy_to_user( (void *)&pUserArgument->count,
+                 (void *)&pLocalArgument->count,
+                 sizeof(pUserArgument->count) ) ;
+
+   return ret;
+}
+
+#endif      /* #if (MEI_SUPPORT_DFE_DBG_ACCESS == 1) */
+
+
+
+#if (MEI_MISC_TEST == 1)
+
+/* allocated bock size: 0x90000 --> ~ 590 000 byte */
+#define MEI_MAX_VMALLOC  0x90000
+
+/**
+   Only for testing: allocate and free large memory ranges.
+*/
+void MEI_MemVAllocTest()
+{
+   char *pTemp1 = NULL, *pTemp2 = NULL;
+
+   pTemp1 = vmalloc(MEI_MAX_VMALLOC);
+   if (!pTemp1)
+   {
+      printk( "MEI_DRV: vmalloc test: alloc mem 1. block[0x%X] (%d) - FAILED !!!" MEI_DRV_CRLF,
+              (unsigned int)MEI_MAX_VMALLOC, MEI_MAX_VMALLOC);
+      return;
+   }
+   else
+   {
+      printk( "MEI_DRV: vmalloc test: alloc mem 1. block[0x%X] (%d) - SUCCESS" MEI_DRV_CRLF,
+              (unsigned int)MEI_MAX_VMALLOC, MEI_MAX_VMALLOC);
+   }
+
+   pTemp2 = vmalloc(MEI_MAX_VMALLOC);
+   if (!pTemp2)
+   {
+      printk( "MEI_DRV: vmalloc test: alloc mem 2. block[0x%X] (%d) - FAILED !!!" MEI_DRV_CRLF,
+              (unsigned int)MEI_MAX_VMALLOC, MEI_MAX_VMALLOC);
+      vfree(pTemp1);
+      return;
+   }
+   else
+   {
+      printk( "MEI_DRV: vmalloc test: alloc mem 2. block[0x%X] (%d) - SUCCESS" MEI_DRV_CRLF,
+              (unsigned int)MEI_MAX_VMALLOC, MEI_MAX_VMALLOC);
+   }
+
+   vfree(pTemp1);
+   vfree(pTemp2);
+
+   return;
+}
+#endif
+
+
+
+/* ============================================================================
+   Setup MEI CPE driver interrupt functions (LINUX) - wrapping
+   ========================================================================= */
+
+/**
+   Set the wrapper function for the LINUX request_irq() function.
+
+\param
+   pRequestIrqFct  - points to the custumer intConnect function
+
+\return
+   0     in case of success.
+   -1    if the function pointer is not valid, or if the interrupt routines
+         already in use.
+
+\remark
+   The MEI_IfxRequestIrq() function locks also further updates of the
+   interrupt wrapper functions.
+
+\remark
+   After the first request_irq call further updates should not be possible anymore.
+
+*/
+int MEI_FctRequestIrqSet(MEI_RequestIrq_WrapLinux_t pRequestIrqFct)
+{
+
+   if ( (MEI_IntSetupLocked != 0) || (pRequestIrqFct == NULL) )
+   {
+      PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+            ("MEI_DRV: ERROR - setup request_irq wrap, locked = %d" MEI_DRV_CRLF,
+              MEI_IntSetupLocked));
+
+      return -1;
+   }
+
+   PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL,
+         ("MEI_DRV: setup request_irq wrapper" MEI_DRV_CRLF));
+
+   MEI_RequestIrq_WrapLx = pRequestIrqFct;
+
+   return 0;
+}
+
+
+/**
+   Set the wrapper function for the LINUX free_irq() function.
+
+\param
+   pRequestIrqFct  - points to the custumer intConnect function
+
+\return
+   0     in case of success.
+   -1    if the function pointer is not valid, or if the interrupt routines
+         already in use.
+
+\remark
+   The MEI_IfxFreeIrq() function unlocks also further updates of the
+   interrupt wrapper functions.
+
+\remark
+   After the last free_irq call further updates should be possible again.
+
+*/
+int MEI_FctFreeIrqSet(MEI_FreeIrq_WrapLinux_t pFreeIrqFct)
+{
+
+   if ( (MEI_IntSetupLocked != 0) || (pFreeIrqFct == NULL) )
+   {
+      PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+            ("MEI_DRV: ERROR - setup free_irq wrap, locked = %d" MEI_DRV_CRLF,
+              MEI_IntSetupLocked));
+
+      return -1;
+   }
+
+   PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL,
+         ("MEI_DRV: setup free_irq wrapper" MEI_DRV_CRLF));
+
+   MEI_FreeIrq_WrapLx = pFreeIrqFct;
+
+   return 0;
+}
+
+
+#if (MEI_EXPORT_INTERNAL_API == 1)
+IFX_int32_t MEI_InternalDevOpen(
+                              IFX_uint16_t      nLine,
+                              MEI_DYN_CNTRL_T **ppMeiDynCntrl)
+{
+   IFX_int32_t          retVal;
+   MEI_DYN_CNTRL_T   *pMeiDynCntrl = NULL;
+
+   if ((retVal = MEI_DevLineAlloc((IFX_uint8_t)nLine)) != IFX_SUCCESS)
+   {
+      return retVal;
+   }
+
+   if ((retVal = MEI_InstanceLineAlloc(
+                                 (IFX_uint8_t)nLine,
+                                 &pMeiDynCntrl)) != IFX_SUCCESS)
+   {
+      return retVal;
+   }
+
+   /* return the allocated struct */
+   *ppMeiDynCntrl = pMeiDynCntrl;
+
+   #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0))
+   /* increment module use counter */
+   MOD_INC_USE_COUNT;
+   #endif
+
+   return IFX_SUCCESS;
+}
+
+IFX_int32_t MEI_InternalDevClose(
+                              MEI_DYN_CNTRL_T *pMeiDynCntrl)
+{
+   MEI_DevLineClose(pMeiDynCntrl);
+
+   #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0))
+   /* decrement use counter */
+   MOD_DEC_USE_COUNT;
+   #endif
+
+   return IFX_SUCCESS;
+}
+#endif /* #if (MEI_EXPORT_INTERNAL_API == 1)*/
+
+#if (MEI_DRV_IFXOS_ENABLE == 0)
+
+/**
+   LINUX Kernel - Copy a block form driver space (kernel) TO USER space (application).
+
+\par Implementation
+   Copy data from kernel to user space by use of the kernel function "copy_to_user"
+
+\param
+   pTo         Points to the source (in driver space)
+\param
+   pFrom       Points to the destination (in user space)
+\param
+   size_byte   Block size to copy [byte]
+
+\return
+   IFX_NULL if an error occured, else pTo
+*/
+IFX_void_t *MEI_DRVOS_CpyToUser(
+               IFX_void_t *pTo,
+               const IFX_void_t *pFrom,
+               IFX_uint32_t size_byte)
+{
+   IFX_uint32_t remainBytes = 0;
+
+   if ((pTo == IFX_NULL) || (pFrom == IFX_NULL))
+      return IFX_NULL;
+
+   if (!size_byte)
+      return IFX_NULL;
+
+   remainBytes = (IFX_uint32_t)copy_to_user( (void *)pTo,
+                                           (const void *)pFrom,
+                                           (unsigned long)size_byte);
+
+   return (remainBytes) ? IFX_NULL : pTo;
+}
+
+/**
+   LINUX Kernel - Copy a block FORM USER space (application) to driver space (kernel).
+
+\par Implementation
+   Copy data from user to kernel space by use of the kernel function "copy_from_user"
+
+\param
+   pTo         Points to the source (in user space).
+\param
+   pFrom       Points to the destination (in driver space).
+\param
+   size_byte   Block size to copy [byte].
+
+\return
+   IFX_NULL if an error occured, else pTo
+*/
+IFX_void_t *MEI_DRVOS_CpyFromUser(
+               IFX_void_t        *pTo,
+               const IFX_void_t  *pFrom,
+               IFX_uint32_t      size_byte)
+{
+   IFX_uint32_t remainBytes = 0;
+
+   if ((pTo == IFX_NULL) || (pFrom == IFX_NULL))
+      return IFX_NULL;
+
+   if (!size_byte)
+      return IFX_NULL;
+
+   remainBytes = (IFX_uint32_t)copy_from_user( (void *)pTo,
+                                                (const void *)pFrom,
+                                                (unsigned long)size_byte);
+
+   return (remainBytes) ? IFX_NULL : pTo;
+}
+
+/**
+   LINUX Kernel - Map the physical address to a virtual memory space.
+   For virtual memory management this is required.
+
+\par Implementation
+   - check if the given physical memory region is free (see "check_mem_region")
+   - reserve the given physical memory region (see "request_mem_region")
+   - map the given physical memory region - no cache (see "ioremap_nocache")
+
+\attention
+   This sequence will reserve the requested memory region, so no following user
+   can remap the same area after this.
+\attention
+   Other users (driver) which have map the area before (without reservation)
+   will still have access to the area.
+
+\param
+   physicalAddr         The physical address for mapping [I]
+\param
+   addrRangeSize_byte   Range of the address space to map [I]
+\param
+   pName                The name of the address space, for administration [I]
+\param
+   ppVirtAddr           Returns the pointer to the virtual mapped address [O]
+
+\return
+   IFX_SUCCESS if the mapping was successful and the ppVirtAddr is set, else
+   IFX_ERROR   if something was wrong.
+
+*/
+IFX_int32_t MEI_DRVOS_Phy2VirtMap(
+               IFX_ulong_t    physicalAddr,
+               IFX_ulong_t    addrRangeSize_byte,
+               IFX_char_t     *pName,
+               IFX_uint8_t    **ppVirtAddr)
+{
+   IFX_uint8_t *pVirtAddr = IFX_NULL;
+
+   if (ppVirtAddr == IFX_NULL)
+      return IFX_ERROR;
+
+   if (*ppVirtAddr != IFX_NULL)
+      return IFX_ERROR;
+
+   if (!addrRangeSize_byte)
+      return IFX_ERROR;
+
+   if ( check_mem_region(physicalAddr, addrRangeSize_byte) )
+   {
+      return IFX_ERROR;
+   }
+
+   /* can't fail */
+   request_mem_region(physicalAddr, addrRangeSize_byte, pName);
+
+   /* remap memory (not cache able): physical --> virtual */
+   pVirtAddr = (IFX_uint8_t *)ioremap_nocache( physicalAddr,
+                                               addrRangeSize_byte );
+   if (pVirtAddr == IFX_NULL)
+   {
+      release_mem_region(physicalAddr, addrRangeSize_byte);
+      return IFX_ERROR;
+   }
+
+   *ppVirtAddr = pVirtAddr;
+
+   return IFX_SUCCESS;
+}
+
+/**
+   LINUX Kernel - Release the virtual memory range of a mapped physical address.
+   For virtual memory management this is required.
+
+\par Implementation
+   - unmap the given physical memory region (see "iounmap")
+   - release the given physical memory region (see "release_mem_region")
+
+\param
+   pPhysicalAddr        Points to the physical address for release mapping [IO]
+                        (Cleared if success)
+\param
+   addrRangeSize_byte   Range of the address space to map [I]
+\param
+   ppVirtAddr           Provides the pointer to the virtual mapped address [IO]
+                        (Cleared if success)
+
+\return
+   IFX_SUCCESS if the release was successful. The physicalAddr and the ppVirtAddr
+               pointer is cleared, else
+   IFX_ERROR   if something was wrong.
+*/
+IFX_int32_t MEI_DRVOS_Phy2VirtUnmap(
+               IFX_ulong_t    *pPhysicalAddr,
+               IFX_ulong_t    addrRangeSize_byte,
+               IFX_uint8_t    **ppVirtAddr)
+{
+   /* unmap the virtual address */
+   if ( (ppVirtAddr != IFX_NULL) && (*ppVirtAddr != IFX_NULL) )
+   {
+      iounmap((void *)(*ppVirtAddr));
+      *ppVirtAddr = IFX_NULL;
+   }
+
+   /* release the memory region */
+   if ( (pPhysicalAddr != IFX_NULL)  && (*pPhysicalAddr != 0) )
+   {
+      release_mem_region( (unsigned long)(*pPhysicalAddr), addrRangeSize_byte );
+      *pPhysicalAddr = 0;
+   }
+
+   return IFX_SUCCESS;
+}
+
+/**
+   LINUX Kernel - Thread stub function. The stub function will be called
+   before calling the user defined thread routine. This gives
+   us the possibility to add checks etc.
+
+\par Implementation
+   Before the stub function enters the user thread routin the following setup will
+   be done:
+   - make the kernel thread to a daemon
+   - asign the parent to the init process (avoid termination if the parent thread dies).
+   - setup thread name, and signal handling (if required).
+   After this the user thread routine will be entered.
+
+\param
+   pThrCntrl   Thread information data
+
+\return
+   - IFX_SUCCESS on success
+   - IFX_ERROR on error
+*/
+static IFX_int32_t MEI_DRVOS_KernelThreadStartup(
+                              MEI_DRVOS_ThreadCtrl_t *pThrCntrl)
+{
+   IFX_int32_t retVal          = IFX_ERROR;
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0))
+   struct task_struct *kthread = current;
+#endif
+
+   if(!pThrCntrl)
+   {
+      return retVal;
+   }
+
+   /* terminate the name if necessary */
+   pThrCntrl->thrParams.pName[16 -1] = 0;
+
+   /* do LINUX specific setup */
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0))
+   daemonize();
+   reparent_to_init();
+
+   /* lock the kernel. A new kernel thread starts without
+      the big kernel lock, regardless of the lock state
+      of the creator (the lock level is *not* inheritated)
+   */
+   lock_kernel();
+
+   /* set signal mask to what we want to respond */
+   siginitsetinv(&current->blocked, sigmask(SIGKILL)|sigmask(SIGINT)|sigmask(SIGTERM));
+
+   /* set name of this process */
+   strcpy(kthread->comm, pThrCntrl->thrParams.pName);
+
+   /* let others run */
+   unlock_kernel();
+#else
+   daemonize(pThrCntrl->thrParams.pName);
+
+   /* Enable signals in Kernel >= 2.6 */
+   allow_signal(SIGKILL);
+   allow_signal(SIGINT);
+   allow_signal(SIGTERM);
+#endif
+
+
+   pThrCntrl->thrParams.bRunning = IFX_TRUE;
+   retVal = pThrCntrl->pThrFct(&pThrCntrl->thrParams);
+   pThrCntrl->thrParams.bRunning = IFX_FALSE;
+
+   complete_and_exit(&pThrCntrl->thrCompletion, (long)retVal);
+
+   return retVal;
+}
+
+/**
+   LINUX Kernel - Creates a new thread / task.
+
+\par Implementation
+   - Allocate and setup the internal thread control structure.
+   - setup the LINUX specific thread parameter (see "init_completion").
+   - start the LINUX Kernel thread with the internal stub function (see "kernel_thread")
+
+\param
+   pThrCntrl         Pointer to thread control structure. This structure has to
+                     be allocated outside and will be initialized.
+\param
+   pName             specifies the 8-char thread / task name.
+\param
+   pThreadFunction   specifies the user entry function of the thread / task.
+\param
+   nArg1             first argument passed to thread / task entry function.
+\param
+   nArg2             second argument passed to thread / task entry function.
+
+\return
+   - IFX_SUCCESS thread was successful started.
+   - IFX_ERROR thread was not started
+*/
+IFX_int32_t MEI_DRVOS_ThreadInit(
+               MEI_DRVOS_ThreadCtrl_t *pThrCntrl,
+               IFX_char_t *pName,
+               MEI_DRVOS_ThreadFunction_t pThreadFunction,
+               IFX_ulong_t nArg1,
+               IFX_ulong_t nArg2)
+{
+   if (pThreadFunction == IFX_NULL)
+      return IFX_ERROR;
+
+   if (pName == IFX_NULL)
+      return IFX_ERROR;
+
+
+   if(pThrCntrl)
+   {
+      if (MEI_DRVOS_THREAD_INIT_VALID(pThrCntrl) == IFX_FALSE)
+      {
+         /* set thread function arguments */
+         strcpy(pThrCntrl->thrParams.pName, pName);
+         pThrCntrl->thrParams.nArg1 = nArg1;
+         pThrCntrl->thrParams.nArg2 = nArg2;
+
+         /* set thread control settings */
+         pThrCntrl->pThrFct = pThreadFunction;
+         init_completion(&pThrCntrl->thrCompletion);
+
+         /* start kernel thread via the wrapper function */
+         pThrCntrl->tid = kernel_thread(
+                        (MEI_DRVOS_KERNEL_THREAD_StartRoutine)MEI_DRVOS_KernelThreadStartup,
+                        (void *)pThrCntrl,
+                        MEI_DRVOS_DRV_THREAD_OPTIONS);
+
+         pThrCntrl->bValid = IFX_TRUE;
+
+         return IFX_SUCCESS;
+      }
+      else
+      {
+         MEI_DRVOS_PRN_USR_ERR_NL( MEI_DRVOS, MEI_DRVOS_PRN_LEVEL_ERR,
+            ("MEI_DRVOS ERROR - Kernel ThreadInit, object already valid" MEI_DRVOS_CRLF));
+      }
+   }
+   else
+   {
+      MEI_DRVOS_PRN_USR_ERR_NL( MEI_DRVOS, MEI_DRVOS_PRN_LEVEL_ERR,
+         ("MEI_DRVOS ERROR - Kernel ThreadInit, missing object" MEI_DRVOS_CRLF));
+   }
+
+   return IFX_ERROR;
+}
+
+/**
+   LINUX Kernel - Shutdown and terminate a given thread.
+   Therefore the thread delete functions triggers the user thread function
+   to shutdown. In case of not responce (timeout) the thread will be canceled.
+
+\par Implementation
+   - force a shutdown via the shutdown flag and wait.
+   - wait for completion (see "wait_for_completion").
+   - free previous allocated internal data.
+
+\param
+   pThrCntrl   Thread control struct.
+
+\return
+   - IFX_SUCCESS thread was successful deleted - thread control struct is freed.
+   - IFX_ERROR thread was not deleted
+*/
+IFX_int32_t MEI_DRVOS_ThreadDelete(
+               MEI_DRVOS_ThreadCtrl_t *pThrCntrl)
+{
+   IFX_uint32_t   waitCnt = 1;
+   IFX_uint32_t   waitTime_ms = 0;
+
+   if(pThrCntrl)
+   {
+      if (MEI_DRVOS_THREAD_INIT_VALID(pThrCntrl) == IFX_TRUE)
+      {
+         if (pThrCntrl->thrParams.bRunning == 1)
+         {
+            /* trigger user thread routine to shutdown */
+            pThrCntrl->thrParams.bShutDown = IFX_TRUE;
+
+            if (waitTime_ms != MEI_DRVOS_THREAD_DELETE_WAIT_FOREVER)
+            {
+               waitCnt = waitTime_ms / MEI_DRVOS_THREAD_DOWN_WAIT_POLL_MS;
+            }
+
+            while (waitCnt && (pThrCntrl->thrParams.bRunning == 1) )
+            {
+               MEI_DRVOS_MSecSleep(MEI_DRVOS_THREAD_DOWN_WAIT_POLL_MS);
+
+               if (waitTime_ms != MEI_DRVOS_THREAD_DELETE_WAIT_FOREVER)
+                  waitCnt--;
+            }
+
+            /* wait for thread end */
+            wait_for_completion (&pThrCntrl->thrCompletion);
+         }
+         else
+         {
+            MEI_DRVOS_PRN_USR_ERR_NL( MEI_DRVOS, MEI_DRVOS_PRN_LEVEL_ERR,
+               ("MEI_DRVOS WRN - Kernel Thread Delete <%s> - not running" MEI_DRVOS_CRLF,
+                 pThrCntrl->thrParams.pName));
+         }
+
+         pThrCntrl->bValid = IFX_FALSE;
+
+         if (pThrCntrl->thrParams.bRunning != 0)
+         {
+            MEI_DRVOS_PRN_USR_ERR_NL( MEI_DRVOS, MEI_DRVOS_PRN_LEVEL_ERR,
+               ("ERROR - Kernel Thread Delete <%s> not stopped" MEI_DRVOS_CRLF,
+                 pThrCntrl->thrParams.pName));
+
+            return IFX_ERROR;
+         }
+
+         return IFX_SUCCESS;
+      }
+      else
+      {
+         MEI_DRVOS_PRN_USR_ERR_NL( MEI_DRVOS, MEI_DRVOS_PRN_LEVEL_ERR,
+            ("IFXOS ERROR - Kernel ThreadDelete, invalid object" MEI_DRVOS_CRLF));
+      }
+   }
+   else
+   {
+      MEI_DRVOS_PRN_USR_ERR_NL( MEI_DRVOS, MEI_DRVOS_PRN_LEVEL_ERR,
+         ("MEI_DRVOS ERROR - Kernel ThreadDelete, missing object" MEI_DRVOS_CRLF));
+   }
+
+   return IFX_ERROR;
+}
+
+/**
+   LINUX Kernel - Sleep a given time in [ms].
+
+\attention
+   The sleep requires a "sleep wait". "busy wait" implementation will not work.
+
+\par Implementation
+   Within the Kernel we use the LINUX scheduler to set the thread into "sleep".
+
+\param
+   sleepTime_ms   Time to sleep [ms]
+
+\return
+   None.
+
+\remark
+   Available in
+   - Driver space
+*/
+IFX_void_t MEI_DRVOS_MSecSleep(
+               IFX_time_t sleepTime_ms)
+{
+   /* current->state = TASK_INTERRUPTIBLE; */
+   set_current_state(TASK_INTERRUPTIBLE);
+   schedule_timeout(HZ * (sleepTime_ms) / 1000);
+
+   return;
+}
+
+/**
+   LINUX Kernel - Get the elapsed time in [ms].
+
+\par Implementation
+   Based on the HZ and jiffies defines we calculate the elapsed time since
+   startup or based on the given ref-time.
+
+\param
+   refTime_ms  Reference time to calculate the elapsed time in [ms].
+
+\return
+   Elapsed time in [ms] based on the given reference time
+
+\remark
+   Provide refTime_ms = 0 to get the current elapsed time. For messurement provide
+   the current time as reference.
+*/
+IFX_time_t MEI_DRVOS_ElapsedTimeMSecGet(
+               IFX_time_t refTime_ms)
+{
+   IFX_time_t currTime_ms = 0;
+
+   currTime_ms = (IFX_time_t)(jiffies * 1000 / HZ);
+
+   return (currTime_ms > refTime_ms) ? (currTime_ms - refTime_ms)
+                                     : (refTime_ms - currTime_ms);
+}
+
+#endif /* #if (MEI_DRV_IFXOS_ENABLE == 0)*/
+
+#if (MEI_EXPORT_INTERNAL_API == 1)
+/**
+   export the MEI CPE ioctl internal interface to the kernel namespace
+*/
+EXPORT_SYMBOL(MEI_InternalDevOpen);
+EXPORT_SYMBOL(MEI_InternalDevClose);
+EXPORT_SYMBOL(MEI_InternalDrvVersionGet);
+EXPORT_SYMBOL(MEI_InternalDebugLevelSet);
+EXPORT_SYMBOL(MEI_InternalInitDevice);
+EXPORT_SYMBOL(MEI_InternalDevReset);
+EXPORT_SYMBOL(MEI_InternalRequestConfig);
+
+#if (MEI_SUPPORT_VDSL2_ADSL_SWAP == 1)
+EXPORT_SYMBOL(MEI_InternalDevCfgFwModeSwap);
+#endif
+
+#if (MEI_SUPPORT_STATISTICS == 1)
+EXPORT_SYMBOL(MEI_InternalRequestStat);
+#endif
+
+#if (MEI_SUPPORT_REGISTER == 1)
+EXPORT_SYMBOL(MEI_InternalSetRegister);
+EXPORT_SYMBOL(MEI_InternalGetRegister);
+#endif
+
+EXPORT_SYMBOL(MEI_InternalFirmwareDownload);
+
+#if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_AR9 == 1)
+EXPORT_SYMBOL(MEI_InternalOptFirmwareDownload);
+#endif /* (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_AR9 == 1) */
+
+#if (MEI_SUPPORT_DEVICE_VR9 == 1)
+EXPORT_SYMBOL(MEI_InternalFwModeCtrlSet);
+EXPORT_SYMBOL(MEI_InternalFwModeStatGet);
+#endif /* (MEI_SUPPORT_DEVICE_VR9 == 1)*/
+
+#if (MEI_SUPPORT_DFE_GPA_ACCESS == 1)
+EXPORT_SYMBOL(MEI_InternalGpaWrAccess);
+EXPORT_SYMBOL(MEI_InternalGpaRdAccess);
+#endif
+
+#if (MEI_SUPPORT_DFE_DBG_ACCESS == 1)
+EXPORT_SYMBOL(MEI_InternalMeiDbgAccessWr);
+EXPORT_SYMBOL(MEI_InternalMeiDbgAccessRd);
+#endif
+
+EXPORT_SYMBOL(MEI_InternalNfcCallBackDataSet);
+EXPORT_SYMBOL(MEI_InternalNfcEnable);
+EXPORT_SYMBOL(MEI_InternalNfcDisable);
+EXPORT_SYMBOL(MEI_InternalAutoMsgCtlSet);
+EXPORT_SYMBOL(MEI_InternalAutoMsgCtlGet);
+
+EXPORT_SYMBOL(MEI_InternalCmdMsgWrite);
+EXPORT_SYMBOL(MEI_InternalAckMsgRead);
+EXPORT_SYMBOL(MEI_InternalMsgSend);
+EXPORT_SYMBOL(MEI_InternalNfcMsgRead);
+
+
+#if (MEI_DRV_ATM_OAM_ENABLE == 1)
+EXPORT_SYMBOL(MEI_InternalAtmOamInit);
+EXPORT_SYMBOL(MEI_InternalAtmOamCntrl);
+EXPORT_SYMBOL(MEI_InternalAtmOamCounterGet);
+EXPORT_SYMBOL(MEI_InternalAtmOamStatusGet);
+EXPORT_SYMBOL(MEI_InternalAtmOamCellInsert);
+#endif
+
+#if (MEI_DRV_CLEAR_EOC_ENABLE == 1)
+EXPORT_SYMBOL(MEI_InternalCEocInit);
+EXPORT_SYMBOL(MEI_InternalCEocCntrl);
+EXPORT_SYMBOL(MEI_InternalCEocStats);
+EXPORT_SYMBOL(MEI_InternalCEocFrameWr);
+EXPORT_SYMBOL(MEI_InternalCEocFrameRd);
+#endif
+
+#endif      /* #if (MEI_EXPORT_INTERNAL_API == 1) */
+
+/*
+   Export the functions to the system
+*/
+EXPORT_SYMBOL(MEI_FctRequestIrqSet);
+EXPORT_SYMBOL(MEI_FctFreeIrqSet);
+
+/*
+   register module init and exit
+*/
+module_init (MEI_module_init);
+module_exit (MEI_module_exit);
+
+/****************************************************************************/
+#ifdef MODULE
+MODULE_AUTHOR("www.infineon.com");
+MODULE_DESCRIPTION("MEI CPE Driver - www.infineon.com");
+MODULE_SUPPORTED_DEVICE("MEI CPE Interface");
+MODULE_LICENSE ("Dual BSD/GPL");
+#endif /* #ifdef MODULE*/
+
+#endif /* LINUX */
+
