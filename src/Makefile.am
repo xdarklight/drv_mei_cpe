@@ -51,12 +51,10 @@ endif
 if IFXOS_ENABLE
 AM_CPPFLAGS = \
 	-I@srcdir@\
-	-I@srcdir@/auto_header\
 	-I@KERNEL_INCL_PATH@ $(IFXOS_INCLUDE_PATH)
 else
 AM_CPPFLAGS = \
 	-I@srcdir@\
-	-I@srcdir@/auto_header\
 	-I@KERNEL_INCL_PATH@
 endif
 
@@ -79,8 +77,7 @@ drv_mei_cpe_all_sources = \
 	drv_mei_cpe_api_atm_ptm_intern.h\
 	drv_mei_cpe_api_intern.c\
 	drv_mei_cpe_api_atm_ptm_intern.c\
-	drv_mei_cpe_mei_vinax.h\
-	drv_mei_cpe_mei_vr9.h\
+	drv_mei_cpe_mei_vrx.h\
 	drv_mei_cpe_mei_interface.h\
 	drv_mei_cpe_mailbox.h\
 	drv_mei_cpe_msg_process.c\
@@ -106,8 +103,7 @@ drv_mei_cpe_all_sources = \
 	drv_mei_cpe_ecos.h\
 	drv_mei_cpe_nucleus.c\
 	drv_mei_cpe_nucleus.h\
-	drv_mei_cpe_mei_access_vinax.c \
-	drv_mei_cpe_mei_access_vr9.c \
+	drv_mei_cpe_mei_access_vrx.c \
 	drv_mei_cpe_mei_access_ar9.c \
 	drv_mei_cpe_device_vinax.c \
 	drv_mei_cpe_device_vr9.c \
@@ -116,28 +112,17 @@ drv_mei_cpe_all_sources = \
 	drv_mei_cpe_rom_handler_if.h\
 	drv_mei_cpe_download.c\
 	drv_mei_cpe_download.h\
-	drv_mei_cpe_download_vinax.c\
-	drv_mei_cpe_download_vr9.c\
-	drv_mei_cpe_download_vinax.h\
-	drv_mei_cpe_download_vr9.h\
-	drv_mei_cpe_download_vinax_common.h\
-	drv_mei_cpe_download_vr9_common.h\
+	drv_mei_cpe_download_vrx.c\
+	drv_mei_cpe_download_vrx.h\
+	drv_mei_cpe_download_vrx_common.h\
 	cmv_message_format.h \
 	drv_mei_cpe_device_cntrl.c\
 	drv_mei_cpe_device_cntrl.h\
 	drv_mei_cpe_driver_msg.c\
 	drv_mei_cpe_driver_msg.h\
-	auto_header/user_if_vdsl2_boot_messages.h\
-	auto_header/drv_mei_cpe_vinax_msg_config_pmd.h\
-	auto_header/drv_mei_cpe_vinax_msg_const.h\
-	auto_header/drv_mei_cpe_vinax_msg_debug.h\
-	auto_header/drv_mei_cpe_vinax_msg_dmt_scope.h\
-	auto_header/drv_mei_cpe_vinax_msg_ghs_status.h\
-	auto_header/drv_mei_cpe_vinax_msg_olr.h\
-	auto_header/drv_mei_cpe_vinax_msg_perf_pmd.h\
-	auto_header/drv_mei_cpe_vinax_msg_tc_counters.h\
-	auto_header/drv_mei_cpe_vinax_msg_utopia_posphy.h\
-	auto_header/drv_mei_cpe_vinax_msg_xtc.h \
+	drv_mei_cpe_dsm.c\
+	drv_mei_cpe_dsm.h\
+	drv_mei_cpe_dsm_common.h\
 	drv_mei_cpe_config_auto.h.in
 
 drv_mei_cpe_atmoam_access_sources = \
@@ -308,7 +293,6 @@ endif
 
 if MEI_TEST_APPL_ENABLE
 mei_cpe_drv_test_CPPFLAGS = -I@srcdir@\
-				-I@srcdir@/auto_header\
 				-I@KERNEL_INCL_PATH@ $(IFXOS_INCLUDE_PATH)
 
 mei_cpe_drv_test_CFLAGS = $(mei_cpe_app_common_cflags) \
@@ -341,7 +325,7 @@ drv_mei_cpe.ko: $(drv_mei_cpe_SOURCES)
 	@echo -e "# drv_mei_cpe: Generated to build Linux 2.6.x kernel object" > $(PWD)/Kbuild
 	@echo -e "obj-m := $(subst .ko,.o,$@)"			>> $(PWD)/Kbuild
 	@echo -e "$(subst .ko,,$@)-y := $(drv_mei_cpe_OBJS)"	>> $(PWD)/Kbuild
-	@echo -e "EXTRA_CFLAGS := $(CFLAGS) $(drv_mei_cpe_CFLAGS) -I@abs_srcdir@ -I@abs_srcdir@/auto_header $(IFXOS_INCLUDE_PATH)" >> $(PWD)/Kbuild
+	@echo -e "EXTRA_CFLAGS := $(CFLAGS) $(drv_mei_cpe_CFLAGS) -I@abs_srcdir@ $(IFXOS_INCLUDE_PATH)" >> $(PWD)/Kbuild
 	$(MAKE) ARCH=@KERNEL_ARCH@ -C @KERNEL_BUILD_PATH@ O=@KERNEL_BUILD_PATH@ M=$(PWD) modules
 
 clean-generic:
