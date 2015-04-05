@@ -32,6 +32,8 @@
    #define KSEG1   (0x00000000)
 #endif
 
+#define MEI_DRVOS_SIGNAL_PENDING             0
+
 /**
    Function typedef for the NUCLEUS intConnect()
 */

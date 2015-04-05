@@ -35,6 +35,8 @@
    typedefs interrupt wrapping (vxWorks)
    ========================================================================= */
 
+#define MEI_DRVOS_SIGNAL_PENDING             0
+
 /**
    Function typedef for the VxWorks intConnect()
 */

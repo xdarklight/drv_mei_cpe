@@ -2642,6 +2642,11 @@ IFX_int32_t MEI_DrvCntrlThr(
 
       MEI_DevPollAllIrq(e_MEI_DEV_ACCESS_MODE_ACTIV_POLL);
 
+      if (MEI_DRVOS_SIGNAL_PENDING)
+      {
+         break;
+      }
+
 #if 0
       if ((count % 100) == 0)
       {

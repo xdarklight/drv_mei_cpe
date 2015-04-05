@@ -78,6 +78,12 @@ typedef irqreturn_t (*usedIsrHandler_t)(int, void *);
    #define KSEG1   (0xa0000000)
 #endif
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0))
+#define MEI_DRVOS_SIGNAL_PENDING             0
+#else
+#define MEI_DRVOS_SIGNAL_PENDING             signal_pending(current)
+#endif
+
 /* PCI device shared IRQ*/
 #define MEI_DRVOS_SLAVE_IRQ_NUM   INT_NUM_IM4_IRL30
 
