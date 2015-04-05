@@ -1,8 +1,7 @@
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -10,7 +9,7 @@
 ******************************************************************************/
 
 /* ==========================================================================
-   Description : Debug and DMA access to the VINAX Device
+   Description : Debug and DMA access to the VRX Device
    ========================================================================== */
 
 /* ============================================================================
@@ -89,7 +88,7 @@ static IFX_int32_t MEI_MeiDbgRead( MEI_DYN_CNTRL_T *pMeiDynCntrl,
 
 
 /* ============================================================================
-   VINAX Driver Debug function - Definitions
+   VRX Driver Debug function - Definitions
    ========================================================================= */
 
 #if (MEI_SUPPORT_MEI_DEBUG == 1)
@@ -818,7 +817,7 @@ IFX_int32_t MEI_GpaWrAccess(
 
 /**
    General Purpose Access - READ.
-   - via these function access to the VINAX devcie will be possible
+   - via these function access to the VRX devcie will be possible
      in a general way
 
 \param

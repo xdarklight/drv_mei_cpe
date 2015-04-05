@@ -2,9 +2,8 @@
 #define _DRV_MEI_CPE_DBG_H
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -12,7 +11,7 @@
 ******************************************************************************/
 
 /* ==========================================================================
-   Description : This file contains OS specific defines for the VINAX driver.
+   Description : This file contains OS specific defines for the VRX driver.
 
    Remarks     : Please use the compiler switches here if you have
                  more than one OS.
@@ -37,7 +36,7 @@
 #endif
 
 /* ============================================================================
-   VINAX Driver Printout - Printout Levels
+   VRX Driver Printout - Printout Levels
    ========================================================================= */
 
 #define MEI_DRV_PRN_LEVEL_OFF          4
@@ -45,10 +44,8 @@
 #define MEI_DRV_PRN_LEVEL_NORMAL       2
 #define MEI_DRV_PRN_LEVEL_LOW          1
 
-
 #define MEI_DRV_PRN_LEVEL_ERR          MEI_DRV_PRN_LEVEL_HIGH
 #define MEI_DRV_PRN_LEVEL_WRN          MEI_DRV_PRN_LEVEL_NORMAL
-
 
 #define MEI_DRV_CRLF                   "\n\r"
 
@@ -56,7 +53,7 @@
 
 
 /* ============================================================================
-   VINAX Driver Printout - Macros for Printout Level Handling
+   VRX Driver Printout - Macros for Printout Level Handling
    ========================================================================= */
 #if ((MEI_DEBUG_PRINT == 1) || (MEI_ERROR_PRINT == 1))
 
@@ -137,7 +134,7 @@
 
 
 /* ============================================================================
-   VINAX Driver Printout - Debug Print, handle global switch
+   VRX Driver Printout - Debug Print, handle global switch
    ========================================================================= */
 #if (MEI_DEBUG_PRINT == 1)
 
@@ -235,7 +232,7 @@
 #if (MEI_DEBUG_PRINT == 1)
 
 /* ============================================================================
-   VINAX Driver Printout - Macros for Debug Printouts
+   VRX Driver Printout - Macros for Debug Printouts
    ========================================================================= */
 
 /*
@@ -251,6 +248,15 @@
             do { \
                if ( (dbg_level >= MEI_PrnUsrModule_##module_name) && (dbg_level >= MEI_PrnUsrModule_DBG_GLOBAL) ) \
                   { MEI_PRINT_USR print_message ; }\
+            } while(0)
+
+/**
+   Debug printout - triggered from user call
+*/
+#define PRN_DBG_USR_RAW(module_name, dbg_level, print_message) \
+            do { \
+               if ( (dbg_level >= MEI_PrnUsrModule_##module_name) && (dbg_level >= MEI_PrnUsrModule_DBG_GLOBAL) ) \
+                  { MEI_PRINT_INT_RAW print_message ; }\
             } while(0)
 
 /**
@@ -294,7 +300,7 @@
 #if (MEI_ERROR_PRINT == 1)
 
 /* ============================================================================
-   VINAX Driver Printout - Macros for Error Printouts
+   VRX Driver Printout - Macros for Error Printouts
    ========================================================================= */
 /*
 #if !defined(MEI_PRINT_INT) || !defined(MEI_PRINT_USR)
@@ -332,11 +338,11 @@
    Export Debug Infos
    ========================================================================= */
 
-/* VINAX-Driver: Global level debug control (seperate error / debug print) */
+/* VRX-Driver: Global level debug control (seperate error / debug print) */
 MEI_DRV_PRN_USR_MODULE_DECL(DBG_GLOBAL);
 MEI_DRV_PRN_INT_MODULE_DECL(DBG_GLOBAL);
 
-/* VINAX-Driver: Declare global debug control variable */
+/* VRX-Driver: Declare global debug control variable */
 MEI_DRV_PRN_DEBUG_CONTROL_DECL();
 
 

@@ -2,9 +2,8 @@
 #define _DRV_MEI_CPE_CLEAR_EOC_H
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -29,7 +28,7 @@
 #include "drv_mei_cpe_interface.h"
 
 /* ==========================================================================
-   Macro defs - VINAX Clear EOC common and constants
+   Macro defs - VRX Clear EOC common and constants
    ========================================================================== */
 
 #if defined (__GNUC__) || defined (__GNUG__)
@@ -44,7 +43,7 @@
 #endif
 
 /* ==========================================================================
-   Macro defs - VINAX Clear EOC constants
+   Macro defs - VRX Clear EOC constants
    ========================================================================== */
 
 /** Max timeout for Clear EOC frames transmit done */
@@ -69,7 +68,7 @@
 
 
 /* ==========================================================================
-   Macro defs - VINAX Clear EOC control macros
+   Macro defs - VRX Clear EOC control macros
    ========================================================================== */
 
 /** get the current timeout counter */
@@ -107,18 +106,18 @@
 /** Clear EOC driver config state - get */
 #define MEI_CEOC_CFG_STATE_GET(p_ceoc_dev_cntrl) (p_ceoc_dev_cntrl)->eCfgState
 
-/** Clear EOC VINAX TX buffer state state - set */
+/** Clear EOC VRX TX buffer state state - set */
 #define MEI_CEOC_TX_DEV_BUF_STATE_SET(p_ceoc_dev_cntrl, newstate) \
                (p_ceoc_dev_cntrl)->eTxDevBufState = newstate
 
-/** Clear EOC VINAX TX buffer state state - get */
+/** Clear EOC VRX TX buffer state state - get */
 #define MEI_CEOC_TX_DEV_BUF_STATE_GET(p_ceoc_dev_cntrl) (p_ceoc_dev_cntrl)->eTxDevBufState
 
-/** Clear EOC VINAX RX buffer state state - set */
+/** Clear EOC VRX RX buffer state state - set */
 #define MEI_CEOC_RX_DEV_BUF_STATE_SET(p_ceoc_dev_cntrl, newstate) \
                (p_ceoc_dev_cntrl)->eRxDevBufState = newstate
 
-/** Clear EOC VINAX RX buffer state state - get */
+/** Clear EOC VRX RX buffer state state - get */
 #define MEI_CEOC_RX_DEV_BUF_STATE_GET(p_ceoc_dev_cntrl) (p_ceoc_dev_cntrl)->eRxDevBufState
 
 /** check transparent mode - event status */
@@ -132,7 +131,7 @@
 
 
 /* ==========================================================================
-   Macro defs - VINAX Clear EOC statistics
+   Macro defs - VRX Clear EOC statistics
    ========================================================================== */
 #if ( (MEI_SUPPORT_STATISTICS == 1) && (MEI_SUPPORT_CEOC_STATISTICS == 1))
 
@@ -192,25 +191,25 @@
 
 
 /* ==========================================================================
-   typedefs - VINAX Clear EOC
+   typedefs - VRX Clear EOC
    ========================================================================== */
 
 /**
-   State for the VINAX Clear EOC configuration.
+   State for the VRX Clear EOC configuration.
 */
 typedef enum
 {
    /** initial state after startup, first enable */
    eMEI_CEOC_OP_CFG_INITIAL,
-   /** the VINAX Clear EOC configuration is valid */
+   /** the VRX Clear EOC configuration is valid */
    eMEI_CEOC_OP_CFG_VALID,
-   /** the VINAX Clear EOC configuration is valid and written to the device */
+   /** the VRX Clear EOC configuration is valid and written to the device */
    eMEI_CEOC_OP_CFG_WRITTEN
 } MEI_CEOC_OP_CFG_E;
 
 
 /**
-   State for the Clear EOC VINAX TX buffer.
+   State for the Clear EOC VRX TX buffer.
 */
 typedef enum
 {
@@ -227,7 +226,7 @@ typedef enum
 } MEI_CEOC_TX_BUF_STATE_E;
 
 /**
-   State for the Clear EOC VINAX RX buffer.
+   State for the Clear EOC VRX RX buffer.
 */
 typedef enum
 {
@@ -244,9 +243,9 @@ typedef enum
 
 #if ((MEI_SUPPORT_STATISTICS == 1) && (MEI_SUPPORT_CEOC_STATISTICS == 1))
 /**
-   VINAX ATM OAM statistic informations
+   VRX ATM OAM statistic informations
 */
-typedef struct vinax_ceoc_stats_s
+typedef struct vrx_ceoc_stats_s
 {
    /** number of written CEOC modem "write" messages */
    IFX_uint32_t wrMsgCnt;
@@ -290,7 +289,7 @@ typedef struct vinax_ceoc_stats_s
 /**
    Union for the Clear EOC raw data block.
 */
-union vinax_ceoc_raw_eoc_data_u
+union vrx_ceoc_raw_eoc_data_u
 {
    /** Clear EOC data block [byte] */
    IFX_uint8_t    d_8[MEI_CEOC_RAW_EOC_DATA_SIZE_BYTE];
@@ -298,14 +297,14 @@ union vinax_ceoc_raw_eoc_data_u
    IFX_uint16_t   d_16[MEI_CEOC_RAW_EOC_DATA_SIZE_16BIT];
 } __PACKED__ ;
 
-typedef union vinax_ceoc_raw_eoc_data_u      MEI_CEOC_RAW_EOC_DATA_T;
+typedef union vrx_ceoc_raw_eoc_data_u      MEI_CEOC_RAW_EOC_DATA_T;
 
 /**
-   Basic Clear EOC frame used by the VINAX firmware.
+   Basic Clear EOC frame used by the VRX firmware.
 */
-typedef struct vinax_ceoc_vnx_eoc_frame_s
+typedef struct vrx_ceoc_vrx_eoc_frame_s
 {
-   /** internal - VINAX driver message id */
+   /** internal - VRX driver message id */
    IFX_uint32_t   cEocId;
    /** lenght of the protocol identifier + data block [byte] */
    IFX_uint16_t   length_byte;
@@ -316,23 +315,23 @@ typedef struct vinax_ceoc_vnx_eoc_frame_s
 } MEI_CEOC_MEI_EOC_FRAME_T;
 
 /**
-   VINAX CEOC frame buffer
+   VRX CEOC frame buffer
 */
-typedef struct vinax_ceoc_frame_buffer_s
+typedef struct vrx_ceoc_frame_buffer_s
 {
    /** frame size: raw frame size + sizeof(protIdent) + sizeof(length_byte) + padding*/
    IFX_uint32_t                 frameSize_byte;
    /** already transfered size [bytes] */
    IFX_uint32_t                 transferedSize_byte;
    /** EOC frame struct */
-   MEI_CEOC_MEI_EOC_FRAME_T   vnxEocFrame;
+   MEI_CEOC_MEI_EOC_FRAME_T   vrxEocFrame;
 } MEI_CEOC_FRAME_BUFFER_T;
 
 
 /**
-   VINAX Clear EOC - data for Clear EOC insert extract.
+   VRX Clear EOC - data for Clear EOC insert extract.
 */
-typedef struct vinax_ceoc_dev_cntrl_s
+typedef struct vrx_ceoc_dev_cntrl_s
 {
    /** confifure the operation mode for the Clear EOC part */
    IFX_uint32_t               opMode;
@@ -344,9 +343,9 @@ typedef struct vinax_ceoc_dev_cntrl_s
    IFX_boolean_t              bEnEvtTxStatus;
 
 
-   /** current Vinax TX device buffer state */
+   /** current VRX TX device buffer state */
    MEI_CEOC_TX_BUF_STATE_E  eTxDevBufState;
-   /** current Vinax RX device buffer state */
+   /** current VRX RX device buffer state */
    MEI_CEOC_RX_BUF_STATE_E  eRxDevBufState;
 
    /** config driver - transparent mode for incoming event messages */

@@ -2,9 +2,8 @@
 #define _DRV_MEI_CPE_DRIVER_MSG_H
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -12,7 +11,7 @@
 ******************************************************************************/
 
 /* ==========================================================================
-   Description : VINAX driver messages
+   Description : VRX driver messages
    ========================================================================== */
 
 /* ==========================================================================
@@ -29,16 +28,16 @@
 
 
 /* ==========================================================================
-   Macro defs - VINAX Driver Message ID
+   Macro defs - VRX Driver Message ID
    ========================================================================== */
 
 /**
-   The current driver interface supports VINAX Driver messages
+   The current driver interface supports VRX Driver messages
 
    The driver message ID hase the following structure:
 
    Bit[ 7.. 0]   message:     Message number
-   Bit[15.. 8]   module:      0x00 = COMMON VINAX
+   Bit[15.. 8]   module:      0x00 = COMMON VRX
                               0x01 = COMMON MEIX-Control
                               0x02 = ROM (DOWNLOAD)
                               0x10 = REM ACCESS
@@ -54,63 +53,63 @@
 */
 
 /**
-   VINAX driver event "message number" mask and bit position
+   VRX driver event "message number" mask and bit position
 */
 #define MEI_DRV_MSG_MESSAGE_NUM_POS        0
 #define MEI_DRV_MSG_MESSAGE_NUM_MASK       (0x000000FF << MEI_DRV_MSG_MESSAGE_NUM_POS)
 
-/** VINAX Driver Message - ROM Start */
+/** VRX Driver Message - ROM Start */
 #define MEI_DRV_MSG_MESSAGE_NUM_ROM_START           0x01
-/** VINAX Driver Message - Remote ATM OAM Extract alarm */
+/** VRX Driver Message - Remote ATM OAM Extract alarm */
 #define MEI_DRV_MSG_MESSAGE_NUM_REM_ATM_OAM_EXTR    0x20
 
 /**
-   VINAX driver event "module" mask and bit position
+   VRX driver event "module" mask and bit position
 */
 #define MEI_DRV_MSG_MODULE_POS             8
 #define MEI_DRV_MSG_MODULE_MASK            (0x000000FF << MEI_DRV_MSG_MODULE_POS)
 
-/** VINAX Driver Message, MODULE - COMMON */
+/** VRX Driver Message, MODULE - COMMON */
 #define MEI_DRV_MSG_MODULE_COMMON          0x01
-/** VINAX Driver Message, MODULE - COMMON X-Control */
+/** VRX Driver Message, MODULE - COMMON X-Control */
 #define MEI_DRV_MSG_MODULE_COMMON_X        0x02
-/** VINAX Driver Message, MODULE - ROM (DOWNLOAD) */
+/** VRX Driver Message, MODULE - ROM (DOWNLOAD) */
 #define MEI_DRV_MSG_MODULE_ROM             0x04
-/** VINAX Driver Message, MODULE - Remote ATM OAM Access */
+/** VRX Driver Message, MODULE - Remote ATM OAM Access */
 #define MEI_DRV_MSG_MODULE_REM_ATM_ACCESS  0x20
-/** VINAX Driver Message, MODULE - Remote Clear EOC Access */
+/** VRX Driver Message, MODULE - Remote Clear EOC Access */
 #define MEI_DRV_MSG_MODULE_REM_EOC_ACCESS  0x40
 
 /**
-   VINAX driver event "type" mask and bit position
+   VRX driver event "type" mask and bit position
 */
 #define MEI_DRV_MSG_TYPE_POS               16
 #define MEI_DRV_MSG_TYPE_MASK              (0x0000007F << MEI_DRV_MSG_TYPE_POS)
 
-/** VINAX Driver Message, TYPE - CMD */
+/** VRX Driver Message, TYPE - CMD */
 #define MEI_DRV_MSG_TYPE_CMD               0x00
-/** VINAX Driver Message, TYPE - ACK */
+/** VRX Driver Message, TYPE - ACK */
 #define MEI_DRV_MSG_TYPE_ACK               0x00
-/** VINAX Driver Message, TYPE - EVT */
+/** VRX Driver Message, TYPE - EVT */
 #define MEI_DRV_MSG_TYPE_EVT               0x02
-/** VINAX Driver Message, TYPE - ALARM */
+/** VRX Driver Message, TYPE - ALARM */
 #define MEI_DRV_MSG_TYPE_ALARM             0x04
 
 
 /**
-   VINAX driver event "direction" mask and bit position
+   VRX driver event "direction" mask and bit position
 */
 #define MEI_DRV_MSG_DIRECTION_POS          23
 #define MEI_DRV_MSG_DIRECTION_MASK         (0x00000001 << MEI_DRV_MSG_DIRECTION_POS)
 
-/** VINAX Driver Message, DIRECTION - IN */
+/** VRX Driver Message, DIRECTION - IN */
 #define MEI_DRV_MSG_DIRECTION_IN           0x0
-/** VINAX Driver Message, DIRECTION - OUT */
+/** VRX Driver Message, DIRECTION - OUT */
 #define MEI_DRV_MSG_DIRECTION_OUT          0x1
 
 
 /**
-   VINAX driver event "return code" mask and bit position
+   VRX driver event "return code" mask and bit position
 */
 #define MEI_DRV_MSG_RET_VAL_POS            24
 #define MEI_DRV_MSG_RET_VAL_MASK           (0x000000FF << MEI_DRV_MSG_RET_VAL_POS)
@@ -165,7 +164,7 @@
 
 
 /* ==========================================================================
-   VINAX Driver Message - check aginst interface defines
+   VRX Driver Message - check aginst interface defines
    ========================================================================== */
 
 #define MEI_DRV_MSG_EVT_ROM_START \
@@ -176,7 +175,7 @@
            | (0 << MEI_DRV_MSG_RET_VAL_POS) )
 
 #if (MEI_DRV_MSG_EVT_ROM_START != MEI_DRV_MSG_IF_ROM_START_EVT)
-#error "VINAX Interface: missmatch for EVT_ROM_START"
+#error "VRX Interface: missmatch for EVT_ROM_START"
 #endif
 
 #define MEI_DRV_MSG_ALM_ROM_START\
@@ -187,7 +186,7 @@
            | (0 << MEI_DRV_MSG_RET_VAL_POS) )
 
 #if (MEI_DRV_MSG_ALM_ROM_START != MEI_DRV_MSG_IF_ROM_START_ALM)
-#error "VINAX Interface: missmatch for ALM_ROM_START"
+#error "VRX Interface: missmatch for ALM_ROM_START"
 #endif
 
 #define MEI_DRV_MSG_ALM_REM_ATM_OAM_EXTR \
@@ -198,7 +197,7 @@
            | (0 << MEI_DRV_MSG_RET_VAL_POS) )
 
 #if (MEI_DRV_MSG_ALM_REM_ATM_OAM_EXTR != MEI_DRV_MSG_IF_REM_ATM_OAM_EXTR_ALM)
-#error "VINAX Interface: missmatch for ALM_REM_ATM_OAM_EXTR"
+#error "VRX Interface: missmatch for ALM_REM_ATM_OAM_EXTR"
 #endif
 
 extern IFX_int32_t MEI_DrvMsg_RomStartDistribute(

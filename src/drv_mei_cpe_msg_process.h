@@ -2,9 +2,8 @@
 #define _DRV_MEI_CPE_MSG_PROCESS_H
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -12,7 +11,7 @@
 ******************************************************************************/
 
 /* ==========================================================================
-   Description : Message Handling between the driver and the VINAX device.
+   Description : Message Handling between the driver and the VRX device.
    ========================================================================== */
 
 #ifdef __cplusplus
@@ -131,11 +130,11 @@ extern IFX_uint32_t MEI_DistributeAutoMsg(
 
 extern IFX_boolean_t MEI_AddNfcToDevList(
                               MEI_DYN_CNTRL_T    *pMeiDynCntrl,
-                              MEI_DYN_NFC_DATA_T *pVinaxDynNfc);
+                              MEI_DYN_NFC_DATA_T *pVrxDynNfc);
 
 extern IFX_boolean_t MEI_RemoveNfcFromDevList(
                               MEI_DYN_CNTRL_T    *pMeiDynCntrl,
-                              MEI_DYN_NFC_DATA_T **ppVinaxDynNfc);
+                              MEI_DYN_NFC_DATA_T **ppVrxDynNfc);
 
 extern IFX_int32_t MEI_WriteMsgAndCheck(
                               MEI_DYN_CNTRL_T    *pMeiDynCntrl,

@@ -1,8 +1,7 @@
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -32,6 +31,10 @@
 #include "drv_mei_cpe_api.h"
 
 #include "drv_mei_cpe_download.h"
+
+#if (MEI_SUPPORT_DSM == 1)
+#include "drv_mei_cpe_dsm.h"
+#endif /* (MEI_SUPPORT_DSM == 1) */
 
 #include "drv_mei_cpe_mailbox.h"
 #include "drv_mei_cpe_msg_process.h"
@@ -101,23 +104,9 @@ IFX_uint32_t MEI_FsmStateSetMsgPreAction = 0;
 MEI_DRV_PRN_USR_MODULE_CREATE(MEI_DRV, MEI_DRV_PRN_LEVEL_LOW);
 MEI_DRV_PRN_INT_MODULE_CREATE(MEI_DRV, MEI_DRV_PRN_LEVEL_LOW);
 
-
-#if (MEI_SUPPORT_DEVICE_VINAX == 1)
-/** modem boot mode: auto / FW download
-
-\remarks
-    To force the driver to use an user specificed boot mode set the highest bit.
-\attention
-    This is only for testing and will not change the device boot mode which is
-    defined by HW setup.
-*/
-IFX_uint8_t MEI_BootMode =
-#if (MEI_SUPPORT_ROM_CODE == 1)
-            (MEI_DEV_BOOT_MODE_FWDL_ROM_START_SRAM | 0x00);
-#else
-            (MEI_DEV_BOOT_MODE_START_AUTO | 0x80);
-#endif
-#endif /* #if (MEI_SUPPORT_DEVICE_VINAX == 1)*/
+/* MEI CPE-Driver: fw message dump debug module - create print level variable */
+MEI_DRV_PRN_USR_MODULE_CREATE(MEI_MSG_DUMP_API, MEI_DRV_PRN_LEVEL_LOW);
+MEI_DRV_PRN_INT_MODULE_CREATE(MEI_MSG_DUMP_API, MEI_DRV_PRN_LEVEL_LOW);
 
 /* Block timeout (for debugging)
    0: timeout not blocked
@@ -223,7 +212,7 @@ MEI_STATIC IFX_int32_t MEI_WaitForFirstResponce(MEI_DEV_T *pMeiDev)
          while(ret == IFX_SUCCESS)
          {
             /* check if msg already in the mailbox */
-            MEI_PollIntPerVnxLine(pMeiDev, e_MEI_DEV_ACCESS_MODE_PASSIV_POLL);
+            MEI_PollIntPerVrxLine(pMeiDev, e_MEI_DEV_ACCESS_MODE_PASSIV_POLL);
 
             /* check if modem read / ROM init done received */
             if (    (MEI_DRV_STATE_GET(pMeiDev) == e_MEI_DRV_STATE_DFE_READY)
@@ -395,6 +384,14 @@ MEI_STATIC IFX_void_t MEI_MeiDevCntrlFree(
 MEIX_CNTRL_T *MEI_DevXCntrlStructAlloc(IFX_uint8_t entityNum)
 {
    MEIX_CNTRL_T  *pXCntrl = NULL;
+#if (MEI_SUPPORT_DEVICE_VR10 == 1)
+   if (MEI_VR10_PcieEntitiesCheck(entityNum) != IFX_SUCCESS)
+   {
+      PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+             ("MEIX_DRV[--]: ERROR Cntrl Struct Allocate - invalid device num" MEI_DRV_CRLF));
+      return IFX_NULL;
+   }
+#endif /* (MEI_SUPPORT_DEVICE_VR10 == 1) */
 
    if (entityNum >= MEI_MAX_DFEX_ENTITIES)
    {
@@ -562,6 +559,17 @@ MEI_DEV_T *MEI_DevLineStructAlloc( IFX_uint8_t nLineNum )
       /* save the device number for downloading firmware*/
       pMeiDev->fwDl.line_num = nLineNum;
 
+#if (MEI_SUPPORT_DEVICE_VR10 == 1)
+      if (MEI_VR10_PcieEntityInit(&pMeiDev->meiDrvCntrl) != IFX_SUCCESS)
+      {
+          PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+             ("MEI_DRV[%02d]: ERROR Line Struct Allocate - pcie driver failed"
+            MEI_DRV_CRLF, nLineNum));
+
+         return IFX_NULL;
+      }
+#endif /* (MEI_SUPPORT_DEVICE_VR10 == 1) */
+
 #if (MEI_SUPPORT_PCI_SLAVE_FW_DOWNLOAD == 1)
       /* Assume dev#0 to be a PCI master*/
       if (MEI_GET_ENTITY_FROM_DEVNUM(nLineNum))
@@ -670,6 +678,12 @@ IFX_int32_t MEI_DevLineStructFree(IFX_uint8_t nLineNum)
 
          /* Free FW download resources*/
          MEI_DEV_FirmwareDownloadResourcesRelease(pMeiDev);
+
+#if (MEI_SUPPORT_DSM == 1)
+         /* Free ERB buf */
+         MEI_VRX_DSM_ErbFree(pMeiDev);
+#endif /* (MEI_SUPPORT_DSM == 1) */
+
 
 #if (MEI_DRV_ATM_OAM_ENABLE == 1)
          MEI_AtmOamReleaseDevCntrl(pMeiDev);
@@ -915,6 +929,11 @@ IFX_int32_t MEI_InstanceLineAlloc(
       return -e_MEI_ERR_NO_MEM;
    }
 
+   if ((pMeiDynCntrl == IFX_NULL) || (pMeiDynCntrl->pMeiDev == IFX_NULL))
+   {
+      return -e_MEI_ERR_NO_MEM;
+   }
+
    pMeiDev = pMeiDynCntrl->pMeiDev;
 
    PRN_DBG_USR( MEI_DRV, MEI_DRV_PRN_LEVEL_LOW, MEI_DRV_LINENUM_GET(pMeiDev),
@@ -947,7 +966,9 @@ IFX_int32_t MEI_InstanceLineAlloc(
          Limit reached - free only the dynamic per open data blocks.
       */
       if (pMeiDynCntrl)
+      {
          MEI_DynCntrlStructFree(&pMeiDynCntrl);
+      }
 
       return e_MEI_ERR_DEV_NO_RESOURCE;
    }
@@ -1234,11 +1255,26 @@ IFX_int32_t MEI_IoctlDebugLevelSet(
                               MEI_DYN_CNTRL_T       *pMeiDynCntrl,
                               IOCTL_MEI_dbgLevel_t  *pArgDbgLevel)
 {
-   if ( (pArgDbgLevel->valLevel >= MEI_DRV_PRN_LEVEL_LOW) &&
-        (pArgDbgLevel->valLevel <= MEI_DRV_PRN_LEVEL_OFF) )
+   if ( (pArgDbgLevel->valLevel   >= MEI_DRV_PRN_LEVEL_LOW) &&
+        (pArgDbgLevel->valLevel   <= MEI_DRV_PRN_LEVEL_OFF) &&
+        (pArgDbgLevel->eDbgModule >= e_MEI_DBGMOD_MEI_DRV)  &&
+        (pArgDbgLevel->eDbgModule <= e_MEI_DBGMOD_MEI_MSG_DUMP_API) )
    {
-      MEI_DRV_PRN_USR_LEVEL_SET(MEI_DRV, pArgDbgLevel->valLevel);
-      MEI_DRV_PRN_INT_LEVEL_SET(MEI_DRV, pArgDbgLevel->valLevel);
+      switch(pArgDbgLevel->eDbgModule)
+      {
+         case e_MEI_DBGMOD_MEI_DRV:
+            MEI_DRV_PRN_USR_LEVEL_SET(MEI_DRV, pArgDbgLevel->valLevel);
+            MEI_DRV_PRN_INT_LEVEL_SET(MEI_DRV, pArgDbgLevel->valLevel);
+            break;
+
+         case e_MEI_DBGMOD_MEI_MSG_DUMP_API:
+            MEI_DRV_PRN_USR_LEVEL_SET(MEI_MSG_DUMP_API, pArgDbgLevel->valLevel);
+            MEI_DRV_PRN_INT_LEVEL_SET(MEI_MSG_DUMP_API, pArgDbgLevel->valLevel);
+            break;
+
+         default:
+            return -e_MEI_ERR_INVAL_ARG;
+      }
    }
    else
    {
@@ -1276,6 +1312,10 @@ IFX_void_t MEI_IoctlRequestConfig(
    pArgDevCfg_out->currOpenInst = (unsigned int)pMeiDynCntrl->openInstance;
    pArgDevCfg_out->phyBaseAddr  = (unsigned int)MEI_DRV_MEI_PHY_ADDR_GET(pMeiDev);
    pArgDevCfg_out->virtBaseAddr = (unsigned int)MEI_DRV_MEI_VIRT_ADDR_GET(pMeiDev);
+#if (MEI_SUPPORT_DEVICE_VR10 == 1)
+   pArgDevCfg_out->phyPDBRAMaddr  = (unsigned int)MEI_DRV_PDBRAM_PHY_ADDR_GET(pMeiDev);
+   pArgDevCfg_out->virtPDBRAMaddr = (unsigned int)MEI_DRV_PDBRAM_VIRT_ADDR_GET(pMeiDev);
+#endif /* (MEI_SUPPORT_DEVICE_VR10 == 1) */
    pArgDevCfg_out->usedIRQ      = (unsigned int)pMeiDynCntrl->pDfeX->IRQ_Num;
    pArgDevCfg_out->drvArc2MeMbSize = (unsigned int)sizeof(MEI_MEI_MAILBOX_T);
    pArgDevCfg_out->drvMe2ArcMbSize = (unsigned int)sizeof(MEI_MEI_MAILBOX_T);
@@ -1560,51 +1600,6 @@ IFX_int32_t MEI_StartupDevice(
 {
    IFX_int32_t ret = IFX_ERROR;
 
-#if (MEI_SUPPORT_DEVICE_VINAX == 1)
-   /*
-      BLOCK interrupts while state change because if interrupts already enabled
-      it will maybe set form interrupt service routine.
-   */
-   MEI_DisableDeviceInt(pMeiDev);
-
-   switch(MEI_DRV_BOOTMODE_GET(pMeiDev))
-   {
-      case e_MEI_DRV_BOOT_MODE_AUTO:
-         PRN_DBG_USR( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL, MEI_DRV_LINENUM_GET(pMeiDev),
-                ("MEI_DRV[%02d]: Start AUTO - wait" MEI_DRV_CRLF, MEI_DRV_LINENUM_GET(pMeiDev)));
-
-         MEI_DRV_STATE_SET(pMeiDev, e_MEI_DRV_STATE_WAIT_FOR_FIRST_RESP);
-
-         break;
-
-      case e_MEI_DRV_BOOT_MODE_7:
-
-         #if (MEI_SUPPORT_DL_DMA_CS == 1)
-         /* wait for modem start via download */
-         PRN_DBG_USR( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL, MEI_DRV_LINENUM_GET(pMeiDev),
-                ("MEI_DRV[%02d]: Start ROM HANDLER (BM-7 DL)- wait" MEI_DRV_CRLF,
-                 MEI_DRV_LINENUM_GET(pMeiDev)));
-
-         MEI_DRV_STATE_SET(pMeiDev, e_MEI_DRV_STATE_BOOT_WAIT_ROM_ALIVE);
-         #else
-         PRN_DBG_USR( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL, MEI_DRV_LINENUM_GET(pMeiDev),
-                ("MEI_DRV[%02d]: ERROR - Start ROM HANDLER (BM-7 DL) not supported" MEI_DRV_CRLF,
-                 MEI_DRV_LINENUM_GET(pMeiDev)));
-
-         return IFX_ERROR;
-         #endif
-
-         break;
-      default:
-         PRN_DBG_USR( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL, MEI_DRV_LINENUM_GET(pMeiDev),
-                ("MEI_DRV[%02d]: ERROR - Start Dev - invalid boot mode" MEI_DRV_CRLF,
-                 MEI_DRV_LINENUM_GET(pMeiDev)));
-
-         return IFX_ERROR;
-   }
-
-   MEI_EnableDeviceInt(pMeiDev);
-#endif /* #if (MEI_SUPPORT_DEVICE_VINAX == 1)*/
    /*
       wait for modem alive
    */
@@ -1624,7 +1619,7 @@ IFX_int32_t MEI_StartupDevice(
    Helper function - counts/checks/update the marked devices of the given mask.
 
 \param
-   pVnxDevMask      - device mask - all devices for update are set to 1
+   pVrxDevMask      - device mask - all devices for update are set to 1
 \prame
    fctCheckDevState - callback function used for check an dedicated state of the
                       device.
@@ -1636,7 +1631,7 @@ IFX_int32_t MEI_StartupDevice(
 
 */
 IFX_int32_t MEIX_DevMaskCheck(
-                              IFX_uint32_t               *pVnxDevMask,
+                              IFX_uint32_t               *pVrxDevMask,
                               MEI_FCT_CHECK_DEV_STATE  fctCheckDevState)
 {
    IFX_uint8_t devCount=0, iMask, devFlag;
@@ -1649,11 +1644,11 @@ IFX_int32_t MEIX_DevMaskCheck(
          break;
 
       /* parse the given mask */
-      if (pVnxDevMask[iMask] != 0x0)
+      if (pVrxDevMask[iMask] != 0x0)
       {
          for (devFlag=0; devFlag<32; devFlag++)
          {
-            if ( ! (pVnxDevMask[iMask] & (0x00000001 << devFlag)) )
+            if ( ! (pVrxDevMask[iMask] & (0x00000001 << devFlag)) )
                continue;
 
             /* marked device found - check state and update mask */
@@ -1674,13 +1669,13 @@ IFX_int32_t MEIX_DevMaskCheck(
                   else
                   {
                      /* invalid state - clear flag */
-                     pVnxDevMask[iMask] &= (~(0x00000001 << devFlag));
+                     pVrxDevMask[iMask] &= (~(0x00000001 << devFlag));
                   }
                }
                else
                {
                   /* device not exists - clear flag */
-                  pVnxDevMask[iMask] &= (~(0x00000001 << devFlag));
+                  pVrxDevMask[iMask] &= (~(0x00000001 << devFlag));
                }
             }
             else
@@ -1712,14 +1707,14 @@ IFX_int32_t MEIX_DevMaskCheck(
    else     root of the list which use these IRQ.
 
 */
-MEIX_CNTRL_T *MEI_VnxXDevToIrqListAdd(
+MEIX_CNTRL_T *MEI_VrxXDevToIrqListAdd(
                                  IFX_uint8_t    devNum,
                                  IFX_uint32_t   irqNum,
                                  MEIX_CNTRL_T *pMeiXCntrl)
 {
    /* 0: new IRQ, 1: new device, 2: already chained */
    int found = 0;
-   int entity, rel_VnxNum;
+   int entity, rel_VrxNum;
    MEIX_CNTRL_T *pTmpXCntrl, *plastDfeXCntrl = NULL;
 
    /* loop through all Entities to check if IRQ is already used */
@@ -1756,7 +1751,7 @@ MEIX_CNTRL_T *MEI_VnxXDevToIrqListAdd(
       }
    }        /* for (entity=0; entity<MEI_MAX_DFEX_ENTITIES; entity++) {...} */
 
-   /* check if existing VINAXx found */
+   /* check if existing VRX found */
    switch(found)
    {
       case 0:
@@ -1770,7 +1765,7 @@ MEIX_CNTRL_T *MEI_VnxXDevToIrqListAdd(
                  devNum, irqNum));
          break;
       case 1:
-         /* new VINAXx device to register for this IRQ
+         /* new VRX device to register for this IRQ
             --> add to end of the list */
          pMeiXCntrl->IRQ_Num = irqNum;
          pTmpXCntrl = plastDfeXCntrl;
@@ -1800,11 +1795,11 @@ MEIX_CNTRL_T *MEI_VnxXDevToIrqListAdd(
                 ("MEI_DRV[%02d]: ERROR while assign MEIx dev to IRQ - IRQ already blocked%d" MEI_DRV_CRLF,
                  devNum, irqNum));
 
-         for (rel_VnxNum=0; rel_VnxNum < MEI_MAX_DFE_INSTANCE_PER_ENTITY ; rel_VnxNum++)
+         for (rel_VrxNum=0; rel_VrxNum < MEI_MAX_DFE_INSTANCE_PER_ENTITY ; rel_VrxNum++)
          {
-            if ( pMeiXCntrl->MeiDevice[rel_VnxNum] )
+            if ( pMeiXCntrl->MeiDevice[rel_VrxNum] )
             {
-               MEI_DRV_STATE_SET(pMeiXCntrl->MeiDevice[rel_VnxNum], e_MEI_DRV_STATE_CFG_ERROR);
+               MEI_DRV_STATE_SET(pMeiXCntrl->MeiDevice[rel_VrxNum], e_MEI_DRV_STATE_CFG_ERROR);
             }
          }
          pTmpXCntrl = NULL;
@@ -1822,15 +1817,15 @@ MEIX_CNTRL_T *MEI_VnxXDevToIrqListAdd(
 
 
 /**
-   Clear the given VINAXx device list.
+   Clear the given VRX device list.
 
 \param
-   pMeiXCntrl  points to the current VINAXx device struct.
+   pMeiXCntrl  points to the current VRX device struct.
 
 \return
    NONE
 */
-IFX_void_t MEI_VnxXDevFromIrqListClear(
+IFX_void_t MEI_VrxXDevFromIrqListClear(
                                  MEIX_CNTRL_T *pMeiXCntrl)
 {
    MEIX_CNTRL_T *pTmpCurr, *pTmpNext;
@@ -1878,7 +1873,7 @@ IFX_int32_t MEI_DevPollAllIrq (MEI_DEV_ACCESS_MODE_E eAccessMode)
               (MEI_DRV_STATE_GET(pMeiDev) != e_MEI_DRV_STATE_DFE_RESET) )
          {
             /* in polling mode: protect the read access */
-            MEI_PollIntPerVnxLine(pMeiDev, eAccessMode);
+            MEI_PollIntPerVrxLine(pMeiDev, eAccessMode);
          }
       }
    }
@@ -1888,17 +1883,17 @@ IFX_int32_t MEI_DevPollAllIrq (MEI_DEV_ACCESS_MODE_E eAccessMode)
 
 
 /**
-   Handles interrupts on VINAX device level in polling mode.
+   Handles interrupts on VRX device level in polling mode.
    Therefore this function lock the driver struct before the interrupt
    routine is called.
 
 \param
-   pMeiDev     private VINAX device data.
+   pMeiDev     private VRX device data.
 
 \return
    Number of processed interrupts.
 */
-IFX_int32_t MEI_PollIntPerVnxLine(
+IFX_int32_t MEI_PollIntPerVrxLine(
                            MEI_DEV_T             *pMeiDev,
                            MEI_DEV_ACCESS_MODE_E eAccessMode)
 {
@@ -1916,7 +1911,7 @@ IFX_int32_t MEI_PollIntPerVnxLine(
          MEI_DRV_GET_UNIQUE_DEVICE_ACCESS(pMeiDev);
       }
 
-      meiIntCnt = MEI_ProcessIntPerVnxLine(pMeiDev);
+      meiIntCnt = MEI_ProcessIntPerVrxLine(pMeiDev);
 
       if (pMeiDev->eModePoll == e_MEI_DEV_ACCESS_MODE_ACTIV_POLL)
       {
@@ -1934,19 +1929,22 @@ IFX_int32_t MEI_PollIntPerVnxLine(
 
 
 /**
-   Handles interrupts on VINAX device level.
+   Handles interrupts on VRX device level.
 
 \param
-   pMeiDev     private VINAX device data.
+   pMeiDev     private VRX device data.
 
 \return
    Number of processed interrupts
 */
-IFX_int32_t MEI_ProcessIntPerVnxLine(
+IFX_int32_t MEI_ProcessIntPerVrxLine(
                                  MEI_DEV_T *pMeiDev)
 {
    IFX_int32_t  processCnt = 0, gpIntCnt = 0;
    MEI_MeiRegVal_t processInt, intMask, tmpInt;
+#if (MEI_DBG_DSM_PROFILING == 1)
+   IFX_uint32_t *pMeiErrVecSize = (IFX_uint32_t *)pMeiDev->meiERBbuf.pERB;
+#endif
 
    if (MEI_DRV_MEI_IF_STATE_GET(pMeiDev) == e_MEI_MEI_HW_STATE_UP)
    {
@@ -1995,8 +1993,17 @@ IFX_int32_t MEI_ProcessIntPerVnxLine(
       processCnt++;
       MEI_IF_STAT_INC_MSGAV_INT_COUNT(pMeiDev);
 
+      #if (MEI_DBG_DSM_PROFILING == 1)
+      /* [TD, 2012-11-19] Reset ERB data word (32 bit) - index: 8, offset: 0x20
+         For FW debugging: Directly after an IRQ has been detected. */
+      if ((pMeiErrVecSize != NULL) && (pMeiDev->meiERBbuf.nERBsize_byte > 0) &&
+          (pMeiDev->bErbReset == IFX_TRUE))
+      {
+         *(pMeiErrVecSize + 8) = 0x0;
+      }
+      #endif
       PRN_DBG_INT( MEI_DRV, MEI_DRV_PRN_LEVEL_LOW, MEI_DRV_LINENUM_GET(pMeiDev),
-           ("MEI_DRV[%02d]: MEI_ProcessIntPerVnxLine - MSGAV (0x%08X)" MEI_DRV_CRLF,
+           ("MEI_DRV[%02d]: MEI_ProcessIntPerVrxLine - MSGAV (0x%08X)" MEI_DRV_CRLF,
            MEI_DRV_LINENUM_GET(pMeiDev), processInt));
       MEI_ReadMailbox(pMeiDev);
    }
@@ -2010,7 +2017,7 @@ IFX_int32_t MEI_ProcessIntPerVnxLine(
          - signal/wakeup event for DBG done
       */
       PRN_DBG_INT( MEI_DRV, MEI_DRV_PRN_LEVEL_LOW, MEI_DRV_LINENUM_GET(pMeiDev),
-           ("MEI_DRV[%02d]: MEI_ProcessIntPerVnxLine - DBG_DONE" MEI_DRV_CRLF,
+           ("MEI_DRV[%02d]: MEI_ProcessIntPerVrxLine - DBG_DONE" MEI_DRV_CRLF,
            MEI_DRV_LINENUM_GET(pMeiDev)));
 
    }
@@ -2020,31 +2027,31 @@ IFX_int32_t MEI_ProcessIntPerVnxLine(
 
 
 /**
-   Handles interrupts on VINAXx chip level.
+   Handles interrupts on VRX chip level.
 
 \param
-   pMeiXCntrl  private VINAXx chip data.
+   pMeiXCntrl  private VRX chip data.
 
 \return
    IFX_TRUE if data for upper layer is available
 */
 MEI_STATIC IFX_uint32_t MEI_ProcessIntPerChip(MEIX_CNTRL_T *pMeiXCntrl)
 {
-   int rel_VnxNum;
+   int rel_VrxNum;
    IFX_int32_t meiIntCnt = 0;
 
-   for (rel_VnxNum=0; rel_VnxNum < MEI_MAX_DFE_INSTANCE_PER_ENTITY ; rel_VnxNum++)
+   for (rel_VrxNum=0; rel_VrxNum < MEI_MAX_DFE_INSTANCE_PER_ENTITY ; rel_VrxNum++)
    {
-      if ( pMeiXCntrl->MeiDevice[rel_VnxNum] &&
-           MEI_DRV_STATE_GET(pMeiXCntrl->MeiDevice[rel_VnxNum]) != e_MEI_DRV_STATE_NOT_INIT)
+      if ( pMeiXCntrl->MeiDevice[rel_VrxNum] &&
+           MEI_DRV_STATE_GET(pMeiXCntrl->MeiDevice[rel_VrxNum]) != e_MEI_DRV_STATE_NOT_INIT)
       {
-         meiIntCnt += MEI_ProcessIntPerVnxLine(pMeiXCntrl->MeiDevice[rel_VnxNum]);
+         meiIntCnt += MEI_ProcessIntPerVrxLine(pMeiXCntrl->MeiDevice[rel_VrxNum]);
       }
    }
 
    if (meiIntCnt)
    {
-      /* at least one interrupt has been processed for this VINAX device */
+      /* at least one interrupt has been processed for this VRX device */
       pMeiXCntrl->meiIntCnt++;
    }
 
@@ -2066,7 +2073,7 @@ IFX_int32_t MEI_ProcessIntPerIrq(MEIX_CNTRL_T *pMeiXCntrlList)
    IFX_int32_t meiIntCnt = 0;
    MEIX_CNTRL_T *pNextXCntrl = pMeiXCntrlList;
 
-   /* get the actual chip device from the list and step through the VINAX devices */
+   /* get the actual chip device from the list and step through the VRX devices */
    while(pNextXCntrl)
    {
       meiIntCnt += MEI_ProcessIntPerChip(pNextXCntrl);
@@ -2090,23 +2097,23 @@ IFX_int32_t MEI_ProcessIntPerIrq(MEIX_CNTRL_T *pMeiXCntrlList)
    pMeiXCntrlList  list of devices for this IRQ.
 
 \return
-   Number of VINAX VINAX'S assigned to this IRQ.
+   Number of VRX VRX'S assigned to this IRQ.
 */
 IFX_int32_t MEI_DisableDevsPerIrq(MEIX_CNTRL_T *pMeiXCntrlList)
 {
-   IFX_int32_t rel_VnxNum, meiDfeCnt = 0;
+   IFX_int32_t rel_VrxNum, meiDfeCnt = 0;
    MEIX_CNTRL_T *pNextXCntrl = pMeiXCntrlList;
 
-   /* get the actual chip device from the list and step through the VINAX devices */
+   /* get the actual chip device from the list and step through the VRX devices */
    while(pNextXCntrl)
    {
       pNextXCntrl->IRQ_Protection = -1;
 
-      for (rel_VnxNum=0; rel_VnxNum < MEI_MAX_DFE_INSTANCE_PER_ENTITY ; rel_VnxNum++)
+      for (rel_VrxNum=0; rel_VrxNum < MEI_MAX_DFE_INSTANCE_PER_ENTITY ; rel_VrxNum++)
       {
-         if ( pNextXCntrl->MeiDevice[rel_VnxNum] )
+         if ( pNextXCntrl->MeiDevice[rel_VrxNum] )
          {
-            MEI_DRV_STATE_SET(pNextXCntrl->MeiDevice[rel_VnxNum], e_MEI_DRV_STATE_CFG_ERROR);
+            MEI_DRV_STATE_SET(pNextXCntrl->MeiDevice[rel_VrxNum], e_MEI_DRV_STATE_CFG_ERROR);
             meiDfeCnt ++;
          }
       }
@@ -2118,7 +2125,7 @@ IFX_int32_t MEI_DisableDevsPerIrq(MEIX_CNTRL_T *pMeiXCntrlList)
 
 
 /**
-   Activate/Deactivate VINAX Reset
+   Activate/Deactivate VRX Reset
 
 \param
    pDev  private device data
@@ -2128,7 +2135,7 @@ IFX_int32_t MEI_DisableDevsPerIrq(MEIX_CNTRL_T *pMeiXCntrlList)
             - e_MEI_RESET_ACTIVATE
             - e_MEI_RESET_DEACTIVATE
 \param
-   rstSelMask  VINAX device blocks to reset
+   rstSelMask  VRX device blocks to reset
 \param
    rstSrc   Reset reason
             0 Software / user triggered.
@@ -2187,7 +2194,7 @@ IFX_int32_t MEI_DrvAndDevReset(
 \param
    pDev        private device data
 \param
-   rstSelect   select also the VINAX device internal blocks.
+   rstSelect   select also the VRX device internal blocks.
 
 \return
    IFX_SUCCESS    now the driver is in init done state.
@@ -2234,7 +2241,7 @@ MEI_STATIC IFX_int32_t MEI_DrvAndDevResetDeAct(
 \param
    pDev        private device data
 \param
-   rstSelect   select also the VINAX device internal blocks.
+   rstSelect   select also the VRX device internal blocks.
 \param
    rstSrc   Reset reason
             0 Software / user triggered.
@@ -2294,7 +2301,7 @@ MEI_STATIC IFX_int32_t MEI_DrvAndDevResetAct(
 
 
 /**
-   Setup of the VINAX driver settings and return the current settings.
+   Setup of the VRX driver settings and return the current settings.
 
 \param
    pMeiDynCntrl points to the dynamic control struct.
@@ -2339,7 +2346,7 @@ IFX_void_t MEI_IoctlDrvInit(
 }
 
 /**
-   Return the VINAX driver version.
+   Return the VRX driver version.
 
 \param
    pMeiDynCntrl - points to the dynamic control struct.
@@ -2539,7 +2546,7 @@ IFX_int32_t MEI_MsgSendPreAction(
    Clear (disable) the interrupt mask for the the given device.
 
 \param
-   pMeiDev: Points to the VINAX device control struct.
+   pMeiDev: Points to the VRX device control struct.
 
 \return
    none
@@ -2559,7 +2566,7 @@ IFX_void_t MEI_DisableDeviceInt(MEI_DEV_T *pMeiDev)
    - Driver Loop (message available interrupt disabled)
 
 \param
-   pMeiDev: Points to the VINAX device control struct.
+   pMeiDev: Points to the VRX device control struct.
 
 \return
    none
@@ -2579,13 +2586,13 @@ IFX_void_t MEI_EnableDeviceInt(MEI_DEV_T *pMeiDev)
 IFX_void_t MEI_MsgIntSet(MEI_DEV_T *pMeiDev)
 {
 
-#if (MEI_SUPPORT_DEVICE_VR9 == 1)
+#if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1)
    pMeiDev->meiDrvCntrl.intMsgMask = MEI_GET_REL_CH_FROM_DEVNUM(pMeiDev->meiDrvCntrl.dslLineNum) == 0 ?
       ME_ARC2ME_MASK_ARC_MSGAV0_ENA :
       ME_ARC2ME_MASK_ARC_MSGAV1_ENA;
 #else
    pMeiDev->meiDrvCntrl.intMsgMask = ME_ARC2ME_MASK_ARC_MSGAV_ENA;
-#endif /* #if (MEI_SUPPORT_DEVICE_VR9 == 1)*/
+#endif /* #if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1)*/
    return;
 }
 
@@ -2611,7 +2618,7 @@ MEI_STATIC void MEI_VersionParse(IFX_uint8_t *pVersion, IFX_uint8_t *pMajor,
 MEI_DRVOS_ThreadCtrl_t MEI_DrvCntrlThreadParams;
 
 /**
-   Vinax driver internal control task for periodic handling.
+   Vrx driver internal control task for periodic handling.
 */
 IFX_int32_t MEI_DrvCntrlThr(
                         MEI_DRVOS_ThreadParams_t *pCntrlThrParams)
@@ -2667,4 +2674,132 @@ IFX_int32_t MEI_DrvCntrlThr(
 
 #endif   /* #if (MEI_SUPPORT_PERIODIC_TASK == 1) */
 
+#if (MEI_SUPPORT_DSM == 1)
+IFX_int32_t MEI_IoctlDsmStatisticGet(MEI_DYN_CNTRL_T *pMeiDynCntrl,
+                             IOCTL_MEI_dsmStatistics_t *pDsmStatistic)
+{
+   MEI_DEV_T *pMeiDev = pMeiDynCntrl->pMeiDev;
+
+   /* read n_fw_dropped_size frim firmware via msg */
+   MEI_VRX_DSM_FwStatsUpdate(pMeiDynCntrl, &pMeiDev->meiDsmStatistic.n_fw_dropped_size);
+
+   pDsmStatistic->n_processed            = pMeiDev->meiDsmStatistic.n_processed;
+   pDsmStatistic->n_fw_dropped_size      = pMeiDev->meiDsmStatistic.n_fw_dropped_size;
+   pDsmStatistic->n_mei_dropped_size     = pMeiDev->meiDsmStatistic.n_mei_dropped_size;
+   pDsmStatistic->n_mei_dropped_no_pp_cb = pMeiDev->meiDsmStatistic.n_mei_dropped_no_pp_cb;
+   pDsmStatistic->n_pp_dropped           = pMeiDev->meiDsmStatistic.n_pp_dropped;
+
+   return IFX_SUCCESS;
+}
+
+IFX_int32_t MEI_IoctlDsmConfigGet(MEI_DYN_CNTRL_T *pMeiDynCntrl,
+                                 IOCTL_MEI_dsmConfig_t *pDsmConfig)
+{
+   MEI_DEV_T *pMeiDev = pMeiDynCntrl->pMeiDev;
+
+   pDsmConfig->eVectorControl = pMeiDev->meiDsmConfig.eVectorControl;
+
+   return IFX_SUCCESS;
+}
+
+IFX_int32_t MEI_IoctlDsmConfigSet(MEI_DYN_CNTRL_T *pMeiDynCntrl,
+                            IOCTL_MEI_dsmConfig_t *pDsmConfig)
+{
+   MEI_DEV_T *pMeiDev = pMeiDynCntrl->pMeiDev;
+   IOCTL_MEI_firmwareFeatures_t *pFwFeatures = &(pMeiDev->firmwareFeatures);
+
+   /* Only proceed if a firmware was download before (otherwise following
+      feature checks will not return meaningful values) */
+   if (pMeiDev->statistics.fwDlCount == 0)
+   {
+      PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+         ("MEI_DRV: Please download a firmware first!"MEI_DRV_CRLF));
+      return (-e_MEI_ERR_INVAL_STATE);
+   }
+
+   /* Check Fw application type */
+   if ( !((pFwFeatures->eFirmwareXdslModes) &
+          (e_MEI_FW_XDSLMODE_VDSL2 | e_MEI_FW_XDSLMODE_VDSL2_VECTOR)) )
+   {
+      /* Firmware does not include any VDSL functionality (ADSL only).
+         Not intended usage case!
+         Do not allow any vectoring enable configuration in this case. */
+      if (pDsmConfig->eVectorControl > e_MEI_VECTOR_CTRL_OFF)
+      {
+         PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+            ("MEI_DRV: Firmware does not support G.Vector"MEI_DRV_CRLF));
+         return (-e_MEI_ERR_NOT_SUPPORTED_BY_FIRMWARE);
+      }
+   }
+   else if ( !((pFwFeatures->eFirmwareXdslModes) &
+               (e_MEI_FW_XDSLMODE_VDSL2_VECTOR)) )
+   {
+      /* Firmware only supports G.Vector friendly (Annex O) operation.
+         Do not allow to switch on full G.Vector (Annex N). */
+      if (pDsmConfig->eVectorControl == e_MEI_VECTOR_CTRL_ON)
+      {
+         PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+            ("MEI_DRV: Firmware does not support full G.Vector (Annex N)"
+             MEI_DRV_CRLF));
+         return (-e_MEI_ERR_NOT_SUPPORTED_BY_FIRMWARE);
+      }
+   }
+
+   pMeiDev->meiDsmConfig.eVectorControl = pDsmConfig->eVectorControl;
+
+   if (pMeiDev->bDsmConfigInit == IFX_FALSE)
+   {
+      pMeiDev->bDsmConfigInit = IFX_TRUE;
+   }
+
+   return IFX_SUCCESS;
+}
+
+IFX_int32_t MEI_IoctlDsmStatusGet(MEI_DYN_CNTRL_T *pMeiDynCntrl,
+                            IOCTL_MEI_dsmStatus_t *pDsmStatus)
+{
+   IFX_int32_t ret = 0;
+   MEI_DEV_T *pMeiDev = pMeiDynCntrl->pMeiDev;
+
+   /* Update Modem State */
+   MEI_VRX_DSM_ModemStateUpdate(pMeiDynCntrl);
+
+   if ((MEI_DRV_MODEM_STATE_GET(pMeiDev) == 7) || (MEI_DRV_MODEM_STATE_GET(pMeiDev) == 8))
+   {
+      ret = MEI_VRX_DSM_StatusGet(pMeiDynCntrl, pDsmStatus);
+   }
+   else
+   {
+      PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_WRN,
+         ("MEI_DRV: WARNING - Function is only available in SHOWTIME!" MEI_DRV_CRLF));
+
+      pDsmStatus->eVectorStatus = e_MEI_VECTOR_STAT_OFF;
+      pDsmStatus->eVectorFriendlyStatus = e_MEI_VECTOR_FRIENDLY_STAT_OFF;
+
+      ret = -e_MEI_ERR_INCOMPLETE_RETURN_VALUES;
+   }
+
+   return ret;
+}
+
+IFX_int32_t MEI_IoctlMacConfigGet(MEI_DYN_CNTRL_T *pMeiDynCntrl,
+                            IOCTL_MEI_MacConfig_t *pMacConfig)
+{
+   MEI_DEV_T *pMeiDev = pMeiDynCntrl->pMeiDev;
+
+   memcpy(pMacConfig->nMacAddress, &pMeiDev->meiMacConfig.nMacAddress,
+                                                       MEI_MAC_ADDRESS_OCTETS);
+   return IFX_SUCCESS;
+}
+
+IFX_int32_t MEI_IoctlMacConfigSet(MEI_DYN_CNTRL_T *pMeiDynCntrl,
+                            IOCTL_MEI_MacConfig_t *pMacConfig)
+{
+   MEI_DEV_T *pMeiDev = pMeiDynCntrl->pMeiDev;
+
+   memcpy(&pMeiDev->meiMacConfig.nMacAddress, pMacConfig->nMacAddress,
+                                                       MEI_MAC_ADDRESS_OCTETS);
+   return IFX_SUCCESS;
+}
+#endif /* (MEI_SUPPORT_DSM == 1) */
 

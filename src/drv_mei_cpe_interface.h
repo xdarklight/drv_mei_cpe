@@ -2,9 +2,8 @@
 #define _DRV_MEI_CPE_INTERFACE_H
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -14,6 +13,8 @@
 /* ==========================================================================
    Description : Interface to user application of the MEI CPE Driver
    ========================================================================== */
+
+#ifndef DSL_DOC_GENERATION_EXCLUDE_UNWANTED
 
 /** \defgroup MEI_INTERFACE MEI CPE Driver Interface
     Lists the entire interface of the MEI CPE Driver
@@ -72,12 +73,26 @@
    \ingroup MEI_CEOC
 */
 
+/** \defgroup MEI_DSM Functions for Digital Spectrum Management (DSM/vectoring)
+    This Group contains all the commonly used functions for configuration,
+    control and status request of the [D]igital [S]pectrum [M]anagement related
+    functionality.
+    As vectoring (G.Vector/G.993.5) is classified as DSM Layer 3 handling it is
+    the only implemented functionality that belongs to this category at the
+    moment.
+    \ingroup MEI_INTERFACE
+*/
+
+/**
+   \defgroup MEI_DSM_IOCTL IOCtl's
+   \ingroup MEI_DSM
+*/
+
 /**
     \defgroup MEI_ERROR_CODES Error Codes
     Defines all possible error codes returned by the DSL API library
     \ingroup MEI_INTERFACE
 */
-
 
 /* ==========================================================================
    Driver features
@@ -122,8 +137,9 @@
      IOCTL_MEI_dbgLevel_t dbgLevel;
 
      memset(&dbgLevel, 0x00, sizeof(IOCTL_MEI_dbgLevel_t));
+     dbgLevel.eDbgModule = e_MEI_DBGMOD_MEI_DRV;
      dbgLevel.valLevel = MEI_DRV_PRN_LEVEL_LOW;
-     ret = ioctl(fd, FIO_MEI_DEBUGLEVEL, &dbgLevel)
+     ret = ioctl(fd, FIO_MEI_DEBUGLEVEL, &dbgLevel);
    \endcode
 
    \ingroup MEI_DEBUG_IOCTL */
@@ -1165,6 +1181,206 @@
 /** For debug only: make an DMA test */
 #define FIO_MEI_DMA_TEST               _IO(MEI_IOC_MAGIC, 64)
 
+#endif /* #ifndef DSL_DOC_GENERATION_EXCLUDE_UNWANTED */
+
+/**
+   This returns statistics counters which are related to the G.Vector related
+   processing of error vectors.
+
+   CLI
+   - long command: DSM_STATisticsGet
+   - short command: dsmstatg
+
+   \note
+   - Vectoring (G.Vector/G.993.5) related functionality is classified as DSM
+     ([D]igital [S]pectrum [M]anagement) Layer 3 handling.
+   - This function is a part of the MEI Driver.
+
+   \param IOCTL_MEI_dsmStatistics_t* points to the
+      \ref IOCTL_MEI_dsmStatistics_t control structure
+
+   \return
+      - 0 if successful, otherwise -1
+
+   \remarks
+   The return code is always returned via the param struct.
+   The current settings are returned via the given argument.
+
+
+   \code
+   IOCTL_MEI_dsmStatistics_t dsmStatistics;
+   memset(&dsmStatistics, 0x00, sizeof(IOCTL_MEI_dsmStatistics_t));
+   ret = ioctl(fd, FIO_MEI_DSM_STATISTICS_GET, &dsmStatistics);
+   \endcode
+
+   \ingroup MEI_DSM_IOCTL
+*/
+#define FIO_MEI_DSM_STATISTICS_GET      _IO(MEI_IOC_MAGIC, 75)
+
+/**
+   This function has to be used to set the MAC address configuration.
+
+   CLI
+   - long command: DSM_MacConfigSet
+   - short command: dsmmcs
+
+   \note This function is a part of the MEI Driver.
+
+   \param IOCTL_MEI_MacConfig_t* points to the
+      \ref IOCTL_MEI_MacConfig_t control structure
+
+   \return
+      - 0 if successful, otherwise -1
+
+   \remarks
+   The return code is always returned via the param struct.
+   The current settings are returned via the given argument.
+
+   \code IOCTL_MEI_MacConfig_t macConfig;
+   memset(&macConfig, 0x00, sizeof(IOCTL_MEI_MacConfig_t));
+   macConfig.nMacAddress = {0x01, 0x23, 0x45, 0xAB, 0xCD, 0xEF};
+   ret = ioctl(fd, FIO_MEI_MAC_CONFIG_SET, &macConfig);
+   \endcode
+
+   \ingroup MEI_DSM_IOCTL
+*/
+#define FIO_MEI_MAC_CONFIG_SET      _IO(MEI_IOC_MAGIC, 76)
+
+/**
+   This function provides configuration options to get MAC related network
+   parameters.
+
+   CLI
+   - long command: DSM_MacConfigGet
+   - short command: dsmmcg
+
+   \note This function is a part of the MEI Driver.
+
+   \param IOCTL_MEI_MacConfig_t* points to the
+      \ref IOCTL_MEI_MacConfig_t control structure
+
+   \return
+      - 0 if successful, otherwise -1
+
+   \remarks
+   The return code is always returned via the param struct.
+   The current settings are returned via the given argument.
+
+
+   \code IOCTL_MEI_MacConfig_t macConfig;
+   memset(&macConfig, 0x00, sizeof(IOCTL_MEI_MacConfig_t));
+   ret = ioctl(fd, FIO_MEI_MAC_CONFIG_GET, &macConfig);
+   // Process configuration parameters as required
+   \endcode
+
+   \ingroup MEI_DSM_IOCTL
+*/
+#define FIO_MEI_MAC_CONFIG_GET      _IO(MEI_IOC_MAGIC, 77)
+
+/**
+   This function has to be used to set/change the DSM related configuration.
+
+   CLI
+   - long command: DSM_ConfigSet
+   - short command: dsmcs
+
+   \note
+   - Vectoring (G.Vector/G.993.5) related functionality is classified as DSM
+     ([D]igital [S]pectrum [M]anagement) Layer 3 handling.
+   - This function is a part of the MEI Driver.
+
+   \param IOCTL_MEI_dsmConfig_t* points to the
+      \ref IOCTL_MEI_dsmConfig_t control structure
+
+   \return
+      - 0 if successful, otherwise -1
+
+   \remarks
+   The return code is always returned via the param struct.
+   The current settings are returned via the given argument.
+
+
+   \code
+   IOCTL_MEI_dsmConfig_t dsmConfig;
+   memset(&dsmConfig, 0x00, sizeof(IOCTL_MEI_dsmConfig_t));
+   // Set configuration parameters as required
+   ret = ioctl(fd, FIO_MEI_DSM_CONFIG_SET, &dsmConfig);
+   \endcode
+
+   \ingroup MEI_DSM_IOCTL
+*/
+#define FIO_MEI_DSM_CONFIG_SET      _IO(MEI_IOC_MAGIC, 78)
+
+/**
+   This function has to be used to get the DSM related configuration.
+
+   CLI
+   - long command: DSM_ConfigGet
+   - short command: dsmcg
+
+   \note
+   - Vectoring (G.Vector/G.993.5) related functionality is classified as DSM
+     ([D]igital [S]pectrum [M]anagement) Layer 3 handling.
+   - This function is a part of the MEI Driver.
+
+   \param IOCTL_MEI_dsmConfig_t* points to the
+      \ref IOCTL_MEI_dsmConfig_t control structure
+
+   \return
+      - 0 if successful, otherwise -1
+
+   \remarks
+   The return code is always returned via the param struct.
+   The current settings are returned via the given argument.
+
+
+   \code
+   IOCTL_MEI_dsmConfig_t dsmConfig;
+   memset(&dsmConfig, 0x00, sizeof(IOCTL_MEI_dsmConfig_t));
+   ret = ioctl(fd, FIO_MEI_DSM_CONFIG_GET, &dsmConfig);
+   // Process configuration parameters as required
+   \endcode
+
+   \ingroup MEI_DSM_IOCTL
+*/
+#define FIO_MEI_DSM_CONFIG_GET      _IO(MEI_IOC_MAGIC, 79)
+
+/**
+   This function has to be used to get the DSM related status.
+
+   CLI
+   - long command: DSM_StatusGet
+   - short command: dsmsg
+
+   \note
+   - Vectoring (G.Vector/G.993.5) related functionality is classified as DSM
+     ([D]igital [S]pectrum [M]anagement) Layer 3 handling.
+   - This function is a part of the MEI Driver.
+
+   \param IOCTL_MEI_dsmStatus_t* points to the
+      \ref IOCTL_MEI_dsmStatus_t control structure
+
+   \return
+      - 0 if successful, otherwise -1
+
+   \remarks
+   The return code is always returned via the param struct.
+   The current settings are returned via the given argument.
+
+
+   \code
+   IOCTL_MEI_dsmStatus_t dsmStatus;
+   memset(&dsmStatus, 0x00, sizeof(IOCTL_MEI_dsmStatus_t));
+   ret = ioctl(fd, FIO_MEI_DSM_STATUS_GET, &dsmStatus);
+   // Process status parameters as required
+   \endcode
+
+   \ingroup MEI_DSM_IOCTL
+*/
+#define FIO_MEI_DSM_STATUS_GET      _IO(MEI_IOC_MAGIC, 80)
+
+#ifndef DSL_DOC_GENERATION_EXCLUDE_UNWANTED
+
 /* ==========================================================================
    ioctl commands (MEI CPE ATM OAM Insert/Extract)
    ========================================================================== */
@@ -1183,7 +1399,7 @@
 
    \remarks
    The return code is always returned via the param struct.
-   Currently supported for the Vinax device only.
+   Currently supported for the Vrx device only.
 
    \code
       IOCTL_MEI_ATMOAM_init_t atmOamInit;
@@ -1210,7 +1426,7 @@
       control and transparent settings internally.
       If "DIRECT" mode is selected the user has to setup the
       control and transparent settings manually.
-   Currently supported for the Vinax device only.
+   Currently supported for the Vrx device only.
 
    \code
       IOCTL_MEI_ATMOAM_cntrl_t atmOamCntrl;
@@ -1237,7 +1453,7 @@
 
    \remarks
    The return code is always returned via the param struct.
-   Currently supported for the Vinax device only.
+   Currently supported for the Vrx device only.
 
    \code
       IOCTL_MEI_ATMOAM_counter_t atmOamDevCnt;
@@ -1258,7 +1474,7 @@
 
    \remarks
    The return code is always returned via the param struct.
-   Currently supported for the Vinax device only.
+   Currently supported for the Vrx device only.
 
    \code
 
@@ -1279,7 +1495,7 @@
 
    \remarks
    The return code is always returned via the param struct.
-   Currently supported for the Vinax device only.
+   Currently supported for the Vrx device only.
 
    \code
       IOCTL_MEI_ATMOAM_drvAtmCells_t atmOamCells;
@@ -1523,12 +1739,32 @@ typedef struct
 #endif
 
 
+/**
+Defines the possible debug modules that can be changed via ioctl interface.
+*/
+typedef enum
+{
+   /**
+   To select the common driver debug module "MEI_DRV". */
+   e_MEI_DBGMOD_MEI_DRV = 1,
+   /**
+   To select the message dump debug module "MEI_MSG_DUMP_API" that prints the
+   output in optimized DSL CPE API conform format. */
+   e_MEI_DBGMOD_MEI_MSG_DUMP_API = 2,
+   /**
+   Delimiter only! */
+   e_MEI_DBGMOD_LAST = 3
+} IOCTL_MEI_dbgModule_t;
+
 /** ioctl structure for set the driver debug level.
 */
 typedef struct
 {
    /** control data of the ioctl */
    IOCTL_MEI_ioctl_t ictl;
+
+   /** selects the debug module for which the debug level should be changed. */
+   IOCTL_MEI_dbgModule_t eDbgModule;
 
    /** new debug level to set */
    unsigned int   valLevel;
@@ -1570,6 +1806,8 @@ typedef struct
    unsigned int  usedIRQ;
    /** base address of the corresponding MEI */
    unsigned int  meiBaseAddr;
+   /** base address of the corresponding PDBRAM */
+   unsigned int  PDBRAMaddr;
 } IOCTL_MEI_devInit_t;
 
 
@@ -1652,6 +1890,10 @@ typedef struct
    unsigned int virtBaseAddr;
    /** Used IRQ (0: polling mode) */
    unsigned int usedIRQ;
+   /** Phy. PDBRAM address */
+   unsigned int phyPDBRAMaddr;
+   /** Virt. PDBRAM address */
+   unsigned int virtPDBRAMaddr;
    /** Driver max ARC2ME mailbox size */
    unsigned int drvArc2MeMbSize;
    /** Driver max ME2ARC mailbox size */
@@ -1842,6 +2084,59 @@ typedef enum
 } IOCTL_MEI_xdslMode_t;
 
 /**
+   Bitfield that defines the possible xDSL mode specific firmware feature sets.
+
+   \note For VRX there will be usually two bits set according to the combination
+         of firmware binaries that includes by default always VDSL2 plus ADSL
+         AnnexA or AnnexB firmware.
+*/
+typedef enum
+{
+   /**
+   Cleaned.
+   This is a reset value only because firmware will support one or more xDSL
+   modes. */
+   e_MEI_FW_XDSLMODE_CLEANED = 0x0000,
+   /**
+   Firmware includes ADSL Annex A feature set. */
+   e_MEI_FW_XDSLMODE_ADSL_A = 0x0001,
+   /**
+   Firmware includes ADSL Annex B feature set. */
+   e_MEI_FW_XDSLMODE_ADSL_B = 0x0002,
+   /**
+   Firmware includes VDSL2 feature set.
+   Annex O (G.Vector friendly): supported
+   Annex N (full G.Vector):     *not* supported */
+   e_MEI_FW_XDSLMODE_VDSL2 = 0x0004,
+   /**
+   Firmware includes VDSL2 feature set (including full G.Vector support).
+   Annex O (G.Vector friendly): supported
+   Annex N (full G.Vector):     supported */
+   e_MEI_FW_XDSLMODE_VDSL2_VECTOR = 0x0008,
+   /**
+   Delimiter only! */
+   e_MEI_FW_XDSLMODE_LAST = 0x0010
+} IOCTL_MEI_firmwareXdslMode_t;
+
+/**
+   Defines the possible firmware features.
+*/
+typedef struct
+{
+   /**
+   The platform ID is the first digit of the firmware version which will be
+   extracted from the what string within currently used firmware binary.*/
+   IFX_uint8_t nPlatformId;
+   /**
+   Bitfield that defines the xDSL feature sets that are supported by the
+   currently used firmware binary.
+   \note For VRX there will be usually two bits set according to the combination
+         of firmware binaries that includes by default always VDSL2 plus ADSL
+         AnnexA or AnnexB firmware. */
+   IOCTL_MEI_firmwareXdslMode_t eFirmwareXdslModes;
+} IOCTL_MEI_firmwareFeatures_t;
+
+/**
    ioctl structure for firmware xDSL/DualPort mode control setup. Configuration
    has to be done before firmware download to specify which configuration shall
    be used for the next link activation.
@@ -1879,6 +2174,9 @@ typedef struct
    /**
       Defines the current xDSL mode to be used for next link activation. */
    IOCTL_MEI_xdslMode_t eXdslModeCurrent;
+   /**
+      Defines the features that are supported by currently used firmware. */
+   IOCTL_MEI_firmwareFeatures_t firmwareFeatures;
 } IOCTL_MEI_FwModeCtrlSet_t;
 
 /**
@@ -2585,6 +2883,175 @@ typedef struct {
    unsigned char *pEocData;
 }  IOCTL_MEI_CEOC_frame_t;
 
+#endif /* #ifndef DSL_DOC_GENERATION_EXCLUDE_UNWANTED */
+
+/**
+   IOCtl structure for getting counter statistics on the G.Vector related
+   processing of error vectors.
+   \note All provided counters are total wrap around counters.
+   \note Vectoring (G.Vector/G.993.5) related functionality is classified as
+         DSM ([D]igital [S]pectrum [M]anagement) Layer 3 handling.
+*/
+typedef struct
+{
+   /** control data of the ioctl */
+   IOCTL_MEI_ioctl_t ictl;
+
+   /**
+      Returns the number of successfully processed error vectors (ERB's). */
+   unsigned int n_processed;
+   /**
+      Returns the number of error vectors (ERB's) that are dropped within
+      DSL firmware.
+      Most likely this happens if the error vector data handling (within
+      interrupt) is not fast enough. This will be detected by the DSL firmware
+      using a simple check: The first 32 bit "err_vec_size" value of the ERB
+      data memory shall be zero by the PP driver which means that the data is
+      processed by the PP driver.
+      \note This DSL Firmware related counter will be updated on request from
+            the higher layer(s) or in DSL FW fail state. */
+   unsigned int n_fw_dropped_size;
+   /**
+      Returns the number of error vectors (ERB's) that are dropped within MEI
+      driver interrupt handling due to
+      - detection of zero value for the ERB size parameter (first 32 bit value
+        of ERB data memory).
+      - detection of different values for ERB size parameter (first 32 bit
+        value of ERB data memory) and "length ERB" (parameter 3 of message
+        "EVT_DSM_ErrorVectorReady"). */
+   unsigned int n_mei_dropped_size;
+   /**
+      Returns the number of error vectors (ERB's) that are dropped within MEI
+      driver interrupt handling due to the fact that no callback function is
+      registered from the PP driver. */
+   unsigned int n_mei_dropped_no_pp_cb;
+   /**
+      Returns the number of error vectors (ERB's) that are dropped within PP
+      driver. This counter will be ioncreased in case of registred callback
+      function returnes with an error (value which *not* equal to 0). */
+   unsigned int n_pp_dropped;
+} IOCTL_MEI_dsmStatistics_t;
+
+/**
+   Defines the control functionalities of the vectoring handling.
+   - G.993.5 Annex N (upstream and downstream)
+   - G.993.2 Annex O (vector-friendly)
+*/
+typedef enum
+{
+   /**
+      Disables the G.993.5 upstream and downstream vectoring. */
+   e_MEI_VECTOR_CTRL_OFF = 0,
+   /**
+      Enables the G.993.5 upstream and downstream vectoring. */
+   e_MEI_VECTOR_CTRL_ON = 1,
+   /**
+      Enables the G.993.2 Annex O (vector-friendly) operation. */
+   e_MEI_VECTOR_CTRL_FRIENDLY_ON = 2,
+   /**
+   Delimiter only */
+   e_MEI_VECTOR_CTRL_LAST = 3
+} IOCTL_MEI_VectorControl_t;
+
+/**
+   IOCtl structure for getting configure options on the G.Vector related
+   processing of error vectors.
+   This structure has to be used for ioctl
+   - \ref FIO_MEI_DSM_CONFIG_SET
+   - \ref FIO_MEI_DSM_CONFIG_GET
+   \note All provided counters are total wrap around counters.
+*/
+typedef struct
+{
+   /** control data of the ioctl */
+   IOCTL_MEI_ioctl_t ictl;
+
+   /**
+      Enable/Disable of G.993.5 upstream and downstream vectoring. */
+   IOCTL_MEI_VectorControl_t eVectorControl;
+} IOCTL_MEI_dsmConfig_t;
+
+/**
+   Defines the status values for the G.Vector (G.993.5) related
+   handling.
+*/
+typedef enum
+{
+   /**
+      G.993.5 vectoring disabled. */
+   e_MEI_VECTOR_STAT_OFF = 0,
+   /**
+      G.993.5 vectoring for downstream enabled. */
+   e_MEI_VECTOR_STAT_ON_DS = 1,
+   /**
+      G.993.5 vectoring for downstream and upstream enabled. */
+   e_MEI_VECTOR_STAT_ON_DS_US = 2,
+   /**
+   Delimiter only */
+   e_MEI_VECTOR_STAT_LAST = 3
+} IOCTL_MEI_VectorStatus_t;
+
+/**
+   Defines the status values for the G.Vector (G.993.2 Annex O, vector-friendly)
+   related handling.
+*/
+typedef enum
+{
+   /**
+      G.993.2 Annex N/O (vector-friendly) operation disabled. */
+   e_MEI_VECTOR_FRIENDLY_STAT_OFF = 0,
+   /**
+      G.993.2 Annex N (vector-friendly) operation for downstream enabled. */
+   e_MEI_VECTOR_FRIENDLY_STAT_ON_DS = 1,
+   /**
+      G.993.2 Annex O (vector-friendly) operation for downstream and upstream
+      enabled. */
+   e_MEI_VECTOR_FRIENDLY_STAT_ON_DS_US = 2,
+   /**
+   Delimiter only */
+   e_MEI_VECTOR_FRIENDLY_STAT_LAST = 3
+} IOCTL_MEI_VectorFriendlyStatus_t;
+
+/**
+   Structure for getting DSM related status parameters.
+   This structure has to be used for ioctl
+   - \ref FIO_MEI_DSM_STATUS_GET
+*/
+typedef struct
+{
+   /** control data of the ioctl */
+   IOCTL_MEI_ioctl_t ictl;
+
+   /**
+      Enable/Disable of G.993.5 upstream and downstream vectoring. */
+   IOCTL_MEI_VectorStatus_t eVectorStatus;
+   /**
+      Enable/Disable of G.993.2 Annex O (vector-friendly) operation. */
+   IOCTL_MEI_VectorFriendlyStatus_t eVectorFriendlyStatus;
+} IOCTL_MEI_dsmStatus_t;
+
+#define MEI_MAC_ADDRESS_OCTETS   6
+
+/**
+   Structure used for configuration of MAC related network parameters.
+   This structure has to be used for ioctl
+   - \ref FIO_MEI_MAC_CONFIG_SET
+   - \ref FIO_MEI_MAC_CONFIG_GET
+*/
+typedef struct
+{
+   /** control data of the ioctl */
+   IOCTL_MEI_ioctl_t ictl;
+
+   /**
+      This struct represents the MAC configuration settings. This only
+          represents the settings of the MAC in the device and not of a possibly
+          attached ethernet phy.
+   */
+   unsigned char nMacAddress[MEI_MAC_ADDRESS_OCTETS];
+} IOCTL_MEI_MacConfig_t;
+
+#ifndef DSL_DOC_GENERATION_EXCLUDE_UNWANTED
 
 /** ioctl structure for channel specific Log/Trace level set via the entity control
    Therefore this IOCTL will execute the Set Trace/Log function per device.
@@ -2654,6 +3121,10 @@ typedef union
    IOCTL_MEI_CEOC_statistic_t     ceoc_statistic;
    IOCTL_MEI_CEOC_frame_t         ceoc_frame;
 
+   IOCTL_MEI_dsmStatistics_t      dsm_statistics;
+   IOCTL_MEI_dsmConfig_t          dsm_config;
+   IOCTL_MEI_dsmStatus_t          dsm_status;
+   IOCTL_MEI_MacConfig_t          mac_config;
 } IOCTL_MEI_arg_t;
 
 /* ==========================================================================
@@ -2705,7 +3176,7 @@ typedef enum
    The driver message ID hase the following structure:
 
    Bit[ 7.. 0]   message:     Message number
-   Bit[15.. 8]   module:      0x01 = COMMON VINAX
+   Bit[15.. 8]   module:      0x01 = COMMON VRX
                               0x02 = COMMON MEIX-Control
                               0x04 = ROM (DOWNLOAD)
                               0x10 = REM ACCESS
@@ -3013,6 +3484,16 @@ typedef enum {
    /** ERROR - Invalid FW image */
    e_MEI_ERR_INVAL_FW_IMAGE    = MEI_ERROR_CODE_BASE + 25,
 
+   /** ERROR - PDBRAM usage locked by PP subsystem (only used for
+       VR10/VRX300) */
+   e_MEI_ERR_PDBRAM_LOCKED    = MEI_ERROR_CODE_BASE + 26,
+
+   /** ERROR - not all returned values includes updated data */
+   e_MEI_ERR_INCOMPLETE_RETURN_VALUES    = MEI_ERROR_CODE_BASE + 27,
+
+   /** ERROR - Not Supported by Firmware */
+   e_MEI_ERR_NOT_SUPPORTED_BY_FIRMWARE = MEI_ERROR_CODE_BASE + 28,
+
    /** End of error codes */
    e_MEI_ERR_END
 } MEI_ERROR_CODES;
@@ -3046,6 +3527,7 @@ typedef enum {
 
 } MEI_ERROR_CODES_REMOTE_e;
 
+#endif /* #ifndef DSL_DOC_GENERATION_EXCLUDE_UNWANTED */
 
 /** @} MEI_ERROR_CODES */
 

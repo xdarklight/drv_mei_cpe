@@ -2,9 +2,8 @@
 #define _DRV_MEI_CPE_CONFIG_H
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -30,19 +29,19 @@
 /* AR9 Device is not fully supported by the MEI CPE driver. At least FW download
    and READY message handling works fine */
 
-#ifndef MEI_SUPPORT_DEVICE_VINAX
-#  define MEI_SUPPORT_DEVICE_VINAX     0
-#else
-#  if (MEI_SUPPORT_DEVICE_VINAX != 1)
-#     define MEI_SUPPORT_DEVICE_VINAX  0
-#  endif
-#endif
-
 #ifndef MEI_SUPPORT_DEVICE_VR9
 #  define MEI_SUPPORT_DEVICE_VR9       0
 #else
 #  if (MEI_SUPPORT_DEVICE_VR9 != 1)
 #     define MEI_SUPPORT_DEVICE_VR9    0
+#  endif
+#endif
+
+#ifndef MEI_SUPPORT_DEVICE_VR10
+#  define MEI_SUPPORT_DEVICE_VR10       0
+#else
+#  if (MEI_SUPPORT_DEVICE_VR10 != 1)
+#     define MEI_SUPPORT_DEVICE_VR10    0
 #  endif
 #endif
 
@@ -54,16 +53,16 @@
 #  endif
 #endif
 
-#if   (MEI_SUPPORT_DEVICE_VINAX == 1)
+#if (MEI_SUPPORT_DEVICE_VR9 == 1)
+#  if (MEI_SUPPORT_DEVICE_VR10 == 1) || (MEI_SUPPORT_DEVICE_AR9 == 1)
+     #error "Only one device could be selected!"
+#  endif
+#elif (MEI_SUPPORT_DEVICE_VR10 == 1)
 #  if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_AR9 == 1)
      #error "Only one device could be selected!"
 #  endif
-#elif (MEI_SUPPORT_DEVICE_VR9 == 1)
-#  if (MEI_SUPPORT_DEVICE_AR9 == 1) || (MEI_SUPPORT_DEVICE_VINAX == 1)
-     #error "Only one device could be selected!"
-#  endif
 #elif (MEI_SUPPORT_DEVICE_AR9 == 1)
-#  if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VINAX == 1)
+#  if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1)
      #error "Only one device could be selected!"
 #  endif
 #else
@@ -127,169 +126,82 @@
 #  endif
 #endif
 
-#if (MEI_SUPPORT_DEVICE_VINAX == 1)
-   /** support VINAX ROM code */
-   #ifndef MEI_SUPPORT_ROM_CODE
-   #  define MEI_SUPPORT_ROM_CODE                1
-   #else
-      /* check: VINAX ROM code */
-   #  if (MEI_SUPPORT_ROM_CODE != 1)
-   #     define MEI_SUPPORT_ROM_CODE             0
-   #  endif
-   #endif      /* #ifndef MEI_SUPPORT_ROM_CODE */
+#undef MEI_SUPPORT_ROM_CODE
+#define MEI_SUPPORT_ROM_CODE                  0
 
-   /* set depending bootmodes */
-   #if (MEI_SUPPORT_ROM_CODE == 1)
+#undef MEI_SUPPORT_DL_DMA_CS
+#define MEI_SUPPORT_DL_DMA_CS                 0
 
-      /** support firmware download via DMA/MEI Dbg and CodeSwap, trigger via boot messages */
-   #  ifndef MEI_SUPPORT_DL_DMA_CS
-   #     define MEI_SUPPORT_DL_DMA_CS            1
-   #  endif
+#undef MEI_BM7_CODESWAP_MEIDBG
+#define MEI_BM7_CODESWAP_MEIDBG               0
 
-      /* check: firmware download via DMA/MEI Dbg and CodeSwap, trigger via boot messages */
-   #  if ((MEI_SUPPORT_DL_DMA_CS != 1) && (MEI_SUPPORT_DL_DMA_CS != 0))
-   #     error "Support Download DMA: define must be 1 or 0"
-   #  endif
+#undef MEI_MAX_FW_IMAGES
+#define MEI_MAX_FW_IMAGES                     1
 
-   #  if (MEI_SUPPORT_DL_DMA_CS == 1)
-   #     ifndef MEI_BM7_CODESWAP_MEIDBG
-   #        define MEI_BM7_CODESWAP_MEIDBG       1
-   #     endif
-   #  else
-   #     ifndef MEI_BM7_CODESWAP_MEIDBG
-   #        define MEI_BM7_CODESWAP_MEIDBG       0
-   #     endif
-   #  endif
+#undef MEI_DRV_POWERSAVING_ENABLED
+#define MEI_DRV_POWERSAVING_ENABLED           0
 
-   #  ifndef MEI_MAX_FW_IMAGES
-   #     define MEI_MAX_FW_IMAGES                2
-   #  endif
+#undef MEI_DRV_ATM_OAM_ENABLE
+#define MEI_DRV_ATM_OAM_ENABLE                0
 
-   #  ifndef MEI_DRV_POWERSAVING_ENABLED
-   #     define MEI_DRV_POWERSAVING_ENABLED      1
-   #  endif
+#undef MEI_DRV_CLEAR_EOC_ENABLE
+#define MEI_DRV_CLEAR_EOC_ENABLE              0
 
-   #else    /* #ifdef (MEI_SUPPORT_ROM_CODE == 1) */
+#undef MEI_SUPPORT_VDSL2_ADSL_SWAP
+#define MEI_SUPPORT_VDSL2_ADSL_SWAP           0
 
-   #  define MEI_SUPPORT_DL_DMA_CS               0
-   #  define MEI_MAX_FW_IMAGES                   1
-
-      /* no support of powersaving without rom code support */
-   #  ifdef MEI_DRV_POWERSAVING_ENABLED
-   #     undef MEI_DRV_POWERSAVING_ENABLED
-   #  endif
-   #  define MEI_DRV_POWERSAVING_ENABLED         0
-
-   #endif   /* #ifdef (MEI_SUPPORT_ROM_CODE == 1) */
-
-   /** support ATM OAM */
-   #ifndef MEI_DRV_ATM_OAM_ENABLE
-   #  define MEI_DRV_ATM_OAM_ENABLE              1
-   #else
-   #  if ( (MEI_DRV_ATM_OAM_ENABLE != 1) && (MEI_DRV_ATM_OAM_ENABLE != 0))
-   #     undef  MEI_DRV_ATM_OAM_ENABLE
-   #     define MEI_DRV_ATM_OAM_ENABLE           0
-   #     warning "switch off ATM OAM - invalid config"
-   #  endif
-   #endif
-
-   /** support CLEAR EOC */
-   #ifndef MEI_DRV_CLEAR_EOC_ENABLE
-   #  define MEI_DRV_CLEAR_EOC_ENABLE            0
-   #else
-   #  if ( (MEI_DRV_CLEAR_EOC_ENABLE != 1) && (MEI_DRV_CLEAR_EOC_ENABLE != 0) )
-   #     undef  MEI_DRV_CLEAR_EOC_ENABLE
-   #     define MEI_DRV_CLEAR_EOC_ENABLE         0
-   #     warning "switch off Clear EOC - invalid config"
-   #  endif
-   #endif
-
-   /** support VDSL2 - ADSL firmware swap */
-   #ifndef MEI_SUPPORT_VDSL2_ADSL_SWAP
-   #  define MEI_SUPPORT_VDSL2_ADSL_SWAP         1
-   #else
-   #  if (MEI_SUPPORT_VDSL2_ADSL_SWAP != 1)
-   #     define MEI_SUPPORT_VDSL2_ADSL_SWAP      0
-   #  endif
-   #endif
+/** support interface to ATM/PTM drivers */
+#ifndef MEI_DRV_ATM_PTM_INTERFACE_ENABLE
+#  define MEI_DRV_ATM_PTM_INTERFACE_ENABLE    0
 #else
-   #undef MEI_SUPPORT_ROM_CODE
-   #define MEI_SUPPORT_ROM_CODE                  0
+#  if ( (MEI_DRV_ATM_PTM_INTERFACE_ENABLE != 1) && (MEI_DRV_ATM_PTM_INTERFACE_ENABLE != 0) )
+#     undef  MEI_DRV_ATM_PTM_INTERFACE_ENABLE
+#     define MEI_DRV_ATM_PTM_INTERFACE_ENABLE 0
+#     warning "switch off internal ATM/PTM interface - invalid config"
+#  endif
+#endif
 
-   #undef MEI_SUPPORT_DL_DMA_CS
-   #define MEI_SUPPORT_DL_DMA_CS                 0
+#ifndef MEI_SUPPORT_PCI_SLAVE_FW_DOWNLOAD
+#  define MEI_SUPPORT_PCI_SLAVE_FW_DOWNLOAD    0
+#else
+#  if ( (MEI_SUPPORT_PCI_SLAVE_FW_DOWNLOAD != 1) && (MEI_SUPPORT_PCI_SLAVE_FW_DOWNLOAD != 0) )
+#     undef  MEI_SUPPORT_PCI_SLAVE_FW_DOWNLOAD
+#     define MEI_SUPPORT_PCI_SLAVE_FW_DOWNLOAD 0
+#     warning "switch off PCI slave FW download - invalid config"
+#  endif
+#endif
 
-   #undef MEI_BM7_CODESWAP_MEIDBG
-   #define MEI_BM7_CODESWAP_MEIDBG               0
+#ifndef MEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_BONDING_EXTERNAL
+#  define MEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_BONDING_EXTERNAL   0
+#else
+#  if ( (MEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_BONDING_EXTERNAL != 1) && (MEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_BONDING_EXTERNAL != 0) )
+#     undef  MEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_BONDING_EXTERNAL
+#     define MEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_BONDING_EXTERNAL 0
+#     warning "switch off PCI Slave BONDING_EXTERNAL address range - invalid config"
+#  endif
+#endif
 
-   #undef MEI_MAX_FW_IMAGES
-   #define MEI_MAX_FW_IMAGES                     1
+#ifndef MEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_BONDING
+#  define MEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_BONDING   0
+#else
+#  if ( (MEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_BONDING != 1) && (MEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_BONDING != 0) )
+#     undef  MEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_BONDING
+#     define MEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_BONDING_EXTERNAL 0
+#     warning "switch off PCI Slave offchip bonding address range - invalid config"
+#  endif
+#endif
 
-   #undef MEI_DRV_POWERSAVING_ENABLED
-   #define MEI_DRV_POWERSAVING_ENABLED           0
+#if (MEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_BONDING_EXTERNAL != 0) && (MEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_BONDING != 0)
+#  error "Please select only one possible PCI Slave address range!"
+#endif
 
-   #undef MEI_DRV_ATM_OAM_ENABLE
-   #define MEI_DRV_ATM_OAM_ENABLE                0
+#if (MEI_SUPPORT_PCI_SLAVE_FW_DOWNLOAD != 0)
+# if (MEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_BONDING_EXTERNAL != 1) && (MEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_BONDING != 1)
+#  error "Please select at least one possible PCI Slave address range!"
+# endif
+#endif
 
-   #undef MEI_DRV_CLEAR_EOC_ENABLE
-   #define MEI_DRV_CLEAR_EOC_ENABLE              0
-
-   #undef MEI_SUPPORT_VDSL2_ADSL_SWAP
-   #define MEI_SUPPORT_VDSL2_ADSL_SWAP           0
-
-   /** support interface to ATM/PTM drivers */
-   #ifndef MEI_DRV_ATM_PTM_INTERFACE_ENABLE
-   #  define MEI_DRV_ATM_PTM_INTERFACE_ENABLE    0
-   #else
-   #  if ( (MEI_DRV_ATM_PTM_INTERFACE_ENABLE != 1) && (MEI_DRV_ATM_PTM_INTERFACE_ENABLE != 0) )
-   #     undef  MEI_DRV_ATM_PTM_INTERFACE_ENABLE
-   #     define MEI_DRV_ATM_PTM_INTERFACE_ENABLE 0
-   #     warning "switch off internal ATM/PTM interface - invalid config"
-   #  endif
-   #endif
-
-   #ifndef MEI_SUPPORT_PCI_SLAVE_FW_DOWNLOAD
-   #  define MEI_SUPPORT_PCI_SLAVE_FW_DOWNLOAD    0
-   #else
-   #  if ( (MEI_SUPPORT_PCI_SLAVE_FW_DOWNLOAD != 1) && (MEI_SUPPORT_PCI_SLAVE_FW_DOWNLOAD != 0) )
-   #     undef  MEI_SUPPORT_PCI_SLAVE_FW_DOWNLOAD
-   #     define MEI_SUPPORT_PCI_SLAVE_FW_DOWNLOAD 0
-   #     warning "switch off PCI slave FW download - invalid config"
-   #  endif
-   #endif
-
-   #ifndef MEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_ADTRAN
-   #  define MEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_ADTRAN   0
-   #else
-   #  if ( (MEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_ADTRAN != 1) && (MEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_ADTRAN != 0) )
-   #     undef  MEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_ADTRAN
-   #     define MEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_ADTRAN 0
-   #     warning "switch off PCI Slave ADTRAN address range - invalid config"
-   #  endif
-   #endif
-
-   #ifndef MEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_BONDING
-   #  define MEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_BONDING   0
-   #else
-   #  if ( (MEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_BONDING != 1) && (MEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_BONDING != 0) )
-   #     undef  MEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_BONDING
-   #     define MEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_ADTRAN 0
-   #     warning "switch off PCI Slave offchip bonding address range - invalid config"
-   #  endif
-   #endif
-
-   #if (MEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_ADTRAN != 0) && (MEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_BONDING != 0)
-   #  error "Please select only one possible PCI Slave address range!"
-   #endif
-
-   #if (MEI_SUPPORT_PCI_SLAVE_FW_DOWNLOAD != 0)
-   # if (MEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_ADTRAN != 1) && (MEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_BONDING != 1)
-   #  error "Please select at least one possible PCI Slave address range!"
-   # endif
-   #endif
-#endif /* #if (MEI_SUPPORT_DEVICE_VINAX == 1)*/
-
-#if (MEI_SUPPORT_DEVICE_VINAX == 1) || (MEI_SUPPORT_DEVICE_VR9 == 1)
+#if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1)
    /** support Debug access (via General Purpose Access - msg's) */
    #ifndef MEI_SUPPORT_DFE_GPA_ACCESS
    #  define MEI_SUPPORT_DFE_GPA_ACCESS          1
@@ -301,7 +213,7 @@
 #else
    #undef MEI_SUPPORT_DFE_GPA_ACCESS
    #define MEI_SUPPORT_DFE_GPA_ACCESS            0
-#endif /* #if (MEI_SUPPORT_DEVICE_VINAX == 1) || (MEI_SUPPORT_DEVICE_VR9 == 1)*/
+#endif /* #if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1) */
 
 /* Protected DMA access - write, read back and compare */
 #ifndef MEI_PROTECTED_MEI_DMA_ACCESS
@@ -434,7 +346,7 @@
 #  endif
 #endif
 
-#if (MEI_SUPPORT_DEVICE_VR9 == 1)
+#if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1)
    #define INCLUDE_VR9_EMULATION_WORKAROUNDS
 #endif
 
@@ -490,6 +402,14 @@
 #  error module name already specified
 #endif
 
+#ifndef PDBRAM_NAME
+#define PDBRAM_NAME                          "PDBRAM"
+#endif
+
+#ifndef PDBRAM_SIZE_BYTE
+#define PDBRAM_SIZE_BYTE                    (1024*140)
+#endif
+
 /** device control prefix */
 #define DRV_MEI_CNTRL_PREFIX                  "cntrl"
 
@@ -526,7 +446,7 @@
 
 /** get the number of of lines per device from extern */
 
-#if (MEI_SUPPORT_DEVICE_VR9 == 1)
+#if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1)
 #ifdef MEI_MAX_DFE_INSTANCE_PER_ENTITY
 #   if (MEI_MAX_DFE_INSTANCE_PER_ENTITY > 2)
 #      undef  MEI_MAX_DFE_INSTANCE_PER_ENTITY
@@ -588,6 +508,17 @@
 #     define MEI_MAX_RD_DEV_BUF_PER_DEV       2
 #  else
 #     define MEI_MAX_RD_DEV_BUF_PER_DEV       MEI_DRV_NFC_BUFFER
+#  endif
+#endif
+
+/** Digital Spectrum Management (vectoring) support */
+#ifndef MEI_SUPPORT_DSM
+#  define MEI_SUPPORT_DSM    1
+#else
+#  if ( (MEI_SUPPORT_DSM != 1) && (MEI_SUPPORT_DSM != 0) )
+#     undef  MEI_SUPPORT_DSM
+#     define MEI_SUPPORT_DSM 1
+#     warning "switch on DSM vectoring support - invalid config"
 #  endif
 #endif
 

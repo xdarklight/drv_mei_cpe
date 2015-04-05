@@ -8,16 +8,15 @@
                E X A M P L E  (vxWorks)
 
             how to setup and use the wrap of
-         the VINAX driver interrupt functions.
+         the VRX driver interrupt functions.
 
    ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! !  */
 
 
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -37,7 +36,7 @@
    Inlcudes
    ========================================================================= */
 
-/* get the VINAX driver interrupt wrapper functions */
+/* get the VRX driver interrupt wrapper functions */
 #include "drv_mei_cpe_vxworks.h"
 
 
@@ -47,7 +46,7 @@
 
 /*
    For save the original ISR routine and parameters
-   (you get it from the VINAX driver "intConnect" call)
+   (you get it from the VRX driver "intConnect" call)
 */
 typedef struct MEI_MyIsrParams_s
 {

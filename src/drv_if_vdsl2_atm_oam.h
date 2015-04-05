@@ -1,8 +1,7 @@
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -11,7 +10,7 @@
 #ifndef _DRV_IF_VDSL2_ATM_OAM_H_
 #define _DRV_IF_VDSL2_ATM_OAM_H_
 /** \file
-   ATM OAM message definitions for VINAX Rev 1.
+   ATM OAM message definitions for VRX Rev 1.
 */
 
 #if defined (__GNUC__) || defined (__GNUG__)

@@ -1,8 +1,7 @@
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -10,7 +9,7 @@
 ******************************************************************************/
 
 /* ==========================================================================
-   Description : Common functions used for FW download via the VINAX Driver
+   Description : Common functions used for FW download via the VRX Driver
    ========================================================================== */
 
 
@@ -65,7 +64,7 @@ MEI_DRVOS_sema_t  pFwDlCntrlLock;
    ========================================================================= */
 
 /**
-   Do the firmware download for the current VINAX.
+   Do the firmware download for the current VRX.
 
 \param
    pMeiDynCntrl - private dynamic comtrol data (per open instance)

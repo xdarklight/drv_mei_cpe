@@ -2,9 +2,8 @@
 #define _DRV_MEI_CPE_LINUX_H
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -567,7 +566,7 @@ IFX_time_t MEI_DRVOS_ElapsedTimeMSecGet(
 #define MEI_DRVOS_CRLF                              "\n\r"
 
    /** Kernel - Error Print on Appl-Level (formated) */
-#define MEI_DRVOS_ERR_PRINT_USR(fmt, args...)       printk(KERN_DEBUG fmt "\r", ##args)
+#define MEI_DRVOS_ERR_PRINT_USR(fmt, args...)       printk(fmt "\r", ##args)
 #define MEI_DRVOS_PRINT_INT_RAW(fmt, args...)       printk(fmt, ##args)
 
 #define MEI_PRINT_USR                     MEI_DRVOS_ERR_PRINT_USR

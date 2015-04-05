@@ -1,8 +1,7 @@
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -11,7 +10,7 @@
 
 
 /* ==========================================================================
-   Description : Clear EOC Common functions for the VINAX Driver
+   Description : Clear EOC Common functions for the VRX Driver
    ========================================================================== */
 
 /* ============================================================================
@@ -82,7 +81,7 @@ MEI_STATIC IFX_int32_t MEI_CEocFrameRead(
    Global Variable Definition
    ========================================================================= */
 
-/* VINAX-Driver: Access module - create print level variable */
+/* VRX-Driver: Access module - create print level variable */
 MEI_DRV_PRN_USR_MODULE_CREATE(MEI_CEOC, MEI_DRV_PRN_LEVEL_HIGH);
 MEI_DRV_PRN_INT_MODULE_CREATE(MEI_CEOC, MEI_DRV_PRN_LEVEL_HIGH);
 
@@ -250,7 +249,7 @@ MEI_STATIC IFX_int32_t MEI_CEocWaitForDevice(
    {
       if (pMeiDev->eModePoll == e_MEI_DEV_ACCESS_MODE_PASSIV_POLL)
       {
-         MEI_PollIntPerVnxLine(pMeiDev, e_MEI_DEV_ACCESS_MODE_PASSIV_POLL);
+         MEI_PollIntPerVrxLine(pMeiDev, e_MEI_DEV_ACCESS_MODE_PASSIV_POLL);
 
          MEI_CEOC_SET_TIMEOUT_CNT( pCEocDevCntrl,
                MEI_CEOC_FRAME_TRANS_DONE_TIMEOUT_MS / MEI_CEOC_MIN_STATE_CHANGE_POLL_TIME_MS);
@@ -263,7 +262,7 @@ MEI_STATIC IFX_int32_t MEI_CEocWaitForDevice(
             MEI_DRVOS_EventWait_timeout(
                         &pCEocDevCntrl->eventCEocStateChange,
                         MEI_CEOC_MIN_STATE_CHANGE_POLL_TIME_MS);
-            MEI_PollIntPerVnxLine(pMeiDev, e_MEI_DEV_ACCESS_MODE_PASSIV_POLL);
+            MEI_PollIntPerVrxLine(pMeiDev, e_MEI_DEV_ACCESS_MODE_PASSIV_POLL);
             MEI_CEOC_DEC_TIMEOUT_CNT(pCEocDevCntrl);
          }
       }
@@ -296,8 +295,8 @@ MEI_STATIC IFX_int32_t MEI_CEocWaitForDevice(
 }
 
 /**
-   Fragment and write a given Clear EOC frame to the VINAX device and
-   trigger the VINAX to transmit.
+   Fragment and write a given Clear EOC frame to the VRX device and
+   trigger the VRX to transmit.
 
 \param
    pMeiDynCntrl private dynamic device data (per open instance) [I]
@@ -328,7 +327,7 @@ MEI_STATIC IFX_int32_t MEI_CEocFrameSend(
    MEI_CEOC_TX_DEV_BUF_STATE_SET(pCEocDevCntrl, eMEI_CEOC_TX_DEV_BUF_STATE_IDLE);
 
    /*
-      Transfer the frame to the VINAX TX EOC buffer
+      Transfer the frame to the VRX TX EOC buffer
    */
    while( msgCnt &&
           (pCEocFrameBuf->transferedSize_byte < pCEocFrameBuf->frameSize_byte) )
@@ -353,7 +352,7 @@ MEI_STATIC IFX_int32_t MEI_CEocFrameSend(
    }
 
    /*
-      Trigger the VINAX to transmit the TX EOC buffer.
+      Trigger the VRX to transmit the TX EOC buffer.
    */
    MEI_CEOC_TX_DEV_BUF_STATE_SET(pCEocDevCntrl, eMEI_CEOC_TX_DEV_BUF_STATE_IN_PROGRESS);
    if( MEI_CEOC_CMD_ClearEOC_TxTrigger( pMeiDynCntrl,
@@ -363,7 +362,7 @@ MEI_STATIC IFX_int32_t MEI_CEocFrameSend(
    }
 
    /*
-      Wait for the notification from the VINAX - transmit done
+      Wait for the notification from the VRX - transmit done
    */
    if (MEI_CEocWaitForDevice(
          pMeiDynCntrl, pCEocDevCntrl, IFX_TRUE) != IFX_SUCCESS)
@@ -383,7 +382,7 @@ MEI_STATIC IFX_int32_t MEI_CEocFrameSend(
 
 
 /**
-   Read and defragment a received Clear EOC frame from the VINAX device.
+   Read and defragment a received Clear EOC frame from the VRX device.
 
 \param
    pMeiDynCntrl private dynamic device data (per open instance) [I]
@@ -443,10 +442,10 @@ MEI_STATIC IFX_int32_t MEI_CEocFrameRead(
 
 
 /**
-   Read and defragment a received Clear EOC frame from the VINAX device.
+   Read and defragment a received Clear EOC frame from the VRX device.
 
 \param
-   pMeiDev      points to the VINAX driver private device data [I]
+   pMeiDev      points to the VRX driver private device data [I]
 \param
    pCEocDevCntrl  points to the Clear EOC control struct pointer [IO]
 \param
@@ -467,11 +466,11 @@ IFX_int32_t MEI_CEocFrameEvt(
    if (pCEocFrameBuf->transferedSize_byte == 0)
    {
       /* first msg for this frame - setup frame buffer */
-      pCEocFrameBuf->vnxEocFrame.cEocId      = MEI_DRV_MSG_CTRL_IF_MODEM_EOC_FRAME_ON;
-      pCEocFrameBuf->vnxEocFrame.length_byte = 0;
+      pCEocFrameBuf->vrxEocFrame.cEocId      = MEI_DRV_MSG_CTRL_IF_MODEM_EOC_FRAME_ON;
+      pCEocFrameBuf->vrxEocFrame.length_byte = 0;
       pCEocFrameBuf->frameSize_byte = MEI_CEOC_RAW_EOC_DATA_SIZE_BYTE +
-                                      sizeof(pCEocFrameBuf->vnxEocFrame.protIdent) +
-                                      sizeof(pCEocFrameBuf->vnxEocFrame.length_byte);
+                                      sizeof(pCEocFrameBuf->vrxEocFrame.protIdent) +
+                                      sizeof(pCEocFrameBuf->vrxEocFrame.length_byte);
    }
 
 
@@ -480,8 +479,8 @@ IFX_int32_t MEI_CEocFrameEvt(
    {
       /* error get data */
       pCEocFrameBuf->frameSize_byte          = 0;
-      pCEocFrameBuf->vnxEocFrame.cEocId      = 0;
-      pCEocFrameBuf->vnxEocFrame.length_byte = 0;
+      pCEocFrameBuf->vrxEocFrame.cEocId      = 0;
+      pCEocFrameBuf->vrxEocFrame.length_byte = 0;
       pCEocFrameBuf->transferedSize_byte     = 0;
 
       return IFX_ERROR;
@@ -494,10 +493,10 @@ IFX_int32_t MEI_CEocFrameEvt(
       /* done ready for distribution */
       distCount = MEI_DistributeAutoMsg(
                      pMeiDev, pMeiDev->pRootNfcRecvFirst,
-                     (IFX_uint8_t *)&pCEocFrameBuf->vnxEocFrame,
-                     (pCEocFrameBuf->vnxEocFrame.length_byte +
-                           sizeof(pCEocFrameBuf->vnxEocFrame.length_byte) +
-                           sizeof(pCEocFrameBuf->vnxEocFrame.cEocId)),
+                     (IFX_uint8_t *)&pCEocFrameBuf->vrxEocFrame,
+                     (pCEocFrameBuf->vrxEocFrame.length_byte +
+                           sizeof(pCEocFrameBuf->vrxEocFrame.length_byte) +
+                           sizeof(pCEocFrameBuf->vrxEocFrame.cEocId)),
                      MEI_RECV_BUF_CTRL_MODEM_EOC_FRAME);
       if (distCount <= 0)
       {
@@ -509,8 +508,8 @@ IFX_int32_t MEI_CEocFrameEvt(
 
       /* reset buffer */
       pCEocFrameBuf->frameSize_byte          = 0;
-      pCEocFrameBuf->vnxEocFrame.cEocId      = 0;
-      pCEocFrameBuf->vnxEocFrame.length_byte = 0;
+      pCEocFrameBuf->vrxEocFrame.cEocId      = 0;
+      pCEocFrameBuf->vrxEocFrame.length_byte = 0;
       pCEocFrameBuf->transferedSize_byte     = 0;
    }
 
@@ -526,7 +525,7 @@ IFX_int32_t MEI_CEocFrameEvt(
    Release the Clear EOC Access Control structure.
 
 \param
-   pMeiDev      points to the VINAX driver private device data [I]
+   pMeiDev      points to the VRX driver private device data [I]
 
 \return
    0 (IFX_SUCCESS) if success.
@@ -574,7 +573,7 @@ IFX_int32_t MEI_CEOC_ReleaseDevCntrl(
    Reset the control infos within the Clear EOC struct.
 
 \param
-   pMeiDev      points to the VINAX driver private device data [I]
+   pMeiDev      points to the VRX driver private device data [I]
 
 
 */
@@ -602,7 +601,7 @@ IFX_int32_t MEI_CEOC_ResetControl(
    Check the CEOC config if processing is neccessary
 
 \param
-   pMeiDev      Points to the VINAX driver device data. [I]
+   pMeiDev      Points to the VRX driver device data. [I]
 \param
    pCEocDevCntrl  Points to the EOC control struct. [I]
 \param
@@ -646,7 +645,7 @@ IFX_boolean_t MEI_CEOC_CheckForWork(
    Clear EOC Autonomous Message Handler.
 
 \param
-   pMeiDev      Points to the VINAX driver device data. [I]
+   pMeiDev      Points to the VRX driver device data. [I]
 \param
    msgId          Message ID of the reveived modem message. [I]
 \param
@@ -731,7 +730,7 @@ IFX_int32_t MEI_CEOC_IoctlDrvInit(
 
 /**
    ioctl-function for configure the Clear EOC access.
-   Setup the Clear EOC access feature within the VINAX device.
+   Setup the Clear EOC access feature within the VRX device.
 
 \param
    pMeiDynCntrl    Private dynamic device data (per open instance). [I]
@@ -920,7 +919,7 @@ IFX_int32_t MEI_CEOC_IoctlStatusGet(
 
 /**
    ioctl-function for write a Clear EOC frame.
-   Segement the frame and insert the messages to the VINAX device.
+   Segement the frame and insert the messages to the VRX device.
 
 \param
    pMeiDynCntrl    Private dynamic device data (per open instance). [I]
@@ -939,7 +938,7 @@ IFX_int32_t MEI_CEOC_IoctlFrameWrite(
    IFX_int32_t                retVal = IFX_SUCCESS;
    MEI_CEOC_DEV_CNTRL_T     *pCEocDevCntrl;
    MEI_CEOC_FRAME_BUFFER_T  *pCEocFrameBuf;
-   MEI_CEOC_MEI_EOC_FRAME_T *pVnxEocFrame;
+   MEI_CEOC_MEI_EOC_FRAME_T *pVrxEocFrame;
 
    if (!pMeiDynCntrl->pMeiDev->pCEocDevCntrl)
    {
@@ -964,7 +963,7 @@ IFX_int32_t MEI_CEOC_IoctlFrameWrite(
 
    pCEocDevCntrl = pMeiDynCntrl->pMeiDev->pCEocDevCntrl;
    pCEocFrameBuf = &pCEocDevCntrl->txEocFrame;
-   pVnxEocFrame  = &pCEocFrameBuf->vnxEocFrame;
+   pVrxEocFrame  = &pCEocFrameBuf->vrxEocFrame;
 
    MEI_CEOC_GET_UNIQUE_ACCESS(pCEocDevCntrl);
 
@@ -987,19 +986,19 @@ IFX_int32_t MEI_CEOC_IoctlFrameWrite(
               MEI_DRV_DYN_LINENUM_GET(pMeiDynCntrl), pMeiDynCntrl->openInstance));
    }
 
-   /* the VINAX EOC Frame struct expects here: sizeof(data) + sizeof(prot-ID) */
-   pVnxEocFrame->length_byte = (IFX_uint16_t)(pIoctlCEocFrame->dataSize_byte +
-                                              sizeof(pVnxEocFrame->protIdent));
-   pVnxEocFrame->protIdent   = (IFX_uint16_t)(pIoctlCEocFrame->protIdent & 0x0000FFFF);
+   /* the VRX EOC Frame struct expects here: sizeof(data) + sizeof(prot-ID) */
+   pVrxEocFrame->length_byte = (IFX_uint16_t)(pIoctlCEocFrame->dataSize_byte +
+                                              sizeof(pVrxEocFrame->protIdent));
+   pVrxEocFrame->protIdent   = (IFX_uint16_t)(pIoctlCEocFrame->protIdent & 0x0000FFFF);
    if (bInternCall)
    {
-      memcpy( pVnxEocFrame->cEocRawData.d_8,
+      memcpy( pVrxEocFrame->cEocRawData.d_8,
               pIoctlCEocFrame->pEocData,
               pIoctlCEocFrame->dataSize_byte);
    }
    else
    {
-      if ( (MEI_DRVOS_CpyFromUser( pVnxEocFrame->cEocRawData.d_8,
+      if ( (MEI_DRVOS_CpyFromUser( pVrxEocFrame->cEocRawData.d_8,
                                    pIoctlCEocFrame->pEocData,
                                    pIoctlCEocFrame->dataSize_byte)) == IFX_NULL )
       {
@@ -1015,23 +1014,23 @@ IFX_int32_t MEI_CEOC_IoctlFrameWrite(
 
    /* setup frame buffer + padding */
    pCEocFrameBuf->transferedSize_byte = 0;
-   pCEocFrameBuf->frameSize_byte      = pVnxEocFrame->length_byte +
-                                        sizeof(pVnxEocFrame->protIdent) +
-                                        sizeof(pVnxEocFrame->length_byte);
+   pCEocFrameBuf->frameSize_byte      = pVrxEocFrame->length_byte +
+                                        sizeof(pVrxEocFrame->protIdent) +
+                                        sizeof(pVrxEocFrame->length_byte);
 
    if (pIoctlCEocFrame->dataSize_byte & 0x1)
    {
-      pVnxEocFrame->cEocRawData.d_8[pIoctlCEocFrame->dataSize_byte] = 0;
+      pVrxEocFrame->cEocRawData.d_8[pIoctlCEocFrame->dataSize_byte] = 0;
       pCEocFrameBuf->frameSize_byte++;
    }
 
 
    PRN_DBG_USR( MEI_CEOC, MEI_DRV_PRN_LEVEL_LOW, MEI_DRV_DYN_LINENUM_GET(pMeiDynCntrl),
-         ("MEI_EOC[%02d - %02d]: Write VnxFrame "
+         ("MEI_EOC[%02d - %02d]: Write VrxFrame "
           "len = %3d - Prot 0x%04X | 0x%02X 0x%02X ... !" MEI_DRV_CRLF,
           MEI_DRV_DYN_LINENUM_GET(pMeiDynCntrl), pMeiDynCntrl->openInstance,
-          pVnxEocFrame->length_byte, pVnxEocFrame->protIdent,
-          pVnxEocFrame->cEocRawData.d_8[0], pVnxEocFrame->cEocRawData.d_8[1]));
+          pVrxEocFrame->length_byte, pVrxEocFrame->protIdent,
+          pVrxEocFrame->cEocRawData.d_8[0], pVrxEocFrame->cEocRawData.d_8[1]));
 
    if ( (retVal = MEI_CEocFrameSend(
                      pMeiDynCntrl, pCEocDevCntrl, pCEocFrameBuf)) != IFX_SUCCESS)
@@ -1056,7 +1055,7 @@ MEI_CEOC_IOCTL_FRAME_WRITE_ERR:
 
 /**
    ioctl-function for read a Clear EOC frame.
-   Receive the segment messages from the VINAX device and reassamble the frame.
+   Receive the segment messages from the VRX device and reassamble the frame.
 
 \param
    pMeiDynCntrl    Private dynamic device data (per open instance). [I]
@@ -1127,12 +1126,12 @@ IFX_int32_t MEI_CEOC_IoctlFrameRead(
    }
 
    /* setup receive message buffer */
-   pCEocFrameBuf->vnxEocFrame.cEocId      = MEI_DRV_MSG_CTRL_IF_MODEM_EOC_FRAME_ON;
-   pCEocFrameBuf->vnxEocFrame.length_byte = 0;
+   pCEocFrameBuf->vrxEocFrame.cEocId      = MEI_DRV_MSG_CTRL_IF_MODEM_EOC_FRAME_ON;
+   pCEocFrameBuf->vrxEocFrame.length_byte = 0;
    pCEocFrameBuf->transferedSize_byte     = 0;
    pCEocFrameBuf->frameSize_byte = MEI_CEOC_RAW_EOC_DATA_SIZE_BYTE +
-                                   sizeof(pCEocFrameBuf->vnxEocFrame.protIdent) +
-                                   sizeof(pCEocFrameBuf->vnxEocFrame.length_byte);
+                                   sizeof(pCEocFrameBuf->vrxEocFrame.protIdent) +
+                                   sizeof(pCEocFrameBuf->vrxEocFrame.length_byte);
 
    if ( (retVal = MEI_CEocFrameRead(
                      pMeiDynCntrl, pCEocDevCntrl, pCEocFrameBuf)) != IFX_SUCCESS)
@@ -1150,19 +1149,19 @@ IFX_int32_t MEI_CEOC_IoctlFrameRead(
    {
       if (pCEocFrameBuf->transferedSize_byte == pCEocFrameBuf->frameSize_byte)
       {
-         pIoctlCEocFrame->protIdent     = (unsigned int)pCEocFrameBuf->vnxEocFrame.protIdent;
-         pIoctlCEocFrame->dataSize_byte = (unsigned int)(pCEocFrameBuf->vnxEocFrame.length_byte -
-                                                         sizeof(pCEocFrameBuf->vnxEocFrame.protIdent));
+         pIoctlCEocFrame->protIdent     = (unsigned int)pCEocFrameBuf->vrxEocFrame.protIdent;
+         pIoctlCEocFrame->dataSize_byte = (unsigned int)(pCEocFrameBuf->vrxEocFrame.length_byte -
+                                                         sizeof(pCEocFrameBuf->vrxEocFrame.protIdent));
          if (bInternCall)
          {
             memcpy( pIoctlCEocFrame->pEocData,
-                    pCEocFrameBuf->vnxEocFrame.cEocRawData.d_8,
+                    pCEocFrameBuf->vrxEocFrame.cEocRawData.d_8,
                     pIoctlCEocFrame->dataSize_byte);
          }
          else
          {
             if ( (MEI_DRVOS_CpyToUser( pIoctlCEocFrame->pEocData,
-                                       pCEocFrameBuf->vnxEocFrame.cEocRawData.d_8,
+                                       pCEocFrameBuf->vrxEocFrame.cEocRawData.d_8,
                                        pIoctlCEocFrame->dataSize_byte)) == IFX_NULL )
             {
                PRN_ERR_USR_NL( MEI_CEOC, MEI_DRV_PRN_LEVEL_ERR,
@@ -1197,15 +1196,15 @@ IFX_int32_t MEI_CEOC_IoctlFrameRead(
       pIoctlCEocFrame->dataSize_byte = 0;
    }
 
-   pCEocFrameBuf->vnxEocFrame.length_byte = 0;
+   pCEocFrameBuf->vrxEocFrame.length_byte = 0;
    pCEocFrameBuf->transferedSize_byte     = 0;
 
    MEI_CEOC_RELEASE_UNIQUE_ACCESS(pCEocDevCntrl);
    return IFX_SUCCESS;
 
 MEI_CEOC_IOCTL_FRAME_READ_ERR:
-   pCEocFrameBuf->vnxEocFrame.cEocId      = 0;
-   pCEocFrameBuf->vnxEocFrame.length_byte = 0;
+   pCEocFrameBuf->vrxEocFrame.cEocId      = 0;
+   pCEocFrameBuf->vrxEocFrame.length_byte = 0;
    pCEocFrameBuf->transferedSize_byte     = 0;
 
    MEI_CEOC_RELEASE_UNIQUE_ACCESS(pCEocDevCntrl);

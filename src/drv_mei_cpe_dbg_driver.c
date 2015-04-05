@@ -1,8 +1,7 @@
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -10,7 +9,7 @@
 ******************************************************************************/
 
 /* ==========================================================================
-   Description : VINAX Driver Debug Functions
+   Description : VRX Driver Debug Functions
    ========================================================================== */
 
 /* ============================================================================
@@ -131,12 +130,12 @@ static IFX_int32_t MEI_GetNfcDataPerInstance(
 
 
 /* ============================================================================
-   VINAX Driver Debug Varibales
+   VRX Driver Debug Varibales
    ========================================================================= */
 
 
 #if ( (MEI_MSG_DUMP_ENABLE == 1) && (MEI_DEBUG_PRINT == 1) )
-/* VINAX-Driver: Msg Dump module - create print level variable */
+/* VRX-Driver: Msg Dump module - create print level variable */
 MEI_DRV_PRN_USR_MODULE_CREATE(MEI_MSG_DUMP, MEI_DRV_PRN_LEVEL_LOW);
 MEI_DRV_PRN_INT_MODULE_CREATE(MEI_MSG_DUMP, MEI_DRV_PRN_LEVEL_LOW);
 
@@ -144,14 +143,14 @@ IFX_uint32_t  MEI_msgDumpEnable   = 0;
 IFX_uint32_t  MEI_msgDumpOutCntrl = 0;
 IFX_boolean_t MEI_msgDumpSetLabel = IFX_FALSE;
 IFX_uint16_t  MEI_msgDumpLine     = 0;
-/* VDSL2 VINAX project */
+/* VDSL2 VRX project */
 IFX_uint16_t  MEI_msgDumpId = 0x0086;
 #endif      /* #if (MEI_MSG_DUMP_ENABLE == 1) */
 
 
 
 /* ============================================================================
-   VINAX Driver Debug Function - Message Dump
+   VRX Driver Debug Function - Message Dump
    ========================================================================= */
 #if ( (MEI_MSG_DUMP_ENABLE == 1) && (MEI_DEBUG_PRINT == 1) )
 
@@ -889,7 +888,7 @@ IFX_void_t MEI_DbgMsgDumpCntrl(
 
 
 /* ============================================================================
-   VINAX Driver Debug function - State Changes
+   VRX Driver Debug function - State Changes
    ========================================================================= */
 
 #if MEI_TRACE_DRV_STATE_CHANGES == 1
@@ -957,7 +956,7 @@ IFX_void_t MEI_DrvMailBoxStateSet_Trace(
 
 
 /* ============================================================================
-   VINAX Driver Debug function - NFC Handling
+   VRX Driver Debug function - NFC Handling
    ========================================================================= */
 #if (MEI_SUPPORT_DRV_NFC_DEBUG == 1)
 

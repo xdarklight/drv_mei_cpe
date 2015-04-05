@@ -2,9 +2,8 @@
 #define _drv_MEI_CPE_download_h
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -12,7 +11,7 @@
 ******************************************************************************/
 
 /* ==========================================================================
-   Description : Common functions used for FW download via the VINAX Driver
+   Description : Common functions used for FW download via the VRX Driver
    ========================================================================== */
 
 #ifdef __cplusplus
@@ -25,17 +24,10 @@ extern "C"
    ========================================================================= */
 /* get at first the driver configuration */
 #include "drv_mei_cpe_config.h"
-
 #include "ifx_types.h"
 #include "drv_mei_cpe_os.h"
-
 #include "drv_mei_cpe_interface.h"
-
-#if (MEI_SUPPORT_DEVICE_VINAX == 1)
-   #include "drv_mei_cpe_download_vinax_common.h"
-#elif (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_AR9 == 1)
-   #include "drv_mei_cpe_download_vr9_common.h"
-#endif
+#include "drv_mei_cpe_download_vrx_common.h"
 
 /* ==========================================================================
    Global Variable Definitions
@@ -59,6 +51,7 @@ extern MEI_DRVOS_sema_t    pFwDlCntrlLock;
 #endif /* (MEI_DRV_OS_BYTE_ORDER == MEI_DRV_OS_BIG_ENDIAN)*/
 
 #define MEI_BOOT_FLAG 0x80000000
+#define MEI_BOOTLOADER_SIZE_PAGE 10
 
 
 /* ============================================================================

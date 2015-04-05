@@ -2,9 +2,8 @@
 #define _DRV_MEI_CPE_VXWORKS_PROC_H
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -12,7 +11,7 @@
 ******************************************************************************/
 
 /* ============================================================================
-   Description : VINAX Driver, proc file system replacement, generic part
+   Description : VRX Driver, proc file system replacement, generic part
    ========================================================================= */
 
 #if !defined(LINUX) && defined(MEI_GENERIC_PROC_FS)
@@ -39,11 +38,11 @@ extern IFX_void_t MEI_ShowStatusProc(FILE *streamOut);
 extern IFX_void_t MEI_ShowNfcProc(FILE *streamOut);
 
 
-extern int doVinaxProcFs_fd(
+extern int doVrxProcFs_fd(
                      FILE *streamOut,
                      int cmd, int procEntry, int param0, int param1, int param2);
 
-extern int doVinaxProcFs(
+extern int doVrxProcFs(
                      int cmd, int procEntry, int param0, int param1, int param2);
 
 

@@ -1,8 +1,7 @@
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -24,9 +23,9 @@
 
 #include "ifx_types.h"
 
-/* add VINAX OS Layer */
+/* add VRX OS Layer */
 #include "drv_mei_cpe_os.h"
-/* add VINAX debug/printout part */
+/* add VRX debug/printout part */
 #include "drv_mei_cpe_dbg.h"
 
 #include "drv_mei_cpe_interface.h"
@@ -566,7 +565,7 @@ MEI_STATIC IFX_int32_t MEI_AR9_CMD_VersionInfoGet(
    /* Set ACK Length*/
    ack.Length = cmd.Length;
 
-   /* Set HW version: DFE HW Version Number for VINAX V1.3, Shared reticle*/
+   /* Set HW version: DFE HW Version Number for VRX V1.3, Shared reticle*/
    ack.HW_Version = 0x3;
    /* Set FW version: v9.6.1.2.0.5*/
    ack.FW_Version = (0x9 << 24) | (0x6 << 16) | (0x1 << 12) | (0x2 << 8) | (0x0 << 6) | (5 << 0);

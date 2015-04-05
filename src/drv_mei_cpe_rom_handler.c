@@ -1,8 +1,7 @@
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -10,7 +9,7 @@
 ******************************************************************************/
 
 /* ==========================================================================
-   Description : VINAX Firmware Download function (ROM START).
+   Description : VRX Firmware Download function (ROM START).
    ========================================================================== */
 
 /* ============================================================================
@@ -72,12 +71,12 @@
    Global variables
    ========================================================================== */
 
-/* VINAX-Driver: ROM Code module - create print level variable */
+/* VRX-Driver: ROM Code module - create print level variable */
 MEI_DRV_PRN_USR_MODULE_CREATE(MEI_ROM, MEI_DRV_PRN_LEVEL_LOW);
 MEI_DRV_PRN_INT_MODULE_CREATE(MEI_ROM, MEI_DRV_PRN_LEVEL_LOW);
 
 
-/* Max time Wait: "VINAX Event Init Done" */
+/* Max time Wait: "VRX Event Init Done" */
 IFX_int32_t MEI_MaxWaitInitDone_ms = 1000;
 
 /* ==========================================================================
@@ -203,8 +202,8 @@ static IFX_void_t MEI_LogBootMsg( MEI_Mailbox_t *pBootMsg,
 /**
    EVENT - EVT_INITDONE has been received.
    NOTE:
-      This is the first message send by the VINAX ROM Handler to signal that
-      the VINAX is alive (and initialisation has been done)
+      This is the first message send by the VRX ROM Handler to signal that
+      the VRX is alive (and initialisation has been done)
 
 \param
    pMeiDev  points to the device structure
@@ -216,8 +215,8 @@ static IFX_void_t MEI_LogBootMsg( MEI_Mailbox_t *pBootMsg,
    IFX_ERROR:   corrupted or valid boot message.
 
 \remark
-   IF the VINAX sends this message it depends on the boot mode (only in
-   boot modes with host interaction the VINAX will send this message)
+   IF the VRX sends this message it depends on the boot mode (only in
+   boot modes with host interaction the VRX will send this message)
 
 \attention
    - Called on int-level
@@ -245,7 +244,7 @@ static IFX_int32_t MEI_FDOnEvt_INITDONE( MEI_DEV_T *pMeiDev,
 
    /*
       check current Driver state - still waiting for alive
-      - set next state VINAX alive
+      - set next state VRX alive
    */
    if (( MEI_DRV_STATE_GET(pMeiDev) == e_MEI_DRV_STATE_SW_INIT_DONE ) ||
        ( MEI_DRV_STATE_GET(pMeiDev) == e_MEI_DRV_STATE_BOOT_WAIT_ROM_ALIVE ))
@@ -383,7 +382,7 @@ static IFX_int32_t MEI_FDOnAck_GpaAccess( MEI_DEV_T *pMeiDev,
    ROM Boot message handler - process messages while boot phase.
 
 \param
-   pMeiDev: Points to the VINAX device struct.
+   pMeiDev: Points to the VRX device struct.
 \param
    pBootMsg: Points to the previous received boot message.
 
@@ -436,10 +435,10 @@ static IFX_int32_t MEI_RomBootMsgHandler( MEI_DEV_T *pMeiDev,
 
 
 /**
-   Write a BOOT mailbox message to the VINAX.
+   Write a BOOT mailbox message to the VRX.
 
 \param
-   pMeiDev: Points to the VINAX device struct.
+   pMeiDev: Points to the VRX device struct.
 \param
    pMsg:    Points to the message.
 \param
@@ -486,7 +485,7 @@ IFX_int32_t MEI_WriteRomBootMsg( MEI_DEV_T *pMeiDev,
    }
    else
    {
-      /* set VINAX device mailbox status */
+      /* set VRX device mailbox status */
       MEI_DRV_MAILBOX_STATE_SET(pMeiDev, e_MEI_MB_PENDING_ACK_1);
       ret *= sizeof(IFX_uint16_t);
 
@@ -506,7 +505,7 @@ IFX_int32_t MEI_WriteRomBootMsg( MEI_DEV_T *pMeiDev,
    Get and process an incoming BOOT ROM mailbox message.
 
 \param
-   pMeiDev: Points to the VINAX device struct.
+   pMeiDev: Points to the VRX device struct.
 
 \return
    NONE - all statistics will be set within the device struct.
@@ -581,7 +580,7 @@ IFX_void_t MEI_RecvRomBootMsg(MEI_DEV_T *pMeiDev )
    - CMD_AUXREGISTERWRITE  --> ACK_AUXREGISTERWRITE
 
 \param
-   pMeiDev: Points to the VINAX device struct.
+   pMeiDev: Points to the VRX device struct.
 \param
    aux:     Destination area on the target: MEM/AUX
 \param
@@ -669,8 +668,8 @@ IFX_int32_t MEI_RomHandlerWrGpa( MEI_DEV_T *pMeiDev,
    /* poll for response */
    while(1)
    {
-      /* wait: for an response from the VINAX boot loader */
-      MEI_PollIntPerVnxLine(pMeiDev, e_MEI_DEV_ACCESS_MODE_PASSIV_POLL);
+      /* wait: for an response from the VRX boot loader */
+      MEI_PollIntPerVrxLine(pMeiDev, e_MEI_DEV_ACCESS_MODE_PASSIV_POLL);
 
       if (MEI_DRV_MAILBOX_STATE_GET(pMeiDev) != e_MEI_MB_FREE)
       {
@@ -706,7 +705,7 @@ IFX_int32_t MEI_RomHandlerWrGpa( MEI_DEV_T *pMeiDev,
    - CMD_AUXREGISTERREAD        --> ACK_AUXREGISTERREAD
 
 \param
-   pMeiDev: Points to the VINAX device struct.
+   pMeiDev: Points to the VRX device struct.
 \param
    aux:     Destination area on the target: MEM/AUX
 \param
@@ -790,8 +789,8 @@ IFX_int32_t MEI_RomHandlerRdGpa( MEI_DEV_T *pMeiDev,
    /* poll for response */
    while(1)
    {
-      /* wait: for an response from the VINAX boot loader */
-      MEI_PollIntPerVnxLine(pMeiDev, e_MEI_DEV_ACCESS_MODE_PASSIV_POLL);
+      /* wait: for an response from the VRX boot loader */
+      MEI_PollIntPerVrxLine(pMeiDev, e_MEI_DEV_ACCESS_MODE_PASSIV_POLL);
 
       if (MEI_DRV_MAILBOX_STATE_GET(pMeiDev) != e_MEI_MB_FREE)
       {
