@@ -1,32 +1,31 @@
-/* src/drv_mei_cpe_config_auto.h.  Generated from drv_mei_cpe_config_auto.h.in by configure.  */
 /* src/drv_mei_cpe_config_auto.h.in.  Generated from configure.in by autoheader.  */
 
 /* Lines per DSL devices to support */
-#define DSL_LINES_PER_DEVICE 1
+#undef DSL_LINES_PER_DEVICE
 
 /* Maximum DSL devices to support */
-#define DSL_MAX_DEVICE_NUMBER 1
+#undef DSL_MAX_DEVICE_NUMBER
 
 /* Name of package */
-#define PACKAGE "drv_mei_cpe"
+#undef PACKAGE
 
 /* Define to the address where bug reports for this package should be sent. */
-#define PACKAGE_BUGREPORT ""
+#undef PACKAGE_BUGREPORT
 
 /* Define to the full name of this package. */
-#define PACKAGE_NAME "IFX MEI CPE Driver"
+#undef PACKAGE_NAME
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "IFX MEI CPE Driver 1.4.1"
+#undef PACKAGE_STRING
 
 /* Define to the one symbol short name of this package. */
-#define PACKAGE_TARNAME "drv_mei_cpe"
+#undef PACKAGE_TARNAME
 
 /* Define to the home page for this package. */
-#define PACKAGE_URL ""
+#undef PACKAGE_URL
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "1.4.1"
+#undef PACKAGE_VERSION
 
 /* Version number of package */
-#define VERSION "1.4.1"
+#undef VERSION
