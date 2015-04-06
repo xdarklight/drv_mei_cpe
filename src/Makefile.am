@@ -105,8 +105,7 @@ drv_mei_cpe_all_sources = \
 	drv_mei_cpe_nucleus.h\
 	drv_mei_cpe_mei_access_vrx.c \
 	drv_mei_cpe_mei_access_ar9.c \
-	drv_mei_cpe_device_vinax.c \
-	drv_mei_cpe_device_vr9.c \
+	drv_mei_cpe_device_vrx.c \
 	drv_mei_cpe_rom_handler.c\
 	drv_mei_cpe_rom_handler.h\
 	drv_mei_cpe_rom_handler_if.h\
