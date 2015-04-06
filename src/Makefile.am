@@ -30,7 +30,7 @@ if ADD_INTERNAL_IF_SET
 bin_PROGRAMS += test_mei_cpe_intern
 endif
 
-bin_SCRIPTS = inst_drv_mei_cpe.sh alias_drv_mei_cpe.sh
+bin_SCRIPTS = ../scripts/inst_drv_mei_cpe.sh ../scripts/alias_drv_mei_cpe.sh
 
 # ENABLE_ECOS
 endif
@@ -351,7 +351,6 @@ EXTRA_DIST = \
 	mei_cpe_drv_examp_int_wrap_vxw.c\
 	mei_cpe_drv_examp_int_wrap_vxw.h\
 	../build_vxworks/drv_mei_cpe.wpj\
-	inst_drv_mei_cpe.sh\
 	alias_drv_mei_cpe.sh\
 	../scripts/enable_ARC_JTAG.sh\
 	../scripts/inst_drv_mei_cpe.sh\
