@@ -1,8 +1,7 @@
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -68,7 +67,7 @@
 #endif
 
 
-/* add VINAX debug/printout part */
+/* add VRX debug/printout part */
 #include "drv_mei_cpe_dbg.h"
 #include "drv_mei_cpe_dbg_driver.h"
 
@@ -151,11 +150,6 @@ static int MEI_ProcWriteConfigMaxWaitModemOnline(char *pArg);
 static int MEI_ProcReadConfigMaxWaitDfeResp(char *pPage);
 static int MEI_ProcWriteConfigMaxWaitDfeResp(char *pArg);
 
-#if (MEI_SUPPORT_DEVICE_VINAX == 1)
-static int MEI_ProcWriteConfigBootMode(char *pArg);
-static int MEI_ProcReadConfigBootMode(char *pPage);
-#endif /* #if (MEI_SUPPORT_DEVICE_VINAX == 1)*/
-
 #if (MEI_SUPPORT_VDSL2_ADSL_SWAP == 1)
 static int MEI_ProcWriteConfigFwSelect(char *pArg);
 static int MEI_ProcReadConfigFwSelect(char *pPage);
@@ -203,7 +197,7 @@ static struct proc_dir_entry *MEI_ProcConfigFile;
 /**
    Contains the procfs configuration.
 */
-static MEI_CONFIG_PROC_ENTRY_T arrVinaxDfeProcFsConfigTable[e_PROCFS_CONFIG_LAST + 1] =
+static MEI_CONFIG_PROC_ENTRY_T arrVrxDfeProcFsConfigTable[e_PROCFS_CONFIG_LAST + 1] =
 {
    MEI_PROCFS_CONFIG_TABLE
 };
@@ -365,7 +359,7 @@ static int MEI_ProcReadConfigGlobalDbgConfig(char *pPage)
 {
    return (sprintf( pPage, "%2d: %s \tT = %d L = %d \tCnt = 0x%X, Mask[0..3] = 0x%X 0x%X 0x%X 0x%X" MEI_DRV_CRLF,
                     e_PROCFS_CONFIG_G_DBG_CONFIG,
-                    arrVinaxDfeProcFsConfigTable[e_PROCFS_CONFIG_G_DBG_CONFIG].pName,
+                    arrVrxDfeProcFsConfigTable[e_PROCFS_CONFIG_G_DBG_CONFIG].pName,
                     MEI_DRVOS_GDBG_USR_LEVEL_GET(),
                     MEI_DRVOS_GDBG_INT_LEVEL_GET(),
                     MEI_DRV_PRN_DEBUG_CONTROL_GET(),
@@ -406,7 +400,7 @@ static int MEI_ProcReadConfigLog(char *pPage)
 {
    return (sprintf( pPage, "%2d: %s \t= %2d" MEI_DRV_CRLF,
                     e_PROCFS_CONFIG_LOG,
-                    arrVinaxDfeProcFsConfigTable[e_PROCFS_CONFIG_LOG].pName,
+                    arrVrxDfeProcFsConfigTable[e_PROCFS_CONFIG_LOG].pName,
                     MEI_DRV_PRN_INT_LEVEL_GET(MEI_DRV)) );
 }
 
@@ -442,7 +436,7 @@ static int MEI_ProcReadConfigTrace(char *pPage)
 {
    return (sprintf( pPage, "%2d: %s \t= %2d" MEI_DRV_CRLF,
                     e_PROCFS_CONFIG_TRACE,
-                    arrVinaxDfeProcFsConfigTable[e_PROCFS_CONFIG_TRACE].pName,
+                    arrVrxDfeProcFsConfigTable[e_PROCFS_CONFIG_TRACE].pName,
                     MEI_DRV_PRN_USR_LEVEL_GET(MEI_DRV)));
 }
 
@@ -478,7 +472,7 @@ static int MEI_ProcReadConfigLogMei(char *pPage)
 {
    return (sprintf( pPage, "%2d: %s \t= %2d" MEI_DRV_CRLF,
                     e_PROCFS_CONFIG_LOG_MEI,
-                    arrVinaxDfeProcFsConfigTable[e_PROCFS_CONFIG_LOG_MEI].pName,
+                    arrVrxDfeProcFsConfigTable[e_PROCFS_CONFIG_LOG_MEI].pName,
                     MEI_DRV_PRN_INT_LEVEL_GET(MEI_MEI_ACCESS)));
 }
 
@@ -514,7 +508,7 @@ static int MEI_ProcReadConfigTraceMei(char *pPage)
 {
    return (sprintf( pPage, "%2d: %s \t= %2d" MEI_DRV_CRLF,
                     e_PROCFS_CONFIG_TRACE_MEI,
-                    arrVinaxDfeProcFsConfigTable[e_PROCFS_CONFIG_TRACE_MEI].pName,
+                    arrVrxDfeProcFsConfigTable[e_PROCFS_CONFIG_TRACE_MEI].pName,
                     MEI_DRV_PRN_USR_LEVEL_GET(MEI_MEI_ACCESS)));
 }
 
@@ -541,7 +535,7 @@ static int MEI_ProcReadConfigMailboxME2ARC(char *pPage)
 {
    return (sprintf( pPage, "%2d: %s \t= 0x%08X" MEI_DRV_CRLF,
                     e_PROCFS_CONFIG_MB_ME2ARC,
-                    arrVinaxDfeProcFsConfigTable[e_PROCFS_CONFIG_MB_ME2ARC].pName,
+                    arrVrxDfeProcFsConfigTable[e_PROCFS_CONFIG_MB_ME2ARC].pName,
                     MEI_MailboxBase_ME2ARC));
 }
 
@@ -568,7 +562,7 @@ static int MEI_ProcReadConfigMailboxARC2ME(char *pPage)
 {
    return (sprintf( pPage, "%2d: %s \t= 0x%08X" MEI_DRV_CRLF,
                     e_PROCFS_CONFIG_MB_ARC2ME,
-                    arrVinaxDfeProcFsConfigTable[e_PROCFS_CONFIG_MB_ARC2ME].pName,
+                    arrVrxDfeProcFsConfigTable[e_PROCFS_CONFIG_MB_ARC2ME].pName,
                     MEI_MailboxBase_ARC2ME));
 }
 
@@ -606,7 +600,7 @@ static int MEI_ProcReadConfigTraceRom(char *pPage)
 {
    return (sprintf( pPage, "%2d: %s \t= %2d" MEI_DRV_CRLF,
                     e_PROCFS_CONFIG_TRACE_DL_ROM,
-                    arrVinaxDfeProcFsConfigTable[e_PROCFS_CONFIG_TRACE_DL_ROM].pName,
+                    arrVrxDfeProcFsConfigTable[e_PROCFS_CONFIG_TRACE_DL_ROM].pName,
                     MEI_DRV_PRN_USR_LEVEL_GET(MEI_ROM)));
 }
 
@@ -634,13 +628,13 @@ static int MEI_ProcReadConfigBlockTimeout(char *pPage)
 {
    return (sprintf( pPage, "%2d: %s \t= %d" MEI_DRV_CRLF,
                     e_PROCFS_CONFIG_BLOCK_TOUT,
-                    arrVinaxDfeProcFsConfigTable[e_PROCFS_CONFIG_BLOCK_TOUT].pName,
+                    arrVrxDfeProcFsConfigTable[e_PROCFS_CONFIG_BLOCK_TOUT].pName,
                     MEI_BlockTimeout));
 }
 
 
 /**
-   Handle procfs config - write max Wait for VINAX Response.
+   Handle procfs config - write max Wait for VRX Response.
 */
 static int MEI_ProcWriteConfigMaxWaitModemOnline(char *pArg)
 {
@@ -653,20 +647,20 @@ static int MEI_ProcWriteConfigMaxWaitModemOnline(char *pArg)
 }
 
 /**
-   Handle procfs config - read  Max Wait for VINAX Response.
+   Handle procfs config - read  Max Wait for VRX Response.
 */
 static int MEI_ProcReadConfigMaxWaitModemOnline(char *pPage)
 {
    return (sprintf( pPage, "%2d: %s \t= %s%d [ms]\n\r",
                     e_PROCFS_CONFIG_W_MODEM_ONLINE,
-                    arrVinaxDfeProcFsConfigTable[e_PROCFS_CONFIG_W_MODEM_ONLINE].pName,
+                    arrVrxDfeProcFsConfigTable[e_PROCFS_CONFIG_W_MODEM_ONLINE].pName,
                     ((MEI_MaxWaitForModemReady_ms & MEI_CFG_DEF_WAIT_PROTECTION_FLAG) ? "*" : ""),
                     (MEI_MaxWaitForModemReady_ms & ~MEI_CFG_DEF_WAIT_PROTECTION_FLAG) ));
 }
 
 
 /**
-   Handle procfs config - write max Wait for VINAX Response.
+   Handle procfs config - write max Wait for VRX Response.
 */
 static int MEI_ProcWriteConfigMaxWaitDfeResp(char *pArg)
 {
@@ -681,43 +675,15 @@ static int MEI_ProcWriteConfigMaxWaitDfeResp(char *pArg)
 
 
 /**
-   Handle procfs config - read  Max Wait for VINAX Response.
+   Handle procfs config - read  Max Wait for VRX Response.
 */
 static int MEI_ProcReadConfigMaxWaitDfeResp(char *pPage)
 {
    return (sprintf( pPage, "%2d: %s \t= %d [ms]" MEI_DRV_CRLF,
                     e_PROCFS_CONFIG_W_DFE_RESP,
-                    arrVinaxDfeProcFsConfigTable[e_PROCFS_CONFIG_W_DFE_RESP].pName,
+                    arrVrxDfeProcFsConfigTable[e_PROCFS_CONFIG_W_DFE_RESP].pName,
                     MEI_MaxWaitDfeResponce_ms));
 }
-
-#if (MEI_SUPPORT_DEVICE_VINAX == 1)
-/**
-   Handle procfs config - write boot mode used for Download.
-*/
-static int MEI_ProcWriteConfigBootMode(char *pArg)
-{
-   unsigned long bootmode = 0;
-
-   bootmode = MEI_GetDigitValue(pArg, 10);
-
-   MEI_BootMode = (unsigned char)(bootmode);
-
-   return 0;
-}
-
-
-/**
-   Handle procfs config - read boot mode used for Download.
-*/
-static int MEI_ProcReadConfigBootMode(char *pPage)
-{
-   return (sprintf( pPage, "%2d: %s \t= 0x%02X " MEI_DRV_CRLF,
-                    e_PROCFS_CONFIG_BOOTMODE,
-                    arrVinaxDfeProcFsConfigTable[e_PROCFS_CONFIG_BOOTMODE].pName,
-                    MEI_BootMode));
-}
-#endif /* (MEI_SUPPORT_DEVICE_VINAX == 1)*/
 
 #if (MEI_SUPPORT_VDSL2_ADSL_SWAP == 1)
 
@@ -743,7 +709,7 @@ static int MEI_ProcReadConfigFwSelect(char *pPage)
 {
    return (sprintf( pPage, "%2d: %s \t= 0x%02X " MEI_DRV_CRLF,
                     e_PROCFS_CONFIG_FW_SELECT,
-                    arrVinaxDfeProcFsConfigTable[e_PROCFS_CONFIG_FW_SELECT].pName,
+                    arrVrxDfeProcFsConfigTable[e_PROCFS_CONFIG_FW_SELECT].pName,
                     MEI_fwModeSelect));
 }
 
@@ -771,7 +737,7 @@ static int MEI_ProcReadConfigFsmSetPreAct(char *pPage)
 {
    return (sprintf( pPage, "%2d: %s \t= 0x%02X " MEI_DRV_CRLF,
                     e_PROCFS_CONFIG_FSM_SET_PRE_ACT,
-                    arrVinaxDfeProcFsConfigTable[e_PROCFS_CONFIG_FSM_SET_PRE_ACT].pName,
+                    arrVrxDfeProcFsConfigTable[e_PROCFS_CONFIG_FSM_SET_PRE_ACT].pName,
                     MEI_FsmStateSetMsgPreAction));
 }
 
@@ -814,7 +780,7 @@ static int MEI_ProcReadConfigMsgDumpEnable(char *pPage)
 
    return (sprintf( pPage, "%2d: %s \t= 0x%02X " MEI_DRV_CRLF,
                     e_PROCFS_CONFIG_MDMP_ENABLE,
-                    arrVinaxDfeProcFsConfigTable[e_PROCFS_CONFIG_MDMP_ENABLE].pName,
+                    arrVrxDfeProcFsConfigTable[e_PROCFS_CONFIG_MDMP_ENABLE].pName,
                     (unsigned int)tmpVal));
 }
 
@@ -828,7 +794,7 @@ static int MEI_ProcReadConfigMsgDumpId(char *pPage)
 {
    return (sprintf( pPage, "%2d: %s \t= 0x%02X " MEI_DRV_CRLF,
                     e_PROCFS_CONFIG_MDMP_ID,
-                    arrVinaxDfeProcFsConfigTable[e_PROCFS_CONFIG_MDMP_ID].pName,
+                    arrVrxDfeProcFsConfigTable[e_PROCFS_CONFIG_MDMP_ID].pName,
                     MEI_msgDumpId));
 }
 
@@ -863,7 +829,7 @@ static int MEI_ProcReadConfigMeiAccCse(char *pPage)
 {
    return (sprintf( pPage, "%2d: %s \tRd=%d \tWr=%d\n\r",
                     e_PROCFS_CONFIG_MEI_ACCESS_ADD_CSE,
-                    arrVinaxDfeProcFsConfigTable[e_PROCFS_CONFIG_MEI_ACCESS_ADD_CSE].pName,
+                    arrVrxDfeProcFsConfigTable[e_PROCFS_CONFIG_MEI_ACCESS_ADD_CSE].pName,
                     MEI_DummyAccessLoopsRd, MEI_DummyAccessLoopsWr));
 }
 
@@ -900,7 +866,7 @@ static int MEI_ProcReadConfigDTestCntrl(char *pPage)
 {
    return (sprintf( pPage, "%2d: %s \t= 0x%08X min = 0x%08X max = 0x%08X" MEI_DRV_CRLF,
                     e_PROCFS_CONFIG_DTEST_CNTRL,
-                    arrVinaxDfeProcFsConfigTable[e_PROCFS_CONFIG_DTEST_CNTRL].pName,
+                    arrVrxDfeProcFsConfigTable[e_PROCFS_CONFIG_DTEST_CNTRL].pName,
                     MEI_procDebugTestCntrl,
                     MEI_procDebugTestBufDmaRangeMin,
                     MEI_procDebugTestBufDmaRangeMax));
@@ -1041,7 +1007,7 @@ int MEI_InstallProcEntryConfig(struct proc_dir_entry *driver_proc_node)
       }
 
       /* Set the configuration data */
-      MEI_ProcConfigFile->data       = &arrVinaxDfeProcFsConfigTable;
+      MEI_ProcConfigFile->data       = &arrVrxDfeProcFsConfigTable;
       MEI_ProcConfigFile->read_proc  = MEI_ProcReadConfig;
       MEI_ProcConfigFile->write_proc = MEI_ProcWriteConfig;
 

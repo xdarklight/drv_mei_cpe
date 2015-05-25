@@ -2,9 +2,8 @@
 #define _DRV_MEI_CPE_DBG_ACCESS_H
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -12,7 +11,7 @@
 ******************************************************************************/
 
 /* ==========================================================================
-   Description : Debug and DMA access to the VINAX Device
+   Description : Debug and DMA access to the VRX Device
    ========================================================================== */
 
 

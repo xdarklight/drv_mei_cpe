@@ -1,8 +1,7 @@
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -31,18 +30,6 @@ extern "C"
 #include "drv_mei_cpe_os.h"
 #include "drv_mei_cpe_api.h"
 #include "drv_mei_cpe_mailbox.h"
-
-#include "drv_mei_cpe_vinax_msg_const.h"
-#include "drv_mei_cpe_vinax_msg_config_pmd.h"
-#include "drv_mei_cpe_vinax_msg_debug.h"
-#include "drv_mei_cpe_vinax_msg_dmt_scope.h"
-#include "drv_mei_cpe_vinax_msg_ghs_status.h"
-#include "drv_mei_cpe_vinax_msg_olr.h"
-#include "drv_mei_cpe_vinax_msg_perf_pmd.h"
-#include "drv_mei_cpe_vinax_msg_tc_counters.h"
-#include "drv_mei_cpe_vinax_msg_utopia_posphy.h"
-#include "drv_mei_cpe_vinax_msg_xtc.h"
-
 
 /* ============================================================================
    Defines

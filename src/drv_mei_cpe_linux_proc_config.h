@@ -2,9 +2,8 @@
 #define _DRV_MEI_CPE_LINUX_PROC_CONFIG_H
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -110,14 +109,7 @@ extern "C"
 #define MEI_PROCFS_CONFIG_W_DFE_RESP \
             GET_FIELD_2(PROCFS_CONFIG_W_DFE_RESP, MEI_PROCFS_CONFIG_W_DFE_RESP_ENTRY, SEPARATOR)
 
-#if (MEI_SUPPORT_DEVICE_VINAX == 1)
-#define MEI_PROCFS_CONFIG_BOOTMODE_ENTRY \
-            {"BOOTMODE", MEI_ProcReadConfigBootMode, MEI_ProcWriteConfigBootMode}
-#define MEI_PROCFS_CONFIG_BOOTMODE \
-            GET_FIELD_2(PROCFS_CONFIG_BOOTMODE, MEI_PROCFS_CONFIG_BOOTMODE_ENTRY, SEPARATOR)
-#else
 #define MEI_PROCFS_CONFIG_BOOTMODE
-#endif /* (MEI_SUPPORT_DEVICE_VINAX == 1)*/
 
 #if (MEI_SUPPORT_VDSL2_ADSL_SWAP == 1)
 

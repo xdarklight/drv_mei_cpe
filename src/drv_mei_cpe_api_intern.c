@@ -1,8 +1,7 @@
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -10,7 +9,7 @@
 ******************************************************************************/
 
 /* ==========================================================================
-   Description : VINAX Driver internal function interface
+   Description : VRX Driver internal function interface
    ========================================================================== */
 
 /* ============================================================================
@@ -31,6 +30,10 @@
 #include "drv_mei_cpe_interface.h"
 #include "drv_mei_cpe_api.h"
 #include "drv_mei_cpe_msg_process.h"
+
+#if (MEI_SUPPORT_DSM == 1)
+#include "drv_mei_cpe_dsm.h"
+#endif /* (MEI_SUPPORT_DSM == 1) */
 
 #include "drv_mei_cpe_dbg_access.h"
 #include "drv_mei_cpe_download.h"
@@ -81,7 +84,7 @@ IFX_int32_t MEI_InternalDrvVersionGet(
 }
 
 /**
-   Internal Interface - Set the VINAX Driver debug level.
+   Internal Interface - Set the VRX Driver debug level.
 \param
    pMeiDynCntrl    points to the dynamic control struct.
 \param
@@ -407,6 +410,91 @@ IFX_int32_t MEI_InternalMsgSend(
    return retVal;
 }
 
+static IFX_void_t MEI_Internal_DumpMessage(
+                              MEI_DYN_CNTRL_T      *pMeiDynCntrl,
+                              const IFX_uint16_t   nMsgId,
+                              const IFX_uint16_t   *pData,
+                              const IFX_uint16_t   nSize,
+                              IFX_boolean_t        bReceive,
+                              IFX_uint16_t         dbg_level)
+{
+   static const IFX_uint16_t *pMsg16;
+   static const IFX_uint32_t *pMsg32;
+   IFX_boolean_t bDirSet = IFX_FALSE;
+   IFX_uint8_t i;
+
+   if((pData == IFX_NULL) || (nSize < 4))
+   {
+      return ;
+   }
+
+   pMsg16 = (IFX_uint16_t*)(pData+2);
+   pMsg32 = (IFX_uint32_t*)(pData+2);
+
+   bDirSet = (nMsgId & 0x40) ? IFX_TRUE : IFX_FALSE;
+
+   PRN_DBG_USR_RAW(MEI_MSG_DUMP_API, dbg_level,
+                  ("MEI[%02d/%s]: 0x%04x 0x%04x 0x%04x",
+                  MEI_DRV_DYN_LINENUM_GET(pMeiDynCntrl),
+                  (bReceive == IFX_TRUE ? "rx" : "tx"), nMsgId,
+                  pData[0], pData[1]));
+
+   /* decide wether to interpret the rest as 16 or 32 bit */
+   if (nMsgId & 0x0010)
+   {
+      /* 32-bit payload elements */
+      for (i=0; i<((nSize-4)/4); i++)
+      {
+         PRN_DBG_USR_RAW(MEI_MSG_DUMP_API, dbg_level, (" %08X", pMsg32[i]));
+      }
+   }
+   else
+   {
+      /* 16-bit payload elements */
+      for (i=0; i<((nSize-4)/2); i++)
+      {
+         PRN_DBG_USR_RAW(MEI_MSG_DUMP_API, dbg_level, (" %04X", pMsg16[i]));
+      }
+   }
+
+   PRN_DBG_USR_RAW(MEI_MSG_DUMP_API, dbg_level, (MEI_DRV_CRLF));
+}
+
+IFX_int32_t MEI_InternalSendMessage(
+                              MEI_DYN_CNTRL_T      *pMeiDynCntrl,
+                              const IFX_uint16_t   nMsgID,
+                              const IFX_uint16_t   nLength,
+                              const IFX_uint8_t    *pData,
+                              const IFX_uint16_t   nLenAck,
+                              IFX_uint8_t          *pDataAck)
+{
+   IFX_int32_t ret = 0;
+   IOCTL_MEI_messageSend_t msg;
+
+   msg.write_msg.msgId = nMsgID;
+   msg.write_msg.pPayload = (unsigned char *)pData;
+   msg.write_msg.paylSize_byte = nLength;
+
+   msg.ack_msg.msgId = 0;
+   msg.ack_msg.pPayload = (unsigned char *)pDataAck;
+   msg.ack_msg.paylSize_byte = nLenAck;
+
+   MEI_Internal_DumpMessage(pMeiDynCntrl, msg.write_msg.msgId,
+      (IFX_uint16_t *)msg.write_msg.pPayload, msg.write_msg.paylSize_byte,
+      IFX_FALSE, MEI_DRV_PRN_LEVEL_NORMAL);
+
+   ret = MEI_InternalMsgSend(pMeiDynCntrl, &msg);
+
+   if (ret >= 0)
+   {
+      MEI_Internal_DumpMessage(pMeiDynCntrl, msg.ack_msg.msgId,
+         (IFX_uint16_t *)msg.ack_msg.pPayload, msg.ack_msg.paylSize_byte,
+         IFX_TRUE, MEI_DRV_PRN_LEVEL_LOW);
+   }
+
+   return ret;
+}
+
 IFX_int32_t MEI_InternalNfcMsgRead(
                               MEI_DYN_CNTRL_T       *pMeiDynCntrl,
                               IOCTL_MEI_message_t   *pArgMsg)
@@ -618,7 +706,7 @@ IFX_int32_t MEI_InternalFirmwareDownload(
    return retVal;
 }
 
-#if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_AR9 == 1)
+#if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1) || (MEI_SUPPORT_DEVICE_AR9 == 1)
 IFX_int32_t MEI_InternalOptFirmwareDownload(
                               MEI_DYN_CNTRL_T           *pMeiDynCntrl,
                               IOCTL_MEI_fwOptDownLoad_t *pArgFwDl)
@@ -639,9 +727,9 @@ IFX_int32_t MEI_InternalOptFirmwareDownload(
 
    return retVal;
 }
-#endif /* (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_AR9 == 1)*/
+#endif /* (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1) || (MEI_SUPPORT_DEVICE_AR9 == 1)*/
 
-#if (MEI_SUPPORT_DEVICE_VR9 == 1)
+#if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1)
 IFX_int32_t MEI_InternalFwModeCtrlSet(
                               MEI_DYN_CNTRL_T           *pMeiDynCntrl,
                               IOCTL_MEI_FwModeCtrlSet_t *pArgFwModeCtrl)
@@ -683,7 +771,7 @@ IFX_int32_t MEI_InternalFwModeStatGet(
 
    return retVal;
 }
-#endif /* (MEI_SUPPORT_DEVICE_VR9 == 1)*/
+#endif /* (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1)*/
 
 #if (MEI_DRV_ATM_OAM_ENABLE == 1)
 

@@ -1,8 +1,7 @@
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -10,7 +9,7 @@
 ******************************************************************************/
 
 /* ==========================================================================
-   Description : VINAX Driver Test, Linux part - internal interface.
+   Description : VRX Driver Test, Linux part - internal interface.
    ========================================================================== */
 
 #ifdef LINUX
@@ -19,7 +18,7 @@
    includes - LINUX
    ========================================================================== */
 
-/* get at first the VINAX driver configuration */
+/* get at first the VRX driver configuration */
 #include "drv_mei_cpe_config.h"
 
 #include "ifx_types.h"
@@ -51,7 +50,7 @@
    #undef CONFIG_DEVFS_FS
 #endif
 
-/* add VINAX debug/printout part */
+/* add VRX debug/printout part */
 #include "drv_mei_cpe_dbg.h"
 #include "drv_mei_cpe_interface.h"
 #include "drv_mei_cpe_api_intern.h"
@@ -89,7 +88,7 @@ static int MEI_TEST_ReadProc(char *page, char **start, off_t off,
    Variable definitions
    ========================================================================== */
 
-/* VINAX-Driver: Common debug module - create print level variable */
+/* VRX-Driver: Common debug module - create print level variable */
 MEI_DRV_PRN_USR_MODULE_CREATE(MEI_TEST, MEI_DRV_PRN_LEVEL_LOW);
 MEI_DRV_PRN_INT_MODULE_CREATE(MEI_TEST, MEI_DRV_PRN_LEVEL_LOW);
 
@@ -154,9 +153,9 @@ static int __init MEI_TEST_module_init (void)
    int result;
 
    printk(KERN_INFO "%s" MEI_DRV_CRLF, &MEI_TEST_DRV_WHAT_STR[4]);
-   printk(KERN_INFO "(c) Copyright 2005, Infineon Technologies AG" MEI_DRV_CRLF);
+   printk(KERN_INFO "(c) Copyright 2012, Lantiq Deutschland GmbH" MEI_DRV_CRLF);
 
-   printk(KERN_INFO "### VINAX - TEST - VINAX - TEST ###" MEI_DRV_CRLF);
+   printk(KERN_INFO "### VRX - TEST - VRX - TEST ###" MEI_DRV_CRLF);
 
    MEI_DRV_PRN_USR_LEVEL_SET(MEI_TEST, debug_level);
    MEI_DRV_PRN_INT_LEVEL_SET(MEI_TEST, debug_level);
@@ -198,16 +197,16 @@ static void __exit MEI_TEST_module_exit(void)
 
    for (meiLine = 0; meiLine < MEI_MAX_DFE_CHAN_DEVICES; meiLine++)
    {
-      if (MEI_TEST_dev.pVnxTestLine[meiLine] != IFX_NULL)
+      if (MEI_TEST_dev.pVrxTestLine[meiLine] != IFX_NULL)
       {
-         MEI_InternalDevClose(MEI_TEST_dev.pVnxTestLine[meiLine]);
-         MEI_TEST_dev.pVnxTestLine[meiLine] = IFX_NULL;
+         MEI_InternalDevClose(MEI_TEST_dev.pVrxTestLine[meiLine]);
+         MEI_TEST_dev.pVrxTestLine[meiLine] = IFX_NULL;
       }
    }
 
 #ifdef CONFIG_DEVFS_FS
 
-   /* remove VINAX channel devices */
+   /* remove VRX channel devices */
    for (meiLine = 0; meiLine < MEI_MAX_DFE_CHAN_DEVICES; meiLine++)
    {
       if (MEI_TEST_dev_handle[meiLine])
@@ -269,10 +268,10 @@ static int MEI_TEST_RegCharDev(const char *devName)
       return IFX_ERROR;
    }
 
-   /* create VINAX channel devices */
+   /* create VRX channel devices */
    for (meiLine=0; meiLine < MEI_MAX_DFE_CHAN_DEVICES; meiLine++)
    {
-      /* add VINAX channel devices to dev fs */
+      /* add VRX channel devices to dev fs */
       sprintf (buf, "%d", meiLine);
 
       /* private_data contains device number for open function
@@ -326,7 +325,7 @@ static int MEI_TEST_RegCharDev(const char *devName)
 
 
 /**
-   Open a VINAX test device
+   Open a VRX test device
 
 \param
    inode pointer to the inode
@@ -340,7 +339,7 @@ static int MEI_TEST_Open(struct inode *inode, struct file *filp)
    MEI_DYN_CNTRL_T *pMeiDynCntrl = NULL;
 
    PRN_DBG_USR_NL( MEI_TEST, MEI_DRV_PRN_LEVEL_NORMAL,
-             ("MEI_TEST[%02d]: Open VINAX test dev" MEI_DRV_CRLF,
+             ("MEI_TEST[%02d]: Open VRX test dev" MEI_DRV_CRLF,
               meiLine));
 
 
@@ -350,7 +349,7 @@ static int MEI_TEST_Open(struct inode *inode, struct file *filp)
       if ( MEI_InternalDevOpen(meiLine, &pMeiDynCntrl) != IFX_SUCCESS )
       {
          PRN_ERR_USR_NL( MEI_TEST, MEI_DRV_PRN_LEVEL_NORMAL,
-                   ("MEI_TEST[%02d]: Open - internal VINAX open failed" MEI_DRV_CRLF,
+                   ("MEI_TEST[%02d]: Open - internal VRX open failed" MEI_DRV_CRLF,
                     meiLine));
          return IFX_ERROR;
       }
@@ -376,7 +375,7 @@ static int MEI_TEST_Open(struct inode *inode, struct file *filp)
 }
 
 /**
-   Release the VINAX test dev.
+   Release the VRX test dev.
 
 \param
    inode pointer to the inode
@@ -394,7 +393,7 @@ static int MEI_TEST_Release(struct inode *inode, struct file *filp)
    if (pMeiDynCntrl)
    {
       PRN_DBG_USR_NL( MEI_TEST, MEI_DRV_PRN_LEVEL_NORMAL,
-             ("MEI_DRV[%02d]: Close - internal VINAX instance" MEI_DRV_CRLF,
+             ("MEI_DRV[%02d]: Close - internal VRX instance" MEI_DRV_CRLF,
               meiLine));
 
       MEI_InternalDevClose(pMeiDynCntrl);
@@ -402,7 +401,7 @@ static int MEI_TEST_Release(struct inode *inode, struct file *filp)
    else
    {
       PRN_DBG_USR_NL( MEI_TEST, MEI_DRV_PRN_LEVEL_NORMAL,
-             ("MEI_DRV[%02d]: close internal VINAX instance failed" MEI_DRV_CRLF,
+             ("MEI_DRV[%02d]: close internal VRX instance failed" MEI_DRV_CRLF,
               meiLine));
    }
 
@@ -938,9 +937,9 @@ module_exit (MEI_TEST_module_exit);
 
 /****************************************************************************/
 
-MODULE_AUTHOR("name <surname.lastname@infineon.com>");
-MODULE_DESCRIPTION("VINAX Test Interface, Internal - www.infineon.com");
-MODULE_SUPPORTED_DEVICE("VINAX Test Interface Internal");
+MODULE_AUTHOR("name <surname.lastname@lantiq.com>");
+MODULE_DESCRIPTION("VRX Test Interface, Internal - www.lantiq.com");
+MODULE_SUPPORTED_DEVICE("VRX Test Interface Internal");
 MODULE_LICENSE("proprietary");
 
 

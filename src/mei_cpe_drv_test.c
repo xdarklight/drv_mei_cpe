@@ -1,8 +1,7 @@
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -10,7 +9,7 @@
 ******************************************************************************/
 
 /* ==========================================================================
-   Description : Small test programm to test the VINAX Driver
+   Description : Small test programm to test the VRX Driver
    ========================================================================== */
 
 /* ============================= */
@@ -61,6 +60,7 @@ static int bMeiDbgDest        = -1;    /* D */
 
 static int bTestFwDl          = -1;    /* F */
 static int bTestFwSwap        = -1;    /* f */
+static int bTestSetModeXDSL   = -1;    /* e */
 static int bTestGetMeiReg     = -1;    /* g */
 
 static int bTestHelp          = -1;    /* h */
@@ -96,11 +96,20 @@ static int bTestSetGpaDest    = -1;    /* X */
 static int bDMAReadTest       = -1;    /* y */
 static int bDMAWriteTest      = -1;    /* Y */
 
+static int bTestDsmCnfGet     = -1;    /* k */
+static int bTestDsmCnfSet     = -1;    /* K */
+static int bTestDsmStsGet     = -1;    /* j */
+static int bTestDsmStcGet     = -1;    /* J */
+static int bTestDsmMacGet     = -1;    /* q */
+static int bTestDsmMacSet     = -1;    /* Q */
+
+static int bDbgLevelSet       = -1;    /* G */
+
 static int bParams[MEI_TEST_MAX_OPT_PARAMS] =
    {-1, -1, -1, -1, -1, -1, -1, -1};  /* 0, 1, 2, 3, 4, 5, 6, 7 */
 
 #define MEI_TEST_MAX_STR_PARAMS   1
-#define MEI_TEST_STR_PARAM_LEN    32
+#define MEI_TEST_STR_PARAM_LEN    256
 
 static char argStrParam[MEI_TEST_MAX_STR_PARAMS][MEI_TEST_STR_PARAM_LEN] =
    { {"\0"} };
@@ -145,24 +154,32 @@ static struct option long_options[] =
 /* 22 */   {"drv_reset", required_argument, NULL, 'R'},
 /* 23 */   {"fw_downl", no_argument,        NULL, 'F'},
 /* 24 */   {"fw_swap ", required_argument,  NULL, 'f'},
-/* 25 */   {"chip_id ", required_argument,  NULL, 'C'},
-/* 26 */   {"gpa_set ", required_argument,  NULL, 'a'},
-/* 27 */   {"gpa_get ", required_argument,  NULL, 'A'},
-/* 28 */   {"gpa_dest", required_argument,  NULL, 'X'},
-/* 29 */   {"mb_send ", optional_argument,  NULL, 'W'},
-/* 30 */   {"dma_stress", required_argument,NULL, 't'},
-/* 31 */   {"dma_read",  required_argument, NULL, 'y'},
-/* 32 */   {"dma_write", required_argument, NULL, 'Y'},
-/* 33 */   {"opt_val  ", required_argument, NULL, 'o'},
-/* 34 */   {"param_0  ", required_argument, NULL, '0'},
-/* 35 */   {"param_1  ", required_argument, NULL, '1'},
-/* 36 */   {"param_2  ", required_argument, NULL, '2'},
-/* 37 */   {"param_3  ", required_argument, NULL, '3'},
-/* 38 */   {"param_4  ", required_argument, NULL, '4'},
-/* 39 */   {"param_5  ", required_argument, NULL, '5'},
-/* 40 */   {"param_6  ", required_argument, NULL, '6'},
-/* 41 */   {"param_7  ", required_argument, NULL, '7'},
-/* 42 */   {"str_z    ", required_argument, NULL, 'z'},
+/* 25 */   {"set_xdsl", required_argument,  NULL, 'e'},
+/* 26 */   {"chip_id ", required_argument,  NULL, 'C'},
+/* 27 */   {"gpa_set ", required_argument,  NULL, 'a'},
+/* 28 */   {"gpa_get ", required_argument,  NULL, 'A'},
+/* 29 */   {"gpa_dest", required_argument,  NULL, 'X'},
+/* 30 */   {"mb_send ", optional_argument,  NULL, 'W'},
+/* 31 */   {"dma_stress", required_argument,NULL, 't'},
+/* 32 */   {"dma_read",  required_argument, NULL, 'y'},
+/* 33 */   {"dma_write", required_argument, NULL, 'Y'},
+/* 34 */   {"opt_val  ", required_argument, NULL, 'o'},
+/* 35 */   {"dsm_cnfg_get ", no_argument, NULL, 'k'},
+/* 36 */   {"dsm_cnfg_set ", no_argument, NULL, 'K'},
+/* 37 */   {"dsm_status   ", no_argument, NULL, 'j'},
+/* 38 */   {"dsm_statistics", no_argument, NULL, 'J'},
+/* 39 */   {"MAC_get  ", no_argument, NULL, 'q'},
+/* 40 */   {"MAC_set  ", no_argument, NULL, 'Q'},
+/* 41 */   {"dbg_lvl_set", no_argument, NULL, 'G'},
+/* 42 */   {"param_0  ", required_argument, NULL, '0'},
+/* 43 */   {"param_1  ", required_argument, NULL, '1'},
+/* 44 */   {"param_2  ", required_argument, NULL, '2'},
+/* 45 */   {"param_3  ", required_argument, NULL, '3'},
+/* 46 */   {"param_4  ", required_argument, NULL, '4'},
+/* 47 */   {"param_5  ", required_argument, NULL, '5'},
+/* 48 */   {"param_6  ", required_argument, NULL, '6'},
+/* 49 */   {"param_7  ", required_argument, NULL, '7'},
+/* 50 */   {"str_z    ", required_argument, NULL, 'z'},
            {NULL, 0, NULL, 0}
 };
 
@@ -170,7 +187,7 @@ static struct option long_options[] =
 /*
                                              1 1              2 2
                                01234 5 6 789 0 1 234 5 6 7 89 0 1 2 34 5 6 7 8 9  */
-#define GETOPT_LONG_OPTSTRING "hvcp:di:Tn:N:s:S:g:Llw:r:x:b:Bm:M:D:R:Ff:C:a:A:X:W:t:y:Y:o:0:1:2:3:4:5:6:7:z:"
+#define GETOPT_LONG_OPTSTRING "hvcp:di:Tn:N:s:S:g:Llw:r:x:b:Bm:M:D:R:Ff:eC:a:A:X:W:t:y:Y:o:kK:jJqQG0:1:2:3:4:5:6:7:z:"
 
 static char description[][64] =
 {
@@ -179,7 +196,7 @@ static char description[][64] =
 /*  2 */   {"MEI configuration"},
 /*  3 */   {"MEI trace level"},
 /*  4 */   {"display MEI Register"},
-/*  5 */   {"init the devive (base Addr, -o IRQ)"},
+/*  5 */   {"init the device (MEI base Addr, -o IRQ), not sup. VR10"},
 /*  6 */   {"init the driver (blk tout, msg tout, MR tout)"},
 /*  7 */   {"MEI number (-n <devNum>, default: 0)"},
 /*  8 */   {"init the devive for NFC (base Addr, -o IRQ)"},
@@ -191,7 +208,7 @@ static char description[][64] =
 /* 14 */   {"mbox raw send (count, none=default)"},
 /* 15 */   {"mbox raw read ack (count, none=default"},
 /* 16 */   {"common used value (write start pattern)"},
-/* 17 */   {"display read buffer (buffer number"},
+/* 17 */   {"display read buffer (buffer number)"},
 /* 18 */   {"display write buffer"},
 /* 19 */   {"mei dbg access write (-m <adr> -D <dest> -x <cnt> -0 <val>)"},
 /* 20 */   {"mei dbg access read  (-M <adr> -D <dest> -x <cnt>)"},
@@ -199,15 +216,23 @@ static char description[][64] =
 /* 22 */   {"Drv Reset -R <MMMMRRRR> (RstMask:MMMM,RstMode:RRRR)"},
 /* 23 */   {"FW Download [-o <0/1>] firmware<#>.bin) [-z <name>]"},
 /* 24 */   {"FW Swap -f <mode> (0: VDSL2, 1: ADSL)"},
-/* 25 */   {"Set BusMaster -C <chipId> -0 <MEI sel mask>"},
-/* 26 */   {"GPA access set (-a <addr> -x <value> -X <dest>)"},
-/* 27 */   {"GPA access get (-A <addr> -X <dest>)"},
-/* 28 */   {"GPA access destination MEM=0, AUX=1"},
-/* 29 */   {"mbox send (-W msgID, [-0 <param> -1 <param> ...] )"},
-/* 30 */   {"DMA Stress test (-t <addr>, -x <range>, -D <loop>)"},
-/* 31 */   {"DMA Read  (32Bit) (-y <addr>, -X <count 32 bit>)"},
-/* 32 */   {"DMA Write (32Bit) (-Y <addr>, -x <value> -X <count 32 bit>)"},
-/* 33 */   {"optional value (-o irq | entity)"},
+/* 25 */   {"Set mode (xdsl<0/1>, id<5/7>, fw_xdsl<0|1|2|4|8>) [-z <...>]"},
+/* 26 */   {"Set BusMaster -C <chipId> -0 <MEI sel mask>"},
+/* 27 */   {"GPA access set (-a <addr> -x <value> -X <dest>)"},
+/* 28 */   {"GPA access get (-A <addr> -X <dest>)"},
+/* 29 */   {"GPA access destination MEM=0, AUX=1"},
+/* 30 */   {"mbox send (-W msgID, [-0 <param> -1 <param> ...] )"},
+/* 31 */   {"DMA Stress test (-t <addr>, -x <range>, -D <loop>)"},
+/* 32 */   {"DMA Read  (32Bit) (-y <addr>, -X <count 32 bit>)"},
+/* 33 */   {"DMA Write (32Bit) (-Y <addr>, -x <value> -X <count 32 bit>)"},
+/* 34 */   {"optional value (-o irq | entity)"},
+/* 35 */   {"Get DSM config (vector_control)"},
+/* 36 */   {"Set DSM config (vector_control<0/1/2>)"},
+/* 37 */   {"Get DSM status (status, friendly_status)"},
+/* 38 */   {"Get DSM statistic (processed, dropped)"},
+/* 39 */   {"Get MAC address (XX:XX:XX:XX:XX:XX)"},
+/* 40 */   {"Set MAC address (XX:XX:XX:XX:XX:XX) [-z <address>]"},
+/* 41 */   {"Set debug level (module <1/2>, level <1/2/3/4>) -z <...>"},
 /*    */   {"message param 0"},
 /*    */   {"message param 1"},
 /*    */   {"message param 2"},
@@ -305,7 +330,6 @@ static void parseArgs(int argc, char *argv[])
                }
             }
             break;
-
          case 'T':
             bTestInitDrv = 1;
             break;
@@ -801,6 +825,50 @@ static void parseArgs(int argc, char *argv[])
                }
             }
             break;
+
+         case 'e':
+            bTestSetModeXDSL = 1;
+            break;
+
+         case 'k':
+            bTestDsmCnfGet = 1;
+            break;
+
+         case 'K':
+            if (optarg)
+            {
+               temp = MEIOS_StrToUl(optarg, &pEndPtr, 0x10);
+               if (errno)
+               {
+                  MEIOS_Printf(TEST_MEI_DBG_PREFIX"DSM config: invalid value 0x%08X" MEIOS_CRLF, (unsigned int)temp);
+               }
+               else
+               {
+                  bTestDsmCnfSet = (int)temp;
+               }
+            }
+            break;
+
+         case 'j':
+            bTestDsmStsGet = 1;
+            break;
+
+         case 'J':
+            bTestDsmStcGet = 1;
+            break;
+
+         case 'q':
+            bTestDsmMacGet = 1;
+            break;
+
+         case 'Q':
+            bTestDsmMacSet = 1;
+            break;
+
+         case 'G':
+            bDbgLevelSet = 1;
+            break;
+
          case 'z':
             GetOptArg_RequStr(optarg, &argStrParam[0][0], "opt Str[0]");
             break;
@@ -911,7 +979,7 @@ void PrintoutMem(unsigned int value)
 
 /**
 Description:
-   Test program to test the VINAX driver.
+   Test program to test the VRX driver.
 Arguments:
    argc - number of parameters
    argv - array of parameter strings
@@ -991,7 +1059,7 @@ void MEI_drv_test(void)
       ret = MEI_init_drv(streamOut, fd, &MEI_DataDrvInit);
    }
 
-   /* test case: request VINAX configuration */
+   /* test case: request VRX configuration */
    if (bReqCfg == 1)
    {
       int tempRet;
@@ -1112,6 +1180,11 @@ void MEI_drv_test(void)
       ret = MEI_fw_swap(streamOut, fd, bTestFwSwap);
    }
 
+   if (bTestSetModeXDSL != -1)
+   {
+      ret = MEI_fw_set_mode(streamOut, fd, argStrParam[0]);
+   }
+
    /* test case: GPA write */
    if (bTestSetGpaReg != -1)
    {
@@ -1157,6 +1230,47 @@ void MEI_drv_test(void)
       ret = MEI_nfc_wait_for_nfcs(streamOut, 100, bTestDfeChannel, bParams);
    }
 
+   /* test case: get DSM config */
+   if (bTestDsmCnfGet != -1)
+   {
+      ret = MEI_dsm_config_get(streamOut, fd);
+   }
+
+   /* test case: set DSM config */
+   if (bTestDsmCnfSet != -1)
+   {
+      ret = MEI_dsm_config_set(streamOut, fd, bTestDsmCnfSet);
+   }
+
+   /* test case: get DSM status */
+   if (bTestDsmStsGet != -1)
+   {
+      ret = MEI_dsm_status_get(streamOut, fd);
+   }
+
+   /* test case: get DSM statistic */
+   if (bTestDsmStcGet != -1)
+   {
+      ret = MEI_dsm_statistics_get(streamOut, fd);
+   }
+
+   /* test case: get MAC address */
+   if (bTestDsmMacGet != -1)
+   {
+      ret = MEI_mac_get(streamOut, fd);
+   }
+
+   /* test case: set MAC address */
+   if (bTestDsmMacSet != -1)
+   {
+      ret = MEI_mac_set(streamOut, fd, argStrParam[0]);
+   }
+
+   /* test case: set debug level */
+   if (bDbgLevelSet != -1)
+   {
+      ret = MEI_dbg_lvl_set(streamOut, fd, argStrParam[0]);
+   }
 
    /* == END Test cases ==================================================== */
    /*
@@ -1170,6 +1284,61 @@ void MEI_drv_test(void)
             "Line = %02d Return = %d" MEIOS_CRLF, bTestDfeChannel, ret);
 
    return;
+}
+
+int MEI_get_mac_addr(unsigned char *pString, IOCTL_MEI_MacConfig_t *pMacAdr)
+{
+   char string[20] = {0};
+   char sMacAddr[3] = {0};
+   char seps[] = ":";
+   char *token;
+   int i = 0;
+
+   strncpy (string, (char *)pString, sizeof(string)-1);
+   string[sizeof(string)-1] = 0;
+
+   /* Get first token */
+   token = strtok (string, seps);
+   if (token != NULL)
+   {
+      for (i = 0; i < MEI_MAC_ADDRESS_OCTETS; i++)
+      {
+         sscanf (token, "%2s", (unsigned char *)sMacAddr);
+         sscanf (token, "%hhx", (unsigned char *)&(pMacAdr->nMacAddress[i]));
+
+         if ( ((strcmp (&sMacAddr[1], "0") != 0) && ( (pMacAdr->nMacAddress[i] & 0xF) == 0)) )
+         {
+            i=0;
+            break;
+         }
+
+         sMacAddr[1] = '\0';
+         if ( ((strcmp (&sMacAddr[0], "0") != 0) && ( ((pMacAdr->nMacAddress[i] >> 4) & 0xF) == 0)) )
+         {
+            i=0;
+            break;
+         }
+
+         /* Get next token */
+         token = strtok(NULL, seps);
+
+         /* Exit scanning if no further information is included */
+         if (token == NULL)
+         {
+            break;
+         }
+      }
+   }
+
+   if (i < (MEI_MAC_ADDRESS_OCTETS - 1))
+   {
+      return -1;
+   }
+   else
+   {
+      return 0;
+   }
+
 }
 
 #endif /* LINUX */

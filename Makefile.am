@@ -11,12 +11,12 @@ SUBDIRS = src
 
 DISTCHECK_CONFIGURE_FLAGS=@CONFIGURE_OPTIONS@
 
-drv_vinax_docdir = ${prefix}/doc/drv_vinax
+drv_vrx_docdir = ${prefix}/doc/drv_vrx
 
-drv_vinax_doc_DATA = \
+drv_vrx_doc_DATA = \
 	ChangeLog
 
-EXTRA_DIST = $(drv_vinax_doc_DATA)\
+EXTRA_DIST = $(drv_vrx_doc_DATA)\
 	README\
 	AUTHORS\
 	NEWS\

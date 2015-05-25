@@ -1,8 +1,7 @@
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -11,7 +10,7 @@
 
 
 /* ==========================================================================
-   Description : ATM OAM Common functions for the VINAX Driver
+   Description : ATM OAM Common functions for the VRX Driver
    ========================================================================== */
 
 /* ============================================================================
@@ -72,7 +71,7 @@ MEI_STATIC IFX_int32_t MEI_AtmOamWaitForTxBuffer(
    Global Variable Definition
    ========================================================================= */
 
-/* VINAX-Driver: Access module - create print level variable */
+/* VRX-Driver: Access module - create print level variable */
 MEI_DRV_PRN_USR_MODULE_CREATE(MEI_ATMOAM, MEI_DRV_PRN_LEVEL_LOW);
 MEI_DRV_PRN_INT_MODULE_CREATE(MEI_ATMOAM, MEI_DRV_PRN_LEVEL_LOW);
 
@@ -194,7 +193,7 @@ MEI_STATIC IFX_int32_t MEI_AtmOamWaitForTxBuffer(
       /* events are enabled and not in trans mode --> wait for events */
       if (pMeiDev->eModePoll == e_MEI_DEV_ACCESS_MODE_PASSIV_POLL)
       {
-         MEI_PollIntPerVnxLine(pMeiDev, e_MEI_DEV_ACCESS_MODE_PASSIV_POLL);
+         MEI_PollIntPerVrxLine(pMeiDev, e_MEI_DEV_ACCESS_MODE_PASSIV_POLL);
 
          /* setup timeout counter for TX buffer free */
          MEI_ATMOAM_SET_TX_TIMEOUT_CNT( pAtmOamDevCntrl,
@@ -207,7 +206,7 @@ MEI_STATIC IFX_int32_t MEI_AtmOamWaitForTxBuffer(
             MEI_DRVOS_EventWait_timeout(
                         &pAtmOamDevCntrl->eventAtmOamInstDone,
                         MEI_ATMOAM_MIN_TXBUFFER_POLL_TIME_MS);
-            MEI_PollIntPerVnxLine(pMeiDev, e_MEI_DEV_ACCESS_MODE_PASSIV_POLL);
+            MEI_PollIntPerVrxLine(pMeiDev, e_MEI_DEV_ACCESS_MODE_PASSIV_POLL);
             MEI_ATMOAM_DEC_TX_TIMEOUT_CNT(pAtmOamDevCntrl);
          }
       }
@@ -244,7 +243,7 @@ MEI_STATIC IFX_int32_t MEI_AtmOamWaitForTxBuffer(
    Update the ATM OAM States depending on the driver state and FSM state.
 
 \param
-   pMeiDev      Points to the VINAX driver device data. [I]
+   pMeiDev      Points to the VRX driver device data. [I]
 
 \return
    none.
@@ -296,7 +295,7 @@ MEI_STATIC IFX_void_t MEI_ATMOAM_UpdateStates(
    Release the ATM OAM Access Control structure.
 
 \param
-   pMeiDev      Points to the VINAX driver device data. [I]
+   pMeiDev      Points to the VRX driver device data. [I]
 
 \return
    0 (IFX_SUCCESS) if success.
@@ -345,7 +344,7 @@ IFX_int32_t MEI_AtmOamReleaseDevCntrl(
    Enable the ATM OAM Access Control on the modem.
 
 \param
-   pMeiDev      Points to the VINAX driver device data. [I]
+   pMeiDev      Points to the VRX driver device data. [I]
 
 \return
    0 (IFX_SUCCESS) if success.
@@ -450,7 +449,7 @@ MEI_ATMOAM_IOCTL_DRV_INIT_EXIT_DRV:
 
 /**
    ioctl-function for enable the ATM OAM access.
-   Setup the ATM OAM access feature within the VINAX device.
+   Setup the ATM OAM access feature within the VRX device.
 
 \param
    pMeiDynCntrl    Private dynamic device data (per open instance). [I]
@@ -541,7 +540,7 @@ IFX_int32_t MEI_ATMOAM_IoctlCntrl(
 }
 
 /**
-   ioctl-function for request the ATM OAM counter from the VINAX.
+   ioctl-function for request the ATM OAM counter from the VRX.
 
 \param
    pMeiDynCntrl    Private dynamic device data (per open instance). [I]
@@ -602,7 +601,7 @@ IFX_int32_t MEI_ATMOAM_IoctlCounterGet(
 
 
 /**
-   ioctl-function for request the ATM OAM counter from the VINAX.
+   ioctl-function for request the ATM OAM counter from the VRX.
 
 \param
    pMeiDynCntrl    Private dynamic device data (per open instance). [I]
@@ -790,7 +789,7 @@ MEI_ATMOAM_IOCTLCELLINSERT_ERR:
    Check the ATM OAM config if processing is neccessary
 
 \param
-   pMeiDev         Points to the VINAX driver device data. [I]
+   pMeiDev         Points to the VRX driver device data. [I]
 \param
    pAtmOamDevCntrl   Points to the ATM OAM control struct. [I]
 \param
@@ -843,7 +842,7 @@ IFX_boolean_t MEI_ATMOAM_CheckForWork(
    ATM OAM Autonomous Message Handler.
 
 \param
-   pMeiDev      Points to the VINAX driver device data. [I]
+   pMeiDev      Points to the VRX driver device data. [I]
 \param
    msgId          Message ID of the reveived modem message. [I]
 \param
@@ -947,7 +946,7 @@ IFX_int32_t MEI_ATMOAM_AutoMsgHandler(
    ATM OAM Reset the current states.
 
 \param
-   pMeiDev      Points to the VINAX driver device data. [I]
+   pMeiDev      Points to the VRX driver device data. [I]
 
 \return
    0 (IFX_SUCCESS) if success

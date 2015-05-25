@@ -2,9 +2,8 @@
 #define _drv_MEI_CPE_rom_handler_h
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -12,7 +11,7 @@
 ******************************************************************************/
 
 /* ==========================================================================
-   Description : VINAX Firmware Boot ROM handler
+   Description : VRX Firmware Boot ROM handler
    ========================================================================== */
 
 #ifdef __cplusplus

@@ -2,9 +2,8 @@
 #define _MEI_CPE_drv_test_fct_h
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -12,7 +11,7 @@
 ******************************************************************************/
 
 /* ==========================================================================
-   Description : Common test routines for the VINAX driver test application.
+   Description : Common test routines for the VRX driver test application.
    ========================================================================== */
 #ifdef __cplusplus
 extern "C"
@@ -42,13 +41,13 @@ extern "C"
 /*
    Device location like
 
-      /dev/VINAX4/0/1
+      /dev/VRX4/0/1
        ___ __________ _ _
         |      |    | | |
-        |      |    | | +- VINAX number (relative channel)
-        |      |    | +--- VINAXx entity (chip)
-        |      |    +-- VINAXx entity type (VINAX1 or VINAX4)
-        |      +------- VINAXx entity type (VINAX1 or VINAX4)
+        |      |    | | +- VRX number (relative channel)
+        |      |    | +--- VRXx entity (chip)
+        |      |    +-- VRXx entity type (VRX1 or VRX4)
+        |      +------- VRXx entity type (VRX1 or VRX4)
         +----------- prefix
 */
 #define TEST_MEI_DEV_PREFIX      "/dev"
@@ -146,16 +145,26 @@ int MEI_gpa_write(MEIOS_File_t *streamOut, int fd, int addr, int dest, int value
 int MEI_fw_download_name(MEIOS_File_t *streamOut, int fd, char *pFileName);
 int MEI_fw_download(MEIOS_File_t *streamOut, int fd, int fileNum, char *pFileName);
 int MEI_fw_swap(MEIOS_File_t *streamOut, int fd, int bTestFwSwap);
+int MEI_fw_set_mode(MEIOS_File_t *streamOut, int fd, char *pConfig);
 
 int MEI_dma_stress(MEIOS_File_t *streamOut, int fd, unsigned int addr, unsigned int range, unsigned int loop);
 int MEI_dma_wr_rd(MEIOS_File_t *streamOut, int fd, unsigned int addr, unsigned int count, unsigned int start);
 int MEI_dma_write(MEIOS_File_t *streamOut, int fd, unsigned int addr, unsigned int count, unsigned int start);
 int MEI_dma_read(MEIOS_File_t *streamOut, int fd, unsigned int addr, unsigned int count);
 
+int MEI_dsm_config_get(MEIOS_File_t *streamOut, int fd);
+int MEI_dsm_config_set(MEIOS_File_t *streamOut, int fd, int vector_control);
+int MEI_dsm_status_get(MEIOS_File_t *streamOut, int fd);
+int MEI_dsm_statistics_get(MEIOS_File_t *streamOut, int fd);
+int MEI_mac_get(MEIOS_File_t *streamOut, int fd);
+int MEI_mac_set(MEIOS_File_t *streamOut, int fd, char *pMAC);
+int MEI_dbg_lvl_set(MEIOS_File_t *streamOut, int fd, char *pConfig);
+
 #ifdef LINUX
 int MEI_nfc_wait_for_nfcs(MEIOS_File_t *streamOut, int max_wait_count, int dfeNum, int *pParams);
 #endif
 
+int MEI_get_mac_addr (unsigned char *pString, IOCTL_MEI_MacConfig_t *pMacAdr);
 
 #ifdef __cplusplus
 /* extern "C" */

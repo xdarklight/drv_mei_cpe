@@ -1,8 +1,7 @@
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -10,7 +9,7 @@
 ******************************************************************************/
 
 /* ============================================================================
-   Description : VINAX Driver, Nucleus part
+   Description : VRX Driver, Nucleus part
    ========================================================================= */
 
 #ifdef NUCLEUS_PLUS
@@ -73,14 +72,14 @@
    Local variables (Nucleus)
    ========================================================================= */
 
-/* VINAX driver number */
-MEI_STATIC IFX_int32_t VINAXDrvNum = 0;
+/* VRX driver number */
+MEI_STATIC IFX_int32_t VRXDrvNum = 0;
 /* DFEX driver number */
 MEI_STATIC IFX_int32_t MEIXDrvNum = 0;
 
 
 /* ============================================================================
-   I/O VINAX driver functions (Nucleus) - declaration
+   I/O VRX driver functions (Nucleus) - declaration
    ========================================================================= */
 
 MEI_STATIC IFX_int_t MEI_CpeDevOpen(
@@ -150,7 +149,7 @@ IFX_int32_t MEI_DfeDevClose(
 
 
 /* ============================================================================
-   VINAX driver interrupt functions (Nucleus) - wrapping
+   VRX driver interrupt functions (Nucleus) - wrapping
    ========================================================================= */
 #if (MEI_SUPPORT_IRQ == 1)
 MEI_STATIC int MEI_IntSetupLocked = 0;
@@ -191,7 +190,7 @@ MEI_STATIC IFX_int_t MEI_CpeDevOpen(
    MEI_DYN_CNTRL_T    *pMeiDynCntrl = NULL;
    IFX_int8_t           nLineNum;
 
-   /* get device number from VINAX struct */
+   /* get device number from VRX struct */
    nLineNum = MEI_DRV_LINENUM_GET(pMeiDev);
 
    if (MEI_InstanceLineAlloc(nLineNum, &pMeiDynCntrl) != IFX_SUCCESS)
@@ -221,7 +220,7 @@ MEI_STATIC IFX_int_t MEI_Close(void *priv)
 {
    MEI_DYN_CNTRL_T *pMeiDynCntrl = (MEI_DYN_CNTRL_T *)priv;
 
-   /* get the VINAX device structure */
+   /* get the VRX device structure */
    if (pMeiDynCntrl == NULL)
    {
       PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
@@ -260,7 +259,7 @@ MEI_STATIC IFX_int_t MEI_Read(
    MEI_DEV_T          *pMeiDev;
    MEI_DYN_CMD_DATA_T *pDynCmd;
 
-   /* get the VINAX device structure */
+   /* get the VRX device structure */
    if (pMeiDynCntrl == NULL)
    {
       PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_WRN,
@@ -345,7 +344,7 @@ MEI_STATIC IFX_int32_t MEI_IoCtl(
 
    pUserArgs = (IOCTL_MEI_arg_t *)nArgument;
 
-   /* get the VINAX device structure */
+   /* get the VRX device structure */
    if (pMeiDynCntrl == NULL)
    {
       PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
@@ -947,7 +946,7 @@ MEI_STATIC void MEI_InterruptNucleus(int ISRParams)
 
 
 /* ============================================================================
-   I/O VINAX X (Control) driver functions (Nucleus) - definition
+   I/O VRX X (Control) driver functions (Nucleus) - definition
    ========================================================================= */
 
 
@@ -1014,7 +1013,7 @@ MEI_STATIC IFX_int32_t MEI_CloseDfeX(void *priv)
    ========================================================================= */
 
 /**
-   Allocate DFEx/VINAX structure blocks for all devices and channels
+   Allocate DFEx/VRX structure blocks for all devices and channels
 
 \return
    IFX_SUCCESS in case of success
@@ -1028,7 +1027,7 @@ MEI_STATIC IFX_int32_t MEI_DevAllocAll(void)
 
    for (deviceNum=0; deviceNum < MEI_MAX_DFE_CHAN_DEVICES; deviceNum++)
    {
-      /* check/allocate VINAX device control block */
+      /* check/allocate VRX device control block */
       if ( (retVal = MEI_DevLineAlloc(deviceNum)) != IFX_SUCCESS )
       {
          return retVal;
@@ -1040,7 +1039,7 @@ MEI_STATIC IFX_int32_t MEI_DevAllocAll(void)
 
 
 /**
-   Free DFEx/VINAX structure blocks for all devices and channels
+   Free DFEx/VRX structure blocks for all devices and channels
 
 \return
    none
@@ -1053,7 +1052,7 @@ MEI_STATIC IFX_int32_t MEI_DevFreeAll(void)
 
    for (deviceNum=0; deviceNum < MEI_MAX_DFE_CHAN_DEVICES; deviceNum++)
    {
-      /* check/allocate VINAX device control block */
+      /* check/allocate VRX device control block */
       if ( MEI_DevLineStructFree(deviceNum) != IFX_SUCCESS )
          allFree++;
    }
@@ -1061,7 +1060,7 @@ MEI_STATIC IFX_int32_t MEI_DevFreeAll(void)
    if ( allFree )
    {
       PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
-             ("MEI_DRV: WARNING FreeAll - %d VINAX device(s) busy" MEI_DRV_CRLF,
+             ("MEI_DRV: WARNING FreeAll - %d VRX device(s) busy" MEI_DRV_CRLF,
               allFree));
    }
 
@@ -1117,7 +1116,7 @@ MEI_STATIC IFX_int32_t MEI_DevAddAll(
       if ( (MEIX_Cntrl[entity] != NULL) &&
            ((pMeiDev = (MEIX_Cntrl[entity])->MeiDevice[rel_ch]) != NULL) )
       {
-         /* Create device name: /dev/<vinax drv name>/<device number> */
+         /* Create device name: /dev/<vrx drv name>/<device number> */
          sprintf(buf, "%s/%d", pDrvBaseName, deviceNum);
 
          PRN_DBG_USR( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL, deviceNum,
@@ -1237,10 +1236,10 @@ IFX_int32_t MEI_IoctlInitDevice(
    }
 
    /*
-      Init the VINAX
+      Init the VRX
       - MEI reset
       - mask interrupts, clear interrupts
-      - get VINAX info
+      - get VRX info
       NOTE:
          MEI Block reset and clear interrupts depends on the
          resetMode param.
@@ -1248,7 +1247,7 @@ IFX_int32_t MEI_IoctlInitDevice(
    if ( (ret = MEI_DefaultInitDevice(pMeiDev, 0)) < 0 )
    {
       PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
-             ("MEI_DRV[%02d]: ERROR - INIT DEVICE, Reset VINAX device, get VINAX info" MEI_DRV_CRLF,
+             ("MEI_DRV[%02d]: ERROR - INIT DEVICE, Reset VRX device, get VRX info" MEI_DRV_CRLF,
              MEI_DRV_LINENUM_GET(pMeiDev)));
 
       goto MEI_IOCTL_INITDEV_BASIC_ERROR;
@@ -1285,7 +1284,7 @@ IFX_int32_t MEI_IoctlInitDevice(
                    MEI_DRV_LINENUM_GET(pMeiDev)));
 
             if (MEI_DRVOS_ThreadInit(&MEI_DrvCntrlThreadParams,
-                                    "VnxCtrl",
+                                    "VrxCtrl",
                                     MEI_DrvCntrlThr,
                                     0, 0) != IFX_SUCCESS)
             {
@@ -1324,7 +1323,7 @@ IFX_int32_t MEI_IoctlInitDevice(
             pMeiDev->eModePoll = e_MEI_DEV_ACCESS_MODE_IRQ;
             pMeiDev->intMask   = ME_ARC2ME_INTERRUPT_UNMASK_ALL;
 
-            pTmpXCntrl = MEI_VnxXDevToIrqListAdd(
+            pTmpXCntrl = MEI_VrxXDevToIrqListAdd(
                                           MEI_DRV_LINENUM_GET(pMeiDev),
                                           (IFX_uint32_t)pInitDev->usedIRQ,
                                           pMeiDynCntrl->pDfeX);
@@ -1354,7 +1353,7 @@ IFX_int32_t MEI_IoctlInitDevice(
          }
 #else
          PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
-               ("MEI_DRV[%02d]: ERROR - VINAX Driver IRQ Support not enabled" MEI_DRV_CRLF,
+               ("MEI_DRV[%02d]: ERROR - VRX Driver IRQ Support not enabled" MEI_DRV_CRLF,
                  MEI_DRV_LINENUM_GET(pMeiDev)));
 
          MEI_DRV_STATE_SET(pMeiDev, e_MEI_DRV_STATE_CFG_ERROR);
@@ -1373,7 +1372,7 @@ IFX_int32_t MEI_IoctlInitDevice(
    else
    {
       PRN_DBG_USR( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL, MEI_DRV_LINENUM_GET(pMeiDev),
-             ("MEI_DRV[%02d]: INIT VINAX, phy addr = 0x%08X, virt addr = 0x%08X IRQ = %d" MEI_DRV_CRLF,
+             ("MEI_DRV[%02d]: INIT VRX, phy addr = 0x%08X, virt addr = 0x%08X IRQ = %d" MEI_DRV_CRLF,
                MEI_DRV_LINENUM_GET(pMeiDev), MEI_DRV_MEI_PHY_ADDR_GET(pMeiDev),
                (IFX_uint32_t)(MEI_DRV_MEI_VIRT_ADDR_GET(pMeiDev)),
                (IFX_uint32_t)pInitDev->usedIRQ));
@@ -1386,7 +1385,7 @@ IFX_int32_t MEI_IoctlInitDevice(
 
       if (pMeiDev->eModePoll == e_MEI_DEV_ACCESS_MODE_PASSIV_POLL)
       {
-         MEI_PollIntPerVnxLine(pMeiDev, e_MEI_DEV_ACCESS_MODE_PASSIV_POLL);
+         MEI_PollIntPerVrxLine(pMeiDev, e_MEI_DEV_ACCESS_MODE_PASSIV_POLL);
       }
    }
 
@@ -1408,11 +1407,11 @@ MEI_IOCTL_INITDEV_BASIC_ERROR:
 
 
 /* ============================================================================
-   Global I/O VINAX driver functions (Nucleus) - definition
+   Global I/O VRX driver functions (Nucleus) - definition
    ========================================================================= */
 
 /**
-   VINAX Driver initialization.
+   VRX Driver initialization.
 
 \return
    IFX_SUCCESS or IFX_ERROR
@@ -1424,8 +1423,8 @@ int MEI_DevCreate(void)
    IFX_int32_t       ret = IFX_SUCCESS;
 
    printf("%s" MEI_DRV_CRLF, &MEI_WHATVERSION[4]);
-   printf("(c) Copyright 2007, Infineon Technologies AG" MEI_DRV_CRLF MEI_DRV_CRLF);
-   printf("### VINAX - VINAX - VINAX - VINAX ###" MEI_DRV_CRLF);
+   printf("(c) Copyright 2012, Lantiq Deutschland GmbH" MEI_DRV_CRLF MEI_DRV_CRLF);
+   printf("### VRX - VRX - VRX - VRX ###" MEI_DRV_CRLF);
 
    MEI_DRV_PRN_USR_LEVEL_SET(MEI_DRV, MEI_DRV_PRN_LEVEL_HIGH);
    MEI_DRV_PRN_INT_LEVEL_SET(MEI_DRV, MEI_DRV_PRN_LEVEL_HIGH);
@@ -1441,16 +1440,16 @@ int MEI_DevCreate(void)
 #ifdef MEI_GENERIC_PROC_FS
    /* dummy call - prevent linker from remove this object */
    if (0)
-      doVinaxProcFs(0, 0, 0, 0, 0);
+      doVrxProcFs(0, 0, 0, 0, 0);
 
 #endif
 
    /* ===========================================================
-      Reset the global VINAX devices data blocks
+      Reset the global VRX devices data blocks
       =========================================================== */
-   if (VINAXDrvNum <= 0)
+   if (VRXDrvNum <= 0)
    {
-      /* first create of VINAX / DFEx devices */
+      /* first create of VRX / DFEx devices */
       if (MEIXDrvNum <= 0)
       {
          memset(MEIX_Cntrl, 0x00, sizeof(MEIX_Cntrl));
@@ -1471,19 +1470,19 @@ int MEI_DevCreate(void)
 
 
    /* ===========================================================
-      Install the VINAX driver.
+      Install the VRX driver.
       =========================================================== */
-   if (VINAXDrvNum <= 0)
+   if (VRXDrvNum <= 0)
    {
       /* add driver to driver table */
-      VINAXDrvNum = DEVIO_driver_install(
+      VRXDrvNum = DEVIO_driver_install(
                                  MEI_CpeDevOpen,
                                  MEI_Close,
                                  MEI_Read,
                                  MEI_Write,
                                  MEI_IoCtl, NULL);
 
-      if (VINAXDrvNum < 0)
+      if (VRXDrvNum < 0)
       {
          PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
                 ("MEI_DRV: unable to install the driver." MEI_DRV_CRLF));
@@ -1499,7 +1498,7 @@ int MEI_DevCreate(void)
 
 
    /* ===========================================================
-      Allocate the VINAX devices data blocks
+      Allocate the VRX devices data blocks
       =========================================================== */
    if ( (ret = MEI_DevAllocAll()) != IFX_SUCCESS)
    {
@@ -1511,7 +1510,7 @@ int MEI_DevCreate(void)
       Add the devices to the device list
       =========================================================== */
    if ( (ret = MEI_DevAddAll( DRV_MEI_NAME,
-                                    VINAXDrvNum,
+                                    VRXDrvNum,
                                     &deviceNumLast)
         ) != IFX_SUCCESS )
    {
@@ -1536,8 +1535,8 @@ MEI_DEV_CREATE_ALLOC_ERROR:
    }
 
    /* remove the driver also and allow new DevCreate */
-   DEVIO_driver_remove(VINAXDrvNum, IFX_TRUE);
-   VINAXDrvNum = 0;
+   DEVIO_driver_remove(VRXDrvNum, IFX_TRUE);
+   VRXDrvNum = 0;
 
    errno = ret;
    return ret;
@@ -1545,7 +1544,7 @@ MEI_DEV_CREATE_ALLOC_ERROR:
 
 
 /**
-   Remove the VINAX Driver .
+   Remove the VRX Driver .
 
 \return
    IFX_SUCCESS successful, all freed and driver removed
@@ -1570,8 +1569,8 @@ int MEI_DevDelete(void)
    }
 
    /* remove the driver also and allow new DevCreate */
-   DEVIO_driver_remove(VINAXDrvNum, IFX_TRUE);
-   VINAXDrvNum = 0;
+   DEVIO_driver_remove(VRXDrvNum, IFX_TRUE);
+   VRXDrvNum = 0;
 
 #if (MEI_SUPPORT_DL_DMA_CS == 1)
    /* mutex exist */
@@ -1587,14 +1586,14 @@ int MEI_DevDelete(void)
 
 
 /**
-   Close a VINAX device - free all dynamic allocated memory blocks.
+   Close a VRX device - free all dynamic allocated memory blocks.
 
 \param
    pMeiDynCntrl  private dynamic control data
 
 \return
-   IFX_SUCCESS - successful close VINAX device
-   IFX_ERROR   - error on close VINAX device
+   IFX_SUCCESS - successful close VRX device
+   IFX_ERROR   - error on close VRX device
 
 */
 IFX_int32_t MEI_DfeDevClose(MEI_DYN_CNTRL_T *pMeiDynCntrl)
@@ -1607,7 +1606,7 @@ IFX_int32_t MEI_DfeDevClose(MEI_DYN_CNTRL_T *pMeiDynCntrl)
 
 #if (MEI_SUPPORT_IRQ == 1)
 /* ============================================================================
-   Setup VINAX driver interrupt functions (Nucleus) - wrapping
+   Setup VRX driver interrupt functions (Nucleus) - wrapping
    ========================================================================= */
 
 /**

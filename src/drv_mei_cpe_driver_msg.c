@@ -1,8 +1,7 @@
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -10,7 +9,7 @@
 ******************************************************************************/
 
 /* ==========================================================================
-   Description : Message Handling between the driver and the VINAX device.
+   Description : Message Handling between the driver and the VRX device.
    ========================================================================== */
 
 
@@ -78,7 +77,7 @@ MEI_STATIC IFX_int32_t MEI_DrvMsg_RemAtmOamSet(
    ========================================================================= */
 
 /**
-   This function setup a ROM Start VINAX driver message.
+   This function setup a ROM Start VRX driver message.
    Depending on the previous state, the actual MEI interface state
    a ALARM or a EVENT message will be generated.
 
@@ -140,7 +139,7 @@ MEI_STATIC IFX_int32_t MEI_DrvMsg_RomStartSet(
 
 
 /**
-   This function setup and distribute a ROM Start VINAX driver message.
+   This function setup and distribute a ROM Start VRX driver message.
    Depending on the previous state, the actual MEI interface state
    a ALARM or a EVENT message will be generated.
 

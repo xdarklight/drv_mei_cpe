@@ -1,8 +1,7 @@
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -10,7 +9,7 @@
 ******************************************************************************/
 
 /* ==========================================================================
-   Description : Common test routines for the VINAX driver test application.
+   Description : Common test routines for the VRX driver test application.
    ========================================================================== */
 
 /* ==========================================================================
@@ -81,7 +80,7 @@ static unsigned int MEI_DmaRdBuf[0x0FF];
 static unsigned int MEI_DmaWrBuf[0x0FF];
 
 
-static unsigned char  *pVinaxFileBuffer = NULL;
+static unsigned char  *pVrxFileBuffer = NULL;
 static IOCTL_MEI_fwDownLoad_t MEI_FwDl;
 
 static IOCTL_MEI_dbgAccess_t        MEI_DbgAccess;
@@ -242,7 +241,7 @@ void MEI_log_drv_msg(MEIOS_File_t *streamOut, IOCTL_MEI_message_t *pCntrl)
 /*
  **
  *
- *  FILENAME: F:\comacsd_driver\drv_vdsl2_dfe\src\vinax_drv_test_fct.c
+ *  FILENAME: F:\comacsd_driver\drv_vdsl2_dfe\src\vrx_drv_test_fct.c
  *
  *  PARAMETERS:
  *
@@ -254,7 +253,7 @@ void MEI_log_drv_msg(MEIOS_File_t *streamOut, IOCTL_MEI_message_t *pCntrl)
 }
 
 /**
-   Print VINAX ATM OAM cell Message.
+   Print VRX ATM OAM cell Message.
 */
 void MEI_log_atmoam_cell_msg(MEIOS_File_t *streamOut, IOCTL_MEI_message_t *pCntrl)
 {
@@ -281,7 +280,7 @@ void MEI_log_atmoam_cell_msg(MEIOS_File_t *streamOut, IOCTL_MEI_message_t *pCntr
 }
 
 /**
-   open an VINAX device
+   open an VRX device
 */
 int MEI_open_dev(MEIOS_File_t *streamOut, int devNum, char *pPrefixName, char *pDevBaseName)
 {
@@ -320,7 +319,7 @@ int MEI_open_dev(MEIOS_File_t *streamOut, int devNum, char *pPrefixName, char *p
 
 
 /**
-   Get VINAX driver configuration.
+   Get VRX driver configuration.
    - ioctl(..., FIO_MEI_REQ_CONFIG, ...);
 
 */
@@ -344,6 +343,13 @@ int MEI_req_cfg(MEIOS_File_t *streamOut, int fd)
            "REQ_CONFIG[%02d-%02d]: phy addr 0x%08X (virt 0x%08X), IRQ %d" MEIOS_CRLF,
            pReqCfg->devNum, pReqCfg->currOpenInst,
            pReqCfg->phyBaseAddr, pReqCfg->virtBaseAddr, pReqCfg->usedIRQ);
+
+#if (MEI_SUPPORT_DEVICE_VR10 == 1)
+   MEIOS_FPrintf(streamOut, TEST_MEI_DBG_PREFIX
+           "REQ_CONFIG[%02d-%02d]: phy PDBRAM addr 0x%08X (virt 0x%08X)" MEIOS_CRLF,
+           pReqCfg->devNum, pReqCfg->currOpenInst,
+           pReqCfg->phyPDBRAMaddr, pReqCfg->virtPDBRAMaddr);
+#endif /* (MEI_SUPPORT_DEVICE_VR10 == 1) */
 
    MEIOS_FPrintf(streamOut, TEST_MEI_DBG_PREFIX
            "REQ_CONFIG[%02d-%02d]: curr DrvState = %d, curr ModemFSM = %d" MEIOS_CRLF,
@@ -380,7 +386,7 @@ int MEI_req_cfg(MEIOS_File_t *streamOut, int fd)
 
 
 /**
-   Get VINAX driver configuration.
+   Get VRX driver configuration.
    - ioctl(..., FIO_MEI_REQ_STAT, ...);
 
 */
@@ -433,12 +439,13 @@ int MEI_req_stat(MEIOS_File_t *streamOut, int fd)
 
 
 /**
-   Do the VINAX initialisation.
+   Do the VRX initialisation.
    - set base address
    - set IRQ (IRQ = 0 --> poll mode)
 */
 int MEI_init_dev(MEIOS_File_t *streamOut, int fd, IOCTL_MEI_devInit_t *pDevInit)
 {
+#if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_AR9 == 1)
    int ret;
 
    MEIOS_Printf( TEST_MEI_DBG_PREFIX
@@ -452,12 +459,17 @@ int MEI_init_dev(MEIOS_File_t *streamOut, int fd, IOCTL_MEI_devInit_t *pDevInit)
          errno, ret, pDevInit->ictl.retCode);
       return -1;
    }
+#elif (MEI_SUPPORT_DEVICE_VR10 == 1)
+      MEIOS_FPrintf(streamOut, TEST_MEI_DBG_PREFIX
+         "ERROR: only internal device init available for VR10" MEIOS_CRLF);
+      return -1;
+#endif
 
    return 0;
 }
 
 /**
-   Do the VINAX initialisation.
+   Do the VRX initialisation.
    - set base address
    - set IRQ (IRQ = 0 --> poll mode)
 */
@@ -491,7 +503,7 @@ int MEI_init_drv(MEIOS_File_t *streamOut, int fd, IOCTL_MEI_drvInit_t *pDrvInit)
 }
 
 /**
-   Reset VINAX driver.
+   Reset VRX driver.
 */
 int MEI_drv_reset(MEIOS_File_t *streamOut, int fd, unsigned int resetMode)
 {
@@ -520,7 +532,7 @@ int MEI_drv_reset(MEIOS_File_t *streamOut, int fd, unsigned int resetMode)
 }
 
 /**
-   Set VINAXx driver debug level.
+   Set VRX driver debug level.
 */
 int MEI_x_drv_set_trace(MEIOS_File_t *streamOut, int fd, unsigned int debugArgs, int *pParamArr)
 {
@@ -559,7 +571,7 @@ int MEI_x_drv_set_trace(MEIOS_File_t *streamOut, int fd, unsigned int debugArgs,
 }
 
 /**
-   Switch on/off the VINAX driver loop
+   Switch on/off the VRX driver loop
    --> ioctl(..., FIO_MEI_DRV_LOOP, ...)
    - 0: loop off
    - 1: loop on
@@ -693,6 +705,8 @@ int MEI_ReadRawAck(MEIOS_File_t *streamOut, int fd)
    /* setup message */
    MEIOS_MemSet(&MEI_RdCmvMsg, 0x00, sizeof(CMV_MESSAGE_ALL_T));
 
+   MEIOS_MemSet(&ioctlArg, 0x00, sizeof(IOCTL_MEI_mboxSend_t));
+
    MEIOS_FPrintf(streamOut, TEST_MEI_DBG_PREFIX
            "Start - read ACK (count=%d / 2)" MEIOS_CRLF, sizeof(CMV_MESSAGE_ALL_T));
 
@@ -732,6 +746,8 @@ int MEI_SendRawMsg(MEIOS_File_t *streamOut, int fd, int payload_count_16bit, int
 
    /* setup write message */
    MEIOS_MemSet(pCmvMsg, 0x00, sizeof(CMV_STD_MESSAGE_T));
+
+   MEIOS_MemSet(&ioctlArg, 0x00, sizeof(IOCTL_MEI_mboxSend_t));
 
    if (payload_count_16bit > CMV_USED_PAYLOAD_16BIT_SIZE)
       payload_count_16bit = CMV_USED_PAYLOAD_16BIT_SIZE;
@@ -992,7 +1008,7 @@ int MEI_ReadNfc(MEIOS_File_t *streamOut, int fd, IOCTL_MEI_message_t *pMsgNfc)
 
 
 /**
-   Switch on/off the VINAX NFC handling
+   Switch on/off the VRX NFC handling
    --> ioctl(..., FIO_MEI_MBOX_NFC_ENABLE, ...)
    --> ioctl(..., FIO_MEI_MBOX_NFC_DISABLE, ...)
 */
@@ -1004,6 +1020,7 @@ int MEI_ReceiveNfcOnOff(MEIOS_File_t *streamOut, int fd, int on_off)
            "ioct(%s)" MEIOS_CRLF,
            (on_off) ? "FIO_MEI_MBOX_NFC_ENABLE":"FIO_MEI_MBOX_NFC_DISABLE");
 
+   MEIOS_MemSet(&argIoctl, 0x00, sizeof(IOCTL_MEI_ioctl_t));
 
    if ( ( MEIOS_DeviceControl(fd,
                  (on_off)?(FIO_MEI_MBOX_NFC_ENABLE):(FIO_MEI_MBOX_NFC_DISABLE),
@@ -1076,13 +1093,13 @@ int MEI_ReadRawNfc(MEIOS_File_t *streamOut, int fd)
    CMV_STD_MESSAGE_T *pCmvMsg = &MEI_RdCmvMsg.cmv;
    IOCTL_MEI_mboxMsg_t ioctlArg;
 
-
    /* enable the NFC message handling */
    MEI_ReceiveNfcOnOff(streamOut, fd, 1);
 
-
    /* setup message */
    MEIOS_MemSet(pCmvMsg, 0x00, sizeof(CMV_STD_MESSAGE_T));
+
+   MEIOS_MemSet(&ioctlArg, 0x00, sizeof(IOCTL_MEI_mboxMsg_t));
 
    MEIOS_Printf( TEST_MEI_DBG_PREFIX
            "Start - read RAW NFC (count=%d / 2)" MEIOS_CRLF,
@@ -1120,6 +1137,8 @@ void MEI_show_mei_regs(int fd)
    MEIOS_Printf( TEST_MEI_DBG_PREFIX
            "ioct(FIO_MEI_MEI_REGS_SHOW)" MEIOS_CRLF);
 
+   MEIOS_MemSet(&argIoctl, 0x00, sizeof(IOCTL_MEI_ioctl_t));
+
    if ( (MEIOS_DeviceControl(fd, FIO_MEI_MEI_REGS_SHOW, (MEI_IOCTL_ARG)&argIoctl)) < 0 )
    {
       MEIOS_Printf( TEST_MEI_DBG_PREFIX
@@ -1142,10 +1161,16 @@ void MEI_show_drv_buffer(int fd, unsigned char bufNum, unsigned int count)
 
    MEIOS_Printf( TEST_MEI_DBG_PREFIX "ioct(FIO_MEI_DRV_BUF_SHOW)" MEIOS_CRLF);
 
+   MEIOS_MemSet(&MEI_ShowDrvBuf, 0x00, sizeof(IOCTL_MEI_drvBufShow_t));
+
    if (count)
+   {
       MEI_ShowDrvBuf.count = (count > CMV_MESSAGE_SIZE) ? CMV_MESSAGE_SIZE : count;
+   }
    else
+   {
       MEI_ShowDrvBuf.count = 16;
+   }
 
    MEI_ShowDrvBuf.bufNum = (unsigned int)(bufNum & 0xFF);
 
@@ -1162,12 +1187,11 @@ void MEI_show_drv_buffer(int fd, unsigned char bufNum, unsigned int count)
 
 
 /**
-   Write to the VINAX via MEI debug functionality.
+   Write to the VRX via MEI debug functionality.
 */
 int MEI_mei_dbg_write(MEIOS_File_t *streamOut, int fd, int offset, int des, int count, int *pParamArr)
 {
    int idx;
-   unsigned int tempData;
 
    count = (count < 0) ? 0x100: count;
 
@@ -1182,11 +1206,11 @@ int MEI_mei_dbg_write(MEIOS_File_t *streamOut, int fd, int offset, int des, int 
    if (count == 1)
    {
       if (pParamArr[0] != -1)
-         tempData = pParamArr[0];
+         MEI_DumpBufWr[0] = pParamArr[0];
       else
-         tempData = 0xDEADBEEF;
+         MEI_DumpBufWr[0] = 0xDEADBEEF;
 
-      MEI_DbgAccess.pData_32 = (unsigned int *)&tempData;
+      MEI_DbgAccess.pData_32 = (unsigned int *)MEI_DumpBufWr;
       MEIOS_Printf( TEST_MEI_DBG_PREFIX
               "DBG Dest[%d] Write[0x%08X] = 0x%08X" MEIOS_CRLF,
               des, offset, (unsigned int)MEI_DbgAccess.pData_32 );
@@ -1219,7 +1243,7 @@ int MEI_mei_dbg_write(MEIOS_File_t *streamOut, int fd, int offset, int des, int 
 
 
 /**
-   Read from the VINAX via MEI debug functionality.
+   Read from the VRX via MEI debug functionality.
 */
 int MEI_mei_dbg_read(MEIOS_File_t *streamOut, int fd, int offset, int des, int count)
 {
@@ -1261,7 +1285,7 @@ int MEI_mei_dbg_read(MEIOS_File_t *streamOut, int fd, int offset, int des, int c
 }
 
 /**
-   Write to the VINAX via General Purpose Access (GPA) functionality
+   Write to the VRX via General Purpose Access (GPA) functionality
 */
 int MEI_gpa_write(MEIOS_File_t *streamOut, int fd, int addr, int dest, int value)
 {
@@ -1298,7 +1322,7 @@ int MEI_gpa_write(MEIOS_File_t *streamOut, int fd, int addr, int dest, int value
 
 
 /**
-   Read from the VINAX via General Purpose Access (GPA) functionality
+   Read from the VRX via General Purpose Access (GPA) functionality
 */
 int MEI_gpa_read(MEIOS_File_t *streamOut, int fd, int addr, int dest)
 {
@@ -1404,6 +1428,8 @@ int MEI_fw_swap(MEIOS_File_t *streamOut, int fd, int bTestFwSwap)
 {
    IOCTL_MEI_fwMode_t fwMode;
 
+   MEIOS_MemSet(&fwMode, 0x00, sizeof(IOCTL_MEI_fwMode_t));
+
    fwMode.fwMode = (bTestFwSwap) ? 1 : 0;
 
    if ( (MEIOS_DeviceControl(fd, FIO_MEI_FW_MODE_SELECT, (MEI_IOCTL_ARG)&fwMode)) < 0 )
@@ -1418,6 +1444,111 @@ int MEI_fw_swap(MEIOS_File_t *streamOut, int fd, int bTestFwSwap)
    return 0;
 }
 
+/*
+   Set Current XDSL mode in port mode control structure
+*/
+int MEI_fw_set_mode(MEIOS_File_t *streamOut, int fd, char *pConfig)
+{
+   IOCTL_MEI_FwModeCtrlSet_t fwMode;
+
+   memset(&fwMode, 0x00, sizeof(IOCTL_MEI_FwModeCtrlSet_t));
+
+   fwMode.bMultiLineModeLock = IFX_TRUE;
+   fwMode.bXdslModeLock      = IFX_TRUE;
+
+   sscanf(pConfig, "%u %hhu %u",
+          (unsigned int *)&fwMode.eXdslModeCurrent,
+          &fwMode.firmwareFeatures.nPlatformId,
+          (unsigned int *)&fwMode.firmwareFeatures.eFirmwareXdslModes);
+
+   if (strlen(pConfig) == 0)
+   {
+      MEIOS_FPrintf(streamOut, TEST_MEI_DBG_PREFIX
+               "ERROR - empty parameters, use -z option!" MEIOS_CRLF);
+
+      return -1;
+   }
+
+   switch (fwMode.eXdslModeCurrent)
+   {
+      case e_MEI_XDSLMODE_VDSL:
+         MEIOS_Printf(TEST_MEI_DBG_PREFIX"XDSL mode: set VDSL mode" MEIOS_CRLF);
+         break;
+
+      case e_MEI_XDSLMODE_ADSL:
+         MEIOS_Printf(TEST_MEI_DBG_PREFIX"XDSL mode: set ADSL mode" MEIOS_CRLF);
+         break;
+
+      default:
+         MEIOS_FPrintf(streamOut, TEST_MEI_DBG_PREFIX
+               "ERROR - inconsistent parameters, invalid xdsl mode %u!" MEIOS_CRLF,
+                                        (unsigned int)fwMode.eXdslModeCurrent);
+         return -1;
+   }
+
+   switch (fwMode.firmwareFeatures.nPlatformId)
+   {
+      case 0x5:
+         MEIOS_Printf(TEST_MEI_DBG_PREFIX"FW platform id: set VRX200 platform" MEIOS_CRLF);
+         break;
+
+      case 0x7:
+         MEIOS_Printf(TEST_MEI_DBG_PREFIX"FW platform id: set VRX300 platform" MEIOS_CRLF);
+         break;
+
+      default:
+         MEIOS_FPrintf(streamOut, TEST_MEI_DBG_PREFIX
+               "ERROR - inconsistent parameters, invalid platform id %u!" MEIOS_CRLF,
+                                (unsigned int)fwMode.firmwareFeatures.nPlatformId);
+         return -1;
+   }
+
+   switch (fwMode.firmwareFeatures.eFirmwareXdslModes)
+   {
+      case e_MEI_FW_XDSLMODE_CLEANED:
+         MEIOS_Printf(TEST_MEI_DBG_PREFIX"FW XDSL mode: set CLEANED mode" MEIOS_CRLF);
+         break;
+
+      case e_MEI_FW_XDSLMODE_ADSL_A:
+         MEIOS_Printf(TEST_MEI_DBG_PREFIX"FW XDSL mode: set ADSL_A mode" MEIOS_CRLF);
+         break;
+
+      case e_MEI_FW_XDSLMODE_ADSL_B:
+         MEIOS_Printf(TEST_MEI_DBG_PREFIX"FW XDSL mode: set ADSL_B mode" MEIOS_CRLF);
+         break;
+
+      case e_MEI_FW_XDSLMODE_VDSL2:
+         MEIOS_Printf(TEST_MEI_DBG_PREFIX"FW XDSL mode: set VDSL2 mode" MEIOS_CRLF);
+         break;
+
+      case e_MEI_FW_XDSLMODE_VDSL2_VECTOR:
+         MEIOS_Printf(TEST_MEI_DBG_PREFIX"FW XDSL mode: set VDSL2_VECTOR mode" MEIOS_CRLF);
+         break;
+
+      default:
+         MEIOS_FPrintf(streamOut, TEST_MEI_DBG_PREFIX
+               "ERROR - inconsistent parameters, invalid fw xdsl mode %u!" MEIOS_CRLF,
+                     (unsigned int)fwMode.firmwareFeatures.eFirmwareXdslModes);
+         return -1;
+   }
+
+   MEIOS_FPrintf(streamOut, TEST_MEI_DBG_PREFIX
+      "xdsl = 0x%X, id = 0x%X, fw xdsl = 0x%X" MEIOS_CRLF,
+          fwMode.eXdslModeCurrent,
+          fwMode.firmwareFeatures.nPlatformId,
+          fwMode.firmwareFeatures.eFirmwareXdslModes);
+
+   if ( (MEIOS_DeviceControl(fd, FIO_MEI_FW_MODE_CTRL_SET, (MEI_IOCTL_ARG)&fwMode)) < 0 )
+   {
+      MEIOS_FPrintf(streamOut, TEST_MEI_DBG_PREFIX
+               "ERROR - ioct(FIO_MEI_FW_MODE_CTRL_SET), %s, retCode = %d" MEIOS_CRLF,
+               MEIOS_StrError(errno), fwMode.ictl.retCode);
+
+      return -1;
+   }
+
+   return 0;
+}
 
 /*
    do an firmware download.
@@ -1426,7 +1557,7 @@ int MEI_fw_download_name(MEIOS_File_t *streamOut, int fd, char *pFileName)
 {
    IFX_size_t filesize = 0;
 
-   if (MEIOS_FileLoad (pFileName, &pVinaxFileBuffer, &filesize) != 0)
+   if (MEIOS_FileLoad (pFileName, &pVrxFileBuffer, &filesize) != 0)
    {
       MEIOS_FPrintf(streamOut, TEST_MEI_DBG_PREFIX
                "ERROR: FW Download - load FW image file <%s> failed", pFileName);
@@ -1444,7 +1575,7 @@ int MEI_fw_download_name(MEIOS_File_t *streamOut, int fd, char *pFileName)
    MEIOS_Printf( TEST_MEI_DBG_PREFIX
            "Start Download <%s>, size: %lu" MEIOS_CRLF, pFileName, filesize);
 
-   MEI_FwDl.pFwImage = pVinaxFileBuffer;
+   MEI_FwDl.pFwImage = pVrxFileBuffer;
    MEI_FwDl.size_byte = (IFX_uint32_t)filesize;
 
    if ( (MEIOS_DeviceControl(fd, FIO_MEI_FW_DL, (MEI_IOCTL_ARG)&MEI_FwDl)) < 0 )
@@ -1461,7 +1592,7 @@ int MEI_fw_download_name(MEIOS_File_t *streamOut, int fd, char *pFileName)
 
 
 /**
-   Read from the VINAX via DMA functionality
+   Read from the VRX via DMA functionality
 */
 int MEI_dma_read(MEIOS_File_t *streamOut, int fd, unsigned int addr, unsigned int count)
 {
@@ -1497,7 +1628,7 @@ int MEI_dma_read(MEIOS_File_t *streamOut, int fd, unsigned int addr, unsigned in
 }
 
 /**
-   Write to the VINAX via DMA functionality
+   Write to the VRX via DMA functionality
 */
 int MEI_dma_write(MEIOS_File_t *streamOut, int fd, unsigned int addr, unsigned int count, unsigned int start)
 {
@@ -1792,8 +1923,246 @@ int MEI_nfc_wait_for_nfcs(MEIOS_File_t *streamOut, int max_wait_count, int dfeNu
    return 0;
 }
 
+/*
+   DSM config get
+*/
+int MEI_dsm_config_get(MEIOS_File_t *streamOut, int fd)
+{
+   IOCTL_MEI_dsmConfig_t dsm_config;
 
+   memset(&dsm_config, 0x0, sizeof(IOCTL_MEI_dsmConfig_t));
 
+   if ( (MEIOS_DeviceControl(fd, FIO_MEI_DSM_CONFIG_GET, (MEI_IOCTL_ARG)&dsm_config)) < 0 )
+   {
+      MEIOS_FPrintf(streamOut, TEST_MEI_DBG_PREFIX
+               "ERROR - ioct(FIO_MEI_DSM_CONFIG_GET), %s, retCode = %d" MEIOS_CRLF,
+               MEIOS_StrError(errno), dsm_config.ictl.retCode);
+
+      return -1;
+   }
+
+   MEIOS_FPrintf(streamOut, TEST_MEI_DBG_PREFIX
+      "VectorControl = %i" MEIOS_CRLF, dsm_config.eVectorControl);
+
+   return 0;
+}
+
+/*
+   DSM config set
+*/
+int MEI_dsm_config_set(MEIOS_File_t *streamOut, int fd, int vector_control)
+{
+   IOCTL_MEI_dsmConfig_t dsm_config;
+
+   memset(&dsm_config, 0x0, sizeof(IOCTL_MEI_dsmConfig_t));
+
+   dsm_config.eVectorControl = vector_control;
+   switch (dsm_config.eVectorControl)
+   {
+      case e_MEI_VECTOR_CTRL_OFF:
+         MEIOS_Printf(TEST_MEI_DBG_PREFIX
+                         "DSM config: set VECTOR_CTRL_OFF" MEIOS_CRLF);
+         break;
+
+      case e_MEI_VECTOR_CTRL_ON:
+         MEIOS_Printf(TEST_MEI_DBG_PREFIX
+                         "DSM config: set VECTOR_CTRL_ON" MEIOS_CRLF);
+         break;
+
+      case e_MEI_VECTOR_CTRL_FRIENDLY_ON:
+         MEIOS_Printf(TEST_MEI_DBG_PREFIX
+                         "DSM config: set VECTOR_CTRL_FRIENDLY_ON" MEIOS_CRLF);
+         break;
+
+      default:
+         MEIOS_FPrintf(streamOut, TEST_MEI_DBG_PREFIX
+               "ERROR - inconsistent parameter %i" MEIOS_CRLF, vector_control);
+         return -1;
+   }
+
+   if ( (MEIOS_DeviceControl(fd, FIO_MEI_DSM_CONFIG_SET, (MEI_IOCTL_ARG)&dsm_config)) < 0 )
+   {
+      MEIOS_FPrintf(streamOut, TEST_MEI_DBG_PREFIX
+               "ERROR - ioct(FIO_MEI_DSM_CONFIG_SET), %s, retCode = %d" MEIOS_CRLF,
+               MEIOS_StrError(errno), dsm_config.ictl.retCode);
+
+      return -1;
+   }
+
+   return 0;
+}
+
+/*
+   DSM status get
+*/
+int MEI_dsm_status_get(MEIOS_File_t *streamOut, int fd)
+{
+   IOCTL_MEI_dsmStatus_t dsm_status;
+
+   memset(&dsm_status, 0x0, sizeof(IOCTL_MEI_dsmStatus_t));
+
+   if ( (MEIOS_DeviceControl(fd, FIO_MEI_DSM_STATUS_GET, (MEI_IOCTL_ARG)&dsm_status)) < 0 )
+   {
+      MEIOS_FPrintf(streamOut, TEST_MEI_DBG_PREFIX
+               "ERROR - ioct(FIO_MEI_DSM_STATUS_GET), %s, retCode = %d" MEIOS_CRLF,
+               MEIOS_StrError(errno), dsm_status.ictl.retCode);
+
+      return -1;
+   }
+
+   MEIOS_FPrintf(streamOut, TEST_MEI_DBG_PREFIX
+      "VectorStatus = %i, VectorFriendlyStatus = %i" MEIOS_CRLF,
+               dsm_status.eVectorStatus, dsm_status.eVectorFriendlyStatus);
+
+   return 0;
+}
+
+/*
+   DSM statistic get
+*/
+int MEI_dsm_statistics_get(MEIOS_File_t *streamOut, int fd)
+{
+   IOCTL_MEI_dsmStatistics_t dsm_statistics;
+
+   memset(&dsm_statistics, 0x0, sizeof(IOCTL_MEI_dsmStatistics_t));
+
+   if ( (MEIOS_DeviceControl(fd, FIO_MEI_DSM_STATISTICS_GET, (MEI_IOCTL_ARG)&dsm_statistics)) < 0 )
+   {
+      MEIOS_FPrintf(streamOut, TEST_MEI_DBG_PREFIX
+               "ERROR - ioct(FIO_MEI_DSM_STATISTICS_GET), %s, retCode = %d" MEIOS_CRLF,
+               MEIOS_StrError(errno), dsm_statistics.ictl.retCode);
+
+      return -1;
+   }
+
+   MEIOS_FPrintf(streamOut, TEST_MEI_DBG_PREFIX "n_processed = %i" MEIOS_CRLF
+                            TEST_MEI_DBG_PREFIX "n_fw_dropped_size = %i" MEIOS_CRLF
+                            TEST_MEI_DBG_PREFIX "n_mei_dropped_size = %i" MEIOS_CRLF
+                            TEST_MEI_DBG_PREFIX "n_mei_dropped_no_pp_cb = %i" MEIOS_CRLF
+                            TEST_MEI_DBG_PREFIX "n_pp_dropped = %i" MEIOS_CRLF,
+      dsm_statistics.n_processed, dsm_statistics.n_fw_dropped_size,
+      dsm_statistics.n_mei_dropped_size, dsm_statistics.n_mei_dropped_no_pp_cb,
+      dsm_statistics.n_pp_dropped);
+
+   return 0;
+}
+
+/*
+   MAC address get
+*/
+int MEI_mac_get(MEIOS_File_t *streamOut, int fd)
+{
+   IOCTL_MEI_MacConfig_t mac_config;
+
+   memset(&mac_config, 0x0, sizeof(IOCTL_MEI_MacConfig_t));
+
+   if ( (MEIOS_DeviceControl(fd, FIO_MEI_MAC_CONFIG_GET, (MEI_IOCTL_ARG)&mac_config)) < 0 )
+   {
+      MEIOS_FPrintf(streamOut, TEST_MEI_DBG_PREFIX
+               "ERROR - ioct(FIO_MEI_MAC_CONFIG_GET), %s, retCode = %d" MEIOS_CRLF,
+               MEIOS_StrError(errno), mac_config.ictl.retCode);
+
+      return -1;
+   }
+
+   MEIOS_FPrintf(streamOut, TEST_MEI_DBG_PREFIX
+      "MAC address = %02X:%02X:%02X:%02X:%02X:%02X" MEIOS_CRLF,
+               mac_config.nMacAddress[0], mac_config.nMacAddress[1],
+               mac_config.nMacAddress[2], mac_config.nMacAddress[3],
+               mac_config.nMacAddress[4], mac_config.nMacAddress[5]);
+
+   return 0;
+}
+
+/*
+   MAC address set
+*/
+int MEI_mac_set(MEIOS_File_t *streamOut, int fd, char *pMAC)
+{
+   IOCTL_MEI_MacConfig_t mac_config;
+
+   memset(&mac_config, 0x0, sizeof(IOCTL_MEI_MacConfig_t));
+
+   if (strlen(pMAC) == 0)
+   {
+      MEIOS_FPrintf(streamOut, TEST_MEI_DBG_PREFIX
+               "ERROR - empty parameters, use -z option!" MEIOS_CRLF);
+      return -1;
+   }
+
+   if (MEI_get_mac_addr((unsigned char *)pMAC, &mac_config) < 0)
+   {
+      MEIOS_FPrintf(streamOut, TEST_MEI_DBG_PREFIX
+               "ERROR - inconsistent MAC address!" MEIOS_CRLF);
+
+      return -1;
+   }
+   else
+   {
+      MEIOS_FPrintf(streamOut, TEST_MEI_DBG_PREFIX
+         "MAC address = %02X:%02X:%02X:%02X:%02X:%02X" MEIOS_CRLF,
+                  mac_config.nMacAddress[0], mac_config.nMacAddress[1],
+                  mac_config.nMacAddress[2], mac_config.nMacAddress[3],
+                  mac_config.nMacAddress[4], mac_config.nMacAddress[5]);
+   }
+
+   if ( (MEIOS_DeviceControl(fd, FIO_MEI_MAC_CONFIG_SET, (MEI_IOCTL_ARG)&mac_config)) < 0 )
+   {
+      MEIOS_FPrintf(streamOut, TEST_MEI_DBG_PREFIX
+               "ERROR - ioct(FIO_MEI_MAC_CONFIG_SET), %s, retCode = %d" MEIOS_CRLF,
+               MEIOS_StrError(errno), mac_config.ictl.retCode);
+
+      return -1;
+   }
+
+   return 0;
+}
+
+/*
+   Debug level set
+*/
+int MEI_dbg_lvl_set(MEIOS_File_t *streamOut, int fd, char *pConfig)
+{
+   IOCTL_MEI_dbgLevel_t dbg_lvl;
+   char* dbg_module[2] = {"MEI_DRV", "MEI_MSG_DUMP_API"};
+   char* dbg_level[4] = {"LOW", "NORMAL", "HIGH", "OFF"};
+
+   memset(&dbg_lvl, 0x0, sizeof(IOCTL_MEI_dbgLevel_t));
+
+   if (strlen(pConfig) == 0)
+   {
+      MEIOS_FPrintf(streamOut, TEST_MEI_DBG_PREFIX
+               "ERROR - empty parameters, use -z option!" MEIOS_CRLF);
+      return -1;
+   }
+
+   sscanf(pConfig, "%u %u", (unsigned int *)&dbg_lvl.eDbgModule, &dbg_lvl.valLevel);
+   if ((dbg_lvl.eDbgModule < e_MEI_DBGMOD_MEI_DRV) ||
+       (dbg_lvl.eDbgModule >= e_MEI_DBGMOD_LAST)   ||
+       (dbg_lvl.valLevel < MEI_DBG_LEVEL_LOW)      ||
+       (dbg_lvl.valLevel > MEI_DBG_LEVEL_OFF))
+   {
+      MEIOS_FPrintf(streamOut, TEST_MEI_DBG_PREFIX
+               "ERROR - inconsistent parameters!" MEIOS_CRLF);
+      return -1;
+   }
+
+   MEIOS_FPrintf(streamOut, TEST_MEI_DBG_PREFIX
+      "DebugModule = %i (%s), DebugLevel = %i (%s)" MEIOS_CRLF,
+               dbg_lvl.eDbgModule, dbg_module[dbg_lvl.eDbgModule - 1],
+               dbg_lvl.valLevel, dbg_level[dbg_lvl.valLevel - 1]);
+
+   if ( (MEIOS_DeviceControl(fd, FIO_MEI_DEBUGLEVEL, (MEI_IOCTL_ARG)&dbg_lvl)) < 0 )
+   {
+      MEIOS_FPrintf(streamOut, TEST_MEI_DBG_PREFIX
+               "ERROR - ioct(FIO_MEI_DEBUGLEVEL), %s, retCode = %d" MEIOS_CRLF,
+               MEIOS_StrError(errno), dbg_lvl.ictl.retCode);
+
+      return -1;
+   }
+
+   return 0;
+}
 
 #ifdef MEI_CURRENT_NOT_USED
 static MEIOS_File_t *openMsgFile(char *pFileName);
@@ -1803,7 +2172,7 @@ static int scanMsgLine(char *pLineBuf, unsigned int *pParams, int maxParams);
 
 #ifdef MEI_CURRENT_NOT_USED
 /**
-Open a VINAX Msg file
+Open a VRX Msg file
 */
 static MEIOS_File_t *openMsgFile(char *pFileName)
 {

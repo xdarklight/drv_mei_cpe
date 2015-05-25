@@ -2,9 +2,8 @@
 #define _MEI_CPE_APPL_OSMAP_H
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -12,7 +11,7 @@
 ******************************************************************************/
 
 /* ==========================================================================
-   Description : IFX OS mapping fo the used VINAX test application OS functions.
+   Description : IFX OS mapping fo the used VRX test application OS functions.
    ========================================================================== */
 #ifdef __cplusplus
 extern "C"

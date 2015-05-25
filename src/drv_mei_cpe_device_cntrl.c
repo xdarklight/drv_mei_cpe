@@ -1,8 +1,7 @@
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -10,7 +9,7 @@
 ******************************************************************************/
 
 /* ==========================================================================
-   Description : VINAX device specific insert / extract functions.
+   Description : VRX device specific insert / extract functions.
    ========================================================================== */
 
 /* ============================================================================
@@ -100,12 +99,12 @@ IFX_int32_t MEI_DevCntlMsgAvailable(
 
 #if (MEI_DRV_POWERSAVING_ENABLED == 1)
 /* ============================================================================
-   VINAX Device Init - setup for power saving
+   VRX Device Init - setup for power saving
    ========================================================================= */
 
 
 /**
-   Init the VINAX device - for power saving.
+   Init the VRX device - for power saving.
    Therefore the function will be called on interrupt level while the
    processing of the GP1 interrupt or the "EventInitDone ROM msg.
 
@@ -185,8 +184,8 @@ IFX_int32_t MEI_DevSetup_PowerSave(
       }
       else
       {
-         /* first instance in the package - switch clock on  on VINAX 0
-                                          - switch clock off on VINAX 1 */
+         /* first instance in the package - switch clock on  on VRX 0
+                                          - switch clock off on VRX 1 */
          regValWr = (regVal & ~0x00000018) | 0x00000008;
       }
    }
@@ -215,7 +214,7 @@ IFX_int32_t MEI_DevSetup_PowerSave(
 
 #if (MEI_SUPPORT_DFE_GPA_ACCESS == 1)
 /* ==========================================================================
-   VINAX Device - Debug messages (General Purpose Access GPA).
+   VRX Device - Debug messages (General Purpose Access GPA).
    ========================================================================== */
 
 /**
@@ -226,7 +225,7 @@ IFX_int32_t MEI_DevSetup_PowerSave(
    - CMD_DBG_AuxRegisterWrite --> ACK_DBG_AuxRegisterWrite
 
 \param
-   pMeiDev:    Points to the VINAX device struct.
+   pMeiDev:    Points to the VRX device struct.
 \param
    drvState:   Current state (Online or ROM Handler alive)
 \param
@@ -300,8 +299,8 @@ IFX_int32_t MEI_OnlineGpaWr(
    /* poll for response */
    while(1)
    {
-      /* wait: for an response from the VINAX boot loader */
-      MEI_PollIntPerVnxLine(pMeiDev, e_MEI_DEV_ACCESS_MODE_PASSIV_POLL);
+      /* wait: for an response from the VRX boot loader */
+      MEI_PollIntPerVrxLine(pMeiDev, e_MEI_DEV_ACCESS_MODE_PASSIV_POLL);
 
       if (MEI_DRV_MAILBOX_STATE_GET(pMeiDev) != e_MEI_MB_FREE)
       {
@@ -342,7 +341,7 @@ IFX_int32_t MEI_OnlineGpaWr(
 
 
 \param
-   pMeiDev: Points to the VINAX device struct.
+   pMeiDev: Points to the VRX device struct.
 \param
    aux:     Destination area on the target: MEM/AUX
 \param
@@ -417,8 +416,8 @@ IFX_int32_t MEI_OnlineGpaRd(
    /* poll for response */
    while(1)
    {
-      /* wait: for an response from the VINAX boot loader */
-      MEI_PollIntPerVnxLine(pMeiDev, e_MEI_DEV_ACCESS_MODE_PASSIV_POLL);
+      /* wait: for an response from the VRX boot loader */
+      MEI_PollIntPerVrxLine(pMeiDev, e_MEI_DEV_ACCESS_MODE_PASSIV_POLL);
 
       if (MEI_DRV_MAILBOX_STATE_GET(pMeiDev) != e_MEI_MB_FREE)
       {
@@ -729,7 +728,7 @@ IFX_int32_t MEI_DevCfgFwModeSwap(
 #if (MEI_DRV_ATM_OAM_ENABLE == 1)
 
 /**
-   Write the VINAX CMD_ATMINSERTEXTRACT_CONTROL command.
+   Write the VRX CMD_ATMINSERTEXTRACT_CONTROL command.
    Enable / Disable the ATM OAM feature and configure the alarm handling.
 
 \param
@@ -820,7 +819,7 @@ IFX_int32_t MEI_ATMOAM_CMD_InsExtControl(
 
 
 /**
-   Write the VINAX CMD_ATMINSERTEXTRACTSTATSGET command.
+   Write the VRX CMD_ATMINSERTEXTRACTSTATSGET command.
    Request the ATM OAM insert / extract status infos.
 
 \param
@@ -922,7 +921,7 @@ IFX_int32_t MEI_ATMOAM_CMD_InsExtStatsGet(
 }
 
 /**
-   Write the VINAX CMD_AtmCellLineInsertStatusGet command.
+   Write the VRX CMD_AtmCellLineInsertStatusGet command.
    Request the status of the previous ATM OAM insert operation.
 
 \param
@@ -1039,7 +1038,7 @@ IFX_int32_t MEI_ATMOAM_CMD_InsStatusGet(
 }
 
 /**
-   Write the VINAX CMD_ATMCELLLINEINSERT command.
+   Write the VRX CMD_ATMCELLLINEINSERT command.
    Insert a ATM OAM cell block to the line.
 
 \param
@@ -1380,7 +1379,7 @@ MEI_STATIC IFX_int32_t MEI_CEOC_DataGet(
 {
    IFX_int32_t                nextTransfer_bytes;
    IFX_uint8_t                *pEocDataSrc, *pEocDataDest;
-   MEI_CEOC_MEI_EOC_FRAME_T *pVnxEocFrame = &pCEocFrameBuf->vnxEocFrame;
+   MEI_CEOC_MEI_EOC_FRAME_T *pVrxEocFrame = &pCEocFrameBuf->vrxEocFrame;
 
 
    if (pCatMsgEvt->Index == 0)
@@ -1393,7 +1392,7 @@ MEI_STATIC IFX_int32_t MEI_CEOC_DataGet(
                ("MEI_CEOC[%02d]: WRN - recv C-EOC Read - invalid msg!" MEI_DRV_CRLF,
                 MEI_DRV_LINENUM_GET(pMeiDev)));
 
-         pVnxEocFrame->length_byte = 0;
+         pVrxEocFrame->length_byte = 0;
          pCEocFrameBuf->transferedSize_byte = 0;
          return IFX_ERROR;
       }
@@ -1407,25 +1406,25 @@ MEI_STATIC IFX_int32_t MEI_CEOC_DataGet(
                 MEI_DRV_LINENUM_GET(pMeiDev)));
       }
 
-      pVnxEocFrame->length_byte = pCatMsgEvt->Data[0];
-      pVnxEocFrame->protIdent   = pCatMsgEvt->Data[1];
+      pVrxEocFrame->length_byte = pCatMsgEvt->Data[0];
+      pVrxEocFrame->protIdent   = pCatMsgEvt->Data[1];
 
-      if (pVnxEocFrame->length_byte > (MEI_CEOC_RAW_EOC_DATA_SIZE_BYTE + sizeof(pVnxEocFrame->protIdent)) )
+      if (pVrxEocFrame->length_byte > (MEI_CEOC_RAW_EOC_DATA_SIZE_BYTE + sizeof(pVrxEocFrame->protIdent)) )
       {
          PRN_ERR_USR_NL( MEI_CEOC, MEI_DRV_PRN_LEVEL_ERR,
                ("MEI_CEOC[%02d]: ERROR - recv C-EOC Read - invalid size %d (max %d + 2)!" MEI_DRV_CRLF,
                 MEI_DRV_LINENUM_GET(pMeiDev),
-                pVnxEocFrame->length_byte, MEI_CEOC_RAW_EOC_DATA_SIZE_BYTE));
-         pVnxEocFrame->length_byte = 0;
+                pVrxEocFrame->length_byte, MEI_CEOC_RAW_EOC_DATA_SIZE_BYTE));
+         pVrxEocFrame->length_byte = 0;
          pCEocFrameBuf->transferedSize_byte = 0;
          return IFX_ERROR;
       }
 
       pCEocFrameBuf->transferedSize_byte =
-            sizeof(pVnxEocFrame->length_byte) + sizeof(pVnxEocFrame->protIdent);
+            sizeof(pVrxEocFrame->length_byte) + sizeof(pVrxEocFrame->protIdent);
 
-      pCEocFrameBuf->frameSize_byte      = pVnxEocFrame->length_byte
-                                           + sizeof(pVnxEocFrame->length_byte);
+      pCEocFrameBuf->frameSize_byte      = pVrxEocFrame->length_byte
+                                           + sizeof(pVrxEocFrame->length_byte);
       /* padding */
       if (pCEocFrameBuf->frameSize_byte & 0x1)
          pCEocFrameBuf->frameSize_byte++;
@@ -1459,9 +1458,9 @@ MEI_STATIC IFX_int32_t MEI_CEOC_DataGet(
       nextTransfer_bytes = (pCatMsgEvt->Length << CMV_MSG_BIT_SIZE_16BIT);
    }
 
-   pEocDataDest  = (IFX_uint8_t *)pVnxEocFrame->cEocRawData.d_8;
+   pEocDataDest  = (IFX_uint8_t *)pVrxEocFrame->cEocRawData.d_8;
    pEocDataDest += (pCEocFrameBuf->transferedSize_byte -
-                     (sizeof(pVnxEocFrame->length_byte) + sizeof(pVnxEocFrame->protIdent)));
+                     (sizeof(pVrxEocFrame->length_byte) + sizeof(pVrxEocFrame->protIdent)));
 
    if ( (pCEocFrameBuf->transferedSize_byte + nextTransfer_bytes) > pCEocFrameBuf->frameSize_byte )
    {
@@ -1479,7 +1478,7 @@ MEI_STATIC IFX_int32_t MEI_CEOC_DataGet(
 }
 
 /**
-   Write the VINAX CMD_CLEAREOC_CONFIGURE command.
+   Write the VRX CMD_CLEAREOC_CONFIGURE command.
    Enable / Disable the Clear EOC feature and configure the indication handling.
 
 \param
@@ -1575,7 +1574,7 @@ IFX_int32_t MEI_CEOC_CMD_ClearEOC_Configure(
 
 
 /**
-   Write the VINAX CMD_CLEAREOCSTATUSGET command.
+   Write the VRX CMD_CLEAREOCSTATUSGET command.
    Request the Clear EOC status form the device.
 
 \param
@@ -1714,7 +1713,7 @@ IFX_int32_t MEI_CEOC_CMD_ClearEOCStatusGet(
 
 
 /**
-   Write the VINAX CMD_CLEAREOC_TXTRIGGER command.
+   Write the VRX CMD_CLEAREOC_TXTRIGGER command.
    Trigger the underlaying FW to insert the previous written EOC frame to the line.
 
 \param
@@ -1800,7 +1799,7 @@ IFX_int32_t MEI_CEOC_CMD_ClearEOC_TxTrigger(
 }
 
 /**
-   Write the VINAX CMD_CLEAREOC_WRITE command.
+   Write the VRX CMD_CLEAREOC_WRITE command.
    Write a EOC frame segment to the device.
 
 \param
@@ -1822,7 +1821,7 @@ IFX_int32_t MEI_CEOC_CMD_ClearEOC_Write(
    CMV_STD_MESSAGE_T    *pModemMsg = (CMV_STD_MESSAGE_T *)pDynCmd->cmdWrBuf.pBuffer;
    CMD_ClearEOC_Write_t *pCatMsg   = (CMD_ClearEOC_Write_t *)&pModemMsg->header.index;
    IFX_uint8_t          *pEocDataSrc, *pEocDataDest;
-   MEI_CEOC_MEI_EOC_FRAME_T *pVnxEocFrame = &pCEocFrameBuf->vnxEocFrame;
+   MEI_CEOC_MEI_EOC_FRAME_T *pVrxEocFrame = &pCEocFrameBuf->vrxEocFrame;
 
    if ( MEI_DevCntlMsgAvailable( pMeiDynCntrl,
                                    (IFX_uint32_t)MEI_DRV_CMD_CLEAREOC_WRITE)
@@ -1837,7 +1836,7 @@ IFX_int32_t MEI_CEOC_CMD_ClearEOC_Write(
 
 
    /* ===============================================
-      check the given VINAX frame and buffer
+      check the given VRX frame and buffer
       =============================================== */
    if (pCEocFrameBuf->frameSize_byte == 0)
    {
@@ -1891,14 +1890,14 @@ IFX_int32_t MEI_CEOC_CMD_ClearEOC_Write(
       pCatMsg->Index          = 0;
       pCatMsg->Length         = modemPaylSize >> CMV_MSG_BIT_SIZE_16BIT;
 
-      /* set Vinax EOC frame - length */
-      pModemMsg->payload.params_16Bit[0] = (unsigned short)pVnxEocFrame->length_byte;
-      /* set Vinax EOC frame - protocol ID */
-      pModemMsg->payload.params_16Bit[1] = (unsigned short)pVnxEocFrame->protIdent;
+      /* set Vrx EOC frame - length */
+      pModemMsg->payload.params_16Bit[0] = (unsigned short)pVrxEocFrame->length_byte;
+      /* set Vrx EOC frame - protocol ID */
+      pModemMsg->payload.params_16Bit[1] = (unsigned short)pVrxEocFrame->protIdent;
 
       nextTransfer_bytes -= (2 * sizeof(unsigned short));
       pEocDataDest = (IFX_uint8_t *)&pCatMsg->Data[2 * sizeof(unsigned short)];
-      pEocDataSrc  = pVnxEocFrame->cEocRawData.d_8;
+      pEocDataSrc  = pVrxEocFrame->cEocRawData.d_8;
 
    }
    else
@@ -1908,7 +1907,7 @@ IFX_int32_t MEI_CEOC_CMD_ClearEOC_Write(
       pCatMsg->Length         = modemPaylSize >> CMV_MSG_BIT_SIZE_16BIT;
 
       pEocDataDest = (IFX_uint8_t *)pCatMsg->Data;
-      pEocDataSrc  = &pVnxEocFrame->cEocRawData.d_8[(pCEocFrameBuf->transferedSize_byte) - (2 * sizeof(unsigned short))];
+      pEocDataSrc  = &pVrxEocFrame->cEocRawData.d_8[(pCEocFrameBuf->transferedSize_byte) - (2 * sizeof(unsigned short))];
    }
 
    /* set the EOC data */
@@ -1944,7 +1943,7 @@ IFX_int32_t MEI_CEOC_CMD_ClearEOC_Write(
 }
 
 /**
-   Write the VINAX CMD_CLEAREOC_READ command.
+   Write the VRX CMD_CLEAREOC_READ command.
    Read a EOC frame segment from the device.
 
 \param
@@ -1981,7 +1980,7 @@ IFX_int32_t MEI_CEOC_CMD_ClearEOC_Read(
 
 
    /* ===============================================
-      check the given VINAX frame and buffer
+      check the given VRX frame and buffer
       =============================================== */
    if (     (pCEocFrameBuf->frameSize_byte == 0)
          || (pCEocFrameBuf->transferedSize_byte >= pCEocFrameBuf->frameSize_byte) )

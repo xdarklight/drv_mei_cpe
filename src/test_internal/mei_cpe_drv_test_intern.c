@@ -1,8 +1,7 @@
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -10,7 +9,7 @@
 ******************************************************************************/
 
 /* ==========================================================================
-   Description : Small test programm to test the VINAX Driver
+   Description : Small test programm to test the VRX Driver
    ========================================================================== */
 
 /* ============================= */
@@ -36,8 +35,8 @@
 
 
 /** get interface and configuration */
-#include "drv_vinax_interface.h"
-#include "test_internal/drv_test_vinax_interface.h"
+#include "drv_vrx_interface.h"
+#include "test_internal/drv_test_vrx_interface.h"
 #include "cmv_message_format.h"
 
 /* ==========================================================================
@@ -67,7 +66,7 @@ static void MEI_TEST_Intern(FILE *streamOut);
 static int MEI_TEST_OpenDev(FILE *streamOut, int devNum, char *pDevBase);
 static int MEI_TEST_GetVers(FILE *streamOut, int fd, IOCTL_MEI_TEST_internArg_t *pArgs);
 static int MEI_TEST_DbgLevelSet(FILE *streamOut, int fd, IOCTL_MEI_TEST_internArg_t *pArgs);
-static int MEI_TEST_InitVnxDev(FILE *streamOut, int fd, IOCTL_MEI_TEST_internArg_t *pArgs);
+static int MEI_TEST_InitVrxDev(FILE *streamOut, int fd, IOCTL_MEI_TEST_internArg_t *pArgs);
 static int MEI_TEST_Reset(FILE *streamOut, int fd, IOCTL_MEI_TEST_internArg_t *pArgs);
 static int MEI_TEST_FwDl(FILE *streamOut, int fd, IOCTL_MEI_TEST_internArg_t *pArgs);
 static int MEI_TEST_FwSwap(FILE *streamOut, int fd, IOCTL_MEI_TEST_internArg_t *pArgs);
@@ -92,7 +91,7 @@ static void MEI_TEST_SetupSendMsg(
 static int bTestInternHelp          = -1;    /* h */
 static int bTestInternTestGetVer    = -1;    /* v */
 static int bTestInternTestDbgLvl    = -1;    /* l */
-static int bTestInternVnxLine       = -1;    /* n */
+static int bTestInternVrxLine       = -1;    /* n */
 
 static int bTestInternInitDev       = -1;    /* i */
 static int bTestInternDrvReset      = -1;    /* R */
@@ -306,7 +305,7 @@ static void parseArgs(int argc, char *argv[])
             GetOptArg_RequDigit(optarg, &bTestInternTestDbgLvl, "DbgLvl");
             break;
          case 'n':
-            GetOptArg_RequDigit(optarg, &bTestInternVnxLine, "line");
+            GetOptArg_RequDigit(optarg, &bTestInternVrxLine, "line");
             break;
          case 'i':
             GetOptArg_RequDigit(optarg, &bTestInternInitDev, "Init");
@@ -430,14 +429,14 @@ static void MEI_TEST_Intern(FILE *streamOut)
    IOCTL_MEI_TEST_internArg_t localArgs;
 
 
-   bTestInternVnxLine = (bTestInternVnxLine == -1) ? 0 : bTestInternVnxLine;
+   bTestInternVrxLine = (bTestInternVrxLine == -1) ? 0 : bTestInternVrxLine;
 
-   fd = MEI_TEST_OpenDev(streamOut, bTestInternVnxLine, MEI_TEST_INTERN_DEV_NAME);
+   fd = MEI_TEST_OpenDev(streamOut, bTestInternVrxLine, MEI_TEST_INTERN_DEV_NAME);
    if (fd <= 0)
    {
       fprintf( streamOut, TEST_INTERN_PREFIX
                "Error = %d - open Dev <%s/%d>\n\r",
-               errno, MEI_TEST_INTERN_DEV_NAME, bTestInternVnxLine);
+               errno, MEI_TEST_INTERN_DEV_NAME, bTestInternVrxLine);
       return;
    }
 
@@ -457,16 +456,16 @@ static void MEI_TEST_Intern(FILE *streamOut)
       goto MEI_TEST_INTERN_END;
    }
 
-   /* test case: basic init VINAX Driver
+   /* test case: basic init VRX Driver
                  "-i base Addr, -0 IRQ"
    */
    if (bTestInternInitDev != -1)
    {
-      ret = MEI_TEST_InitVnxDev(streamOut, fd, &localArgs);
+      ret = MEI_TEST_InitVrxDev(streamOut, fd, &localArgs);
       goto MEI_TEST_INTERN_END;
    }
 
-   /* test case: reset VINAX Drv and Dev
+   /* test case: reset VRX Drv and Dev
                  "MEI Rst (-R <0/1/2 rst/act/deact> [cntrl<-0 MEI sel mask>]"
    */
    if (bTestInternDrvReset != -1)
@@ -538,7 +537,7 @@ static void MEI_TEST_Intern(FILE *streamOut)
       goto MEI_TEST_INTERN_END;
    }
 
-   /* test case: Send Vnx Msg */
+   /* test case: Send Vrx Msg */
    if (bTestInternSendMsg != -1)
    {
       ret = MEI_TEST_SendMsg(streamOut, fd, &localArgs);
@@ -549,13 +548,13 @@ MEI_TEST_INTERN_END:
 
    close(fd);
    fprintf( streamOut, TEST_INTERN_PREFIX
-            "Line = %02d Return = %d\n\r", bTestInternVnxLine, ret);
+            "Line = %02d Return = %d\n\r", bTestInternVrxLine, ret);
    return;
 }
 
 
 /**
-   open an VINAX device
+   open an VRX device
 */
 static int MEI_TEST_OpenDev(FILE *streamOut, int devNum, char *pDevBase)
 {
@@ -582,7 +581,7 @@ static int MEI_TEST_OpenDev(FILE *streamOut, int devNum, char *pDevBase)
 
 
 /**
-   test case: request VINAX Driver Version
+   test case: request VRX Driver Version
 */
 static int MEI_TEST_GetVers(FILE *streamOut, int fd, IOCTL_MEI_TEST_internArg_t *pArgs)
 {
@@ -659,10 +658,10 @@ static int MEI_TEST_DbgLevelSet(FILE *streamOut, int fd, IOCTL_MEI_TEST_internAr
 
 
 /**
-   test case: basic init VINAX Driver
+   test case: basic init VRX Driver
               "-i base Addr, -0 IRQ"
 */
-static int MEI_TEST_InitVnxDev(FILE *streamOut, int fd, IOCTL_MEI_TEST_internArg_t *pArgs)
+static int MEI_TEST_InitVrxDev(FILE *streamOut, int fd, IOCTL_MEI_TEST_internArg_t *pArgs)
 {
    int retVal = -1;
 
@@ -692,7 +691,7 @@ static int MEI_TEST_InitVnxDev(FILE *streamOut, int fd, IOCTL_MEI_TEST_internArg
 
 
 /**
-   test case: reset VINAX Drv and Dev
+   test case: reset VRX Drv and Dev
               "MEI Rst (-R <0/1/2 rst/act/deact> [cntrl<-0 MEI sel mask>]"
 */
 static int MEI_TEST_Reset(FILE *streamOut, int fd, IOCTL_MEI_TEST_internArg_t *pArgs)
@@ -1179,7 +1178,7 @@ CMV_MESSAGE_ALL_T MEI_TEST_AckMsg;
 
 
 /**
-   test case: Send Vnx Msg
+   test case: Send Vrx Msg
 */
 static int MEI_TEST_SendMsg(FILE *streamOut, int fd, IOCTL_MEI_TEST_internArg_t *pArgs)
 {

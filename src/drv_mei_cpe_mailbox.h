@@ -2,9 +2,8 @@
 #define _MEI_CPE_mailbox_h
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -64,22 +63,7 @@ extern "C"
    ARC memory map + mailbox settings
    ========================================================== */
 
-#  if (MEI_SUPPORT_DEVICE_VINAX == 1)
-/**
-   Location of the mailbox description table.
-*/
-#define MEI_MAILBOX_DESCR_TABLE_ADDR    0x20000
-/*
-   Boot Mailbox address within the ARC controller memory.
-*/
-/** Mailbox address within the ARC Bulk memory: ARC to ME */
-#define MEI_BOOT_MAILBOX_ARC2ME_ADDR    0x25FC0
-#define MEI_BOOT_MAILBOX_ARC2ME_LEN     0x14
-/** Mailbox address within the ARC Bulk memory: ME to ARC */
-#define MEI_BOOT_MAILBOX_ME2ARC_ADDR    0x25F80
-#define MEI_BOOT_MAILBOX_ME2ARC_LEN     0x14
-
-#  elif (MEI_SUPPORT_DEVICE_VR9 == 1)
+#  if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1)
 
 /**
    Location of the mailbox description table.
@@ -247,13 +231,6 @@ typedef struct MEI_mei_mailbox_raw_s
    IFX_uint16_t   rawMsg[CMV_HEADER_16BIT_SIZE + CMV_USED_PAYLOAD_16BIT_SIZE];
 } MEI_MEI_MAILBOX_RAW_T;
 
-
-#if (MEI_SUPPORT_DEVICE_VINAX == 1)
-/**
-   Wrap the boot mailbox.
-*/
-typedef BootMessage_t  MEI_Mailbox_t;
-#endif /* defined(MEI_SUPPORT_DEVICE_VINAX)*/
 
 /**
    Mailbox struct

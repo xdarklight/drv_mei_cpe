@@ -2,9 +2,8 @@
 #define _DRV_MEI_CPE_DEVICE_CNTRL_H
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -12,7 +11,7 @@
 ******************************************************************************/
 
 /* ==========================================================================
-   Description : VINAX device specific insert / extract defines.
+   Description : VRX device specific insert / extract defines.
    ========================================================================== */
 
 
@@ -28,7 +27,7 @@
 #include "drv_mei_cpe_api.h"
 
 /* ==========================================================================
-   VINAX Register - Macro defs
+   VRX Register - Macro defs
    ========================================================================== */
 
 /** Base Address of the TIMER memory mapping area */
@@ -89,7 +88,7 @@
 
 
 /* ==========================================================================
-   VINAX Device common functions.
+   VRX Device common functions.
    ========================================================================== */
 extern IFX_int32_t MEI_DevCntlMsgAvailable(
                               MEI_DYN_CNTRL_T *pMeiDynCntrl,
@@ -97,7 +96,7 @@ extern IFX_int32_t MEI_DevCntlMsgAvailable(
 
 
 /* ==========================================================================
-   VINAX Device Init functions.
+   VRX Device Init functions.
    ========================================================================== */
 #if (MEI_DRV_POWERSAVING_ENABLED == 1)
 extern IFX_int32_t MEI_DevSetup_PowerSave(
@@ -108,7 +107,7 @@ extern IFX_int32_t MEI_DevSetup_PowerSave(
 
 #if (MEI_SUPPORT_DFE_GPA_ACCESS == 1)
 /* ==========================================================================
-   VINAX Device - Debug messages (General Purpose Access - GPA).
+   VRX Device - Debug messages (General Purpose Access - GPA).
    ========================================================================== */
 
 /*
@@ -155,10 +154,10 @@ extern IFX_int32_t MEI_OnlineOnGpaAckRecv(
    SWAP: Macro defs
    ========================================================================== */
 
-/** VINAX HW register[PDSCR]: used for selecting VDSL2 ADSL mode */
+/** VRX HW register[PDSCR]: used for selecting VDSL2 ADSL mode */
 #define MEI_DEV_CFG_FW_MODE_SELECT_REG        0xE208C
 
-/** VINAX HW register[PDSCR]: bit 29 is used for selecting VDSL2 ADSL mode */
+/** VRX HW register[PDSCR]: bit 29 is used for selecting VDSL2 ADSL mode */
 #define MEI_DEV_CFG_FW_MODE_SELECT_BIT_POS    29
 
 /** Local definition FW restart cmd - VDSL2/ADSL swap */

@@ -2,9 +2,8 @@
 #define _DRV_TEST_MEI_CPE_INTERFACE_H
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -12,15 +11,15 @@
 ******************************************************************************/
 
 /* ==========================================================================
-   Description : Test Interface to user application of the VINAX Driver
+   Description : Test Interface to user application of the VRX Driver
    ========================================================================== */
 
-/* get the data definitions from the VINAX driver */
-#include "drv_vinax_interface.h"
+/* get the data definitions from the VRX driver */
+#include "drv_vrx_interface.h"
 
 
 /* ==========================================================================
-   ioctl commands - access VINAX Driver Test module
+   ioctl commands - access VRX Driver Test module
    ========================================================================== */
 
 /** magic number */
@@ -38,7 +37,7 @@
 
 
 /* ==========================================================================
-   ioctl commands - access VINAX Driver module via test module
+   ioctl commands - access VRX Driver module via test module
    ========================================================================== */
 
 /** magic number */
@@ -55,23 +54,23 @@
 #define FIO_MEI_INTERN_VERS_GET                 _IO(MEI_TEST_IOC_MAGIC_INTERN, 2)
 
 /**
-   Internal Interface - Init a VINAX device line.
+   Internal Interface - Init a VRX device line.
 */
 #define FIO_MEI_INTERN_INIT                     _IO(MEI_TEST_IOC_MAGIC_INTERN, 3)
 
 /**
-   Internal Interface - Close a VINAX device line.
+   Internal Interface - Close a VRX device line.
 */
 #define FIO_MEI_INTERN_CLOSE                    _IO(MEI_TEST_IOC_MAGIC_INTERN, 4)
 
 /**
-   Internal Interface - This service resets the VINAX Device Driver and optional
-   the VINAX blocks via MEI register.
+   Internal Interface - This service resets the VRX Device Driver and optional
+   the VRX blocks via MEI register.
 */
 #define FIO_MEI_INTERN_RESET                    _IO(MEI_TEST_IOC_MAGIC_INTERN, 5)
 
 /**
-   Internal Interface - Firmware download to the VINAX device.
+   Internal Interface - Firmware download to the VRX device.
 */
 #define FIO_MEI_INTERN_FW_DL                    _IO(MEI_TEST_IOC_MAGIC_INTERN, 6)
 
@@ -81,12 +80,12 @@
 #define FIO_MEI_INTERN_FW_MODE_SELECT           _IO(MEI_TEST_IOC_MAGIC_INTERN, 7)
 
 /**
-   Internal Interface - Requests the VINAX Driver config.
+   Internal Interface - Requests the VRX Driver config.
 */
 #define FIO_MEI_INTERN_REQ_CONFIG               _IO(MEI_TEST_IOC_MAGIC_INTERN, 11)
 
 /**
-   Internal Interface - Requests the VINAX Driver statistic.
+   Internal Interface - Requests the VRX Driver statistic.
 */
 #define FIO_MEI_INTERN_REQ_STAT                 _IO(MEI_TEST_IOC_MAGIC_INTERN, 12)
 
@@ -114,12 +113,12 @@
 
 
 /**
-   Internal Interface - write to the VINAX via MEI (debug write)
+   Internal Interface - write to the VRX via MEI (debug write)
 */
 #define FIO_MEI_INTERN_DBG_WRITE                _IO(MEI_TEST_IOC_MAGIC_INTERN, 17)
 
 /**
-   Internal Interface - read from the VINAX via MEI (debug read)
+   Internal Interface - read from the VRX via MEI (debug read)
 */
 #define FIO_MEI_INTERN_DBG_READ                 _IO(MEI_TEST_IOC_MAGIC_INTERN, 18)
 
@@ -136,13 +135,13 @@
 
 
 /**
-   Internal Interface - set VINAX driver message control for autonomous messages.
+   Internal Interface - set VRX driver message control for autonomous messages.
 */
 #define FIO_MEI_INTERN_AUTO_MSG_CTRL_SET        _IO(MEI_TEST_IOC_MAGIC_INTERN, 23)
 
 
 /**
-   Internal Interface - get VINAX driver message control for autonomous messages.
+   Internal Interface - get VRX driver message control for autonomous messages.
 */
 #define FIO_MEI_INTERN_AUTO_MSG_CTRL_GET        _IO(MEI_TEST_IOC_MAGIC_INTERN, 24)
 
@@ -168,7 +167,7 @@
 
 
 /* ==========================================================================
-   ioctl commands - map VINAX Driver data structures
+   ioctl commands - map VRX Driver data structures
    ========================================================================== */
 
 /**
@@ -201,7 +200,7 @@ typedef struct
 } IOCTL_MEI_TEST_drvVers_t;
 
 
-/** encapsulate all ioctl command arguments (VINAX devices) */
+/** encapsulate all ioctl command arguments (VRX devices) */
 typedef union
 {
    IOCTL_MEI_ioctl_t                 tst_ioctl;

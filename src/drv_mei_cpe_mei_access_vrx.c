@@ -1,8 +1,7 @@
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -10,7 +9,7 @@
 ******************************************************************************/
 
 /* ==========================================================================
-   Description : VINAX MEI interface access function.
+   Description : VR9/VR10 MEI interface access function.
    ========================================================================== */
 
 /* ============================================================================
@@ -20,7 +19,7 @@
 /* get at first the driver configuration */
 #include "drv_mei_cpe_config.h"
 
-#if (MEI_SUPPORT_DEVICE_VINAX == 1)
+#if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1)
 
 #include "ifx_types.h"
 #include "drv_mei_cpe_os.h"
@@ -29,7 +28,7 @@
 #include "drv_mei_cpe_dbg_driver.h"
 
 
-#include "drv_mei_cpe_mei_vinax.h"
+#include "drv_mei_cpe_mei_vrx.h"
 
 #include "drv_mei_cpe_mei_interface.h"
 #include "drv_mei_cpe_api.h"
@@ -37,19 +36,14 @@
 
 #include "cmv_message_format.h"
 
-#if (MEI_SUPPORT_ROM_CODE == 1)
-#include "drv_mei_cpe_rom_handler_if.h"
-#include "user_if_vdsl2_boot_messages.h"
-#endif
-
 
 /* ============================================================================
    Local macro definition
    ========================================================================= */
 
-#if TRACE_MEI_MEI_REG_ACCESS == 1
+#if (TRACE_MEI_MEI_REG_ACCESS == 1)
 
-/* VINAX-Driver: MEI register trace - create print level variable */
+/* MEI-Driver: MEI register trace - create print level variable */
 MEI_DRV_PRN_USR_MODULE_CREATE(MEI_REG, MEI_DRV_PRN_LEVEL_OFF);
 MEI_DRV_PRN_INT_MODULE_CREATE(MEI_REG, MEI_DRV_PRN_LEVEL_OFF);
 
@@ -113,7 +107,7 @@ static IFX_uint32_t MEI_CmpDma(
    Local variable definition
    ========================================================================= */
 
-/* VINAX-Driver: MEI Access module - create print level variable */
+/* MEI-Driver: MEI Access module - create print level variable */
 MEI_DRV_PRN_USR_MODULE_CREATE(MEI_MEI_ACCESS, MEI_DRV_PRN_LEVEL_HIGH);
 MEI_DRV_PRN_INT_MODULE_CREATE(MEI_MEI_ACCESS, MEI_DRV_PRN_LEVEL_HIGH);
 
@@ -129,7 +123,7 @@ MEI_DRV_PRN_INT_MODULE_CREATE(MEI_MEI_ACCESS, MEI_DRV_PRN_LEVEL_HIGH);
 #else
    /* set access MACROS for MEI register access */
 #  define MEI_REG_WRAP_GET(pRegAddr)            pRegAddr
-#  define MEI_REG_WRAP_SET(pRegAddr, val)       pRegAddr = (val & 0xFFFF)
+#  define MEI_REG_WRAP_SET(pRegAddr, val)       pRegAddr = (val & 0xFFFFFFFF)
 #endif
 
 
@@ -199,8 +193,8 @@ IFX_int32_t MEI_DummyAccessLoopsWr = 3;
 \remark
    For GNU Compile: inline
 */
-MEI_INLINE MEI_MeiRegVal_t MEI_RegAccessRd(
-                              MEI_MeiReg_t *pMeiReg)
+MEI_INLINE IFX_uint32_t MEI_RegAccessRd(
+                           MEI_MeiReg_t *pMeiReg)
 {
 #if ((MEI_EXT_MEI_ACCESS_ADD_CSE_MIPS == 1) || (MEI_EXT_MEI_ACCESS_ADD_CSE == 1))
    IFX_int32_t i;
@@ -211,7 +205,7 @@ MEI_INLINE MEI_MeiRegVal_t MEI_RegAccessRd(
    }
 #endif
 
-   return (MEI_MeiRegVal_t)(*pMeiReg);
+   return (IFX_uint32_t)(*pMeiReg);
 }
 
 /**
@@ -230,7 +224,7 @@ MEI_INLINE MEI_MeiRegVal_t MEI_RegAccessRd(
    For GNU Compile: inline
 */
 MEI_INLINE IFX_void_t MEI_RegAccessWr(
-                           MEI_MeiReg_t *pMeiReg, MEI_MeiRegVal_t val)
+                           MEI_MeiReg_t *pMeiReg, IFX_uint32_t val)
 {
 #if ((MEI_EXT_MEI_ACCESS_ADD_CSE_MIPS == 1) || (MEI_EXT_MEI_ACCESS_ADD_CSE == 1))
    IFX_int32_t i;
@@ -241,7 +235,7 @@ MEI_INLINE IFX_void_t MEI_RegAccessWr(
    }
 #endif
 
-   *pMeiReg = (val & 0xFFFF);
+   *pMeiReg = val;
    return;
 }
 #endif   /* #if (MEI_EXT_MEI_ACCESS == 1) */
@@ -356,7 +350,7 @@ static IFX_boolean_t MEI_PollForDbgDone(
                            MEI_MEI_DRV_CNTRL_T *pMeiDrvCntrl,
                            IFX_int32_t           pollCount)
 {
-   IFX_uint16_t Arc2MeStatReg = 0;
+   IFX_uint32_t Arc2MeStatReg = 0;
 
    while(pollCount > 0)
    {
@@ -405,7 +399,11 @@ static IFX_boolean_t MEI_PollForDbgDone(
 \param
    pMeiDrvCntrl:   points to the MEI interface register set
 \param
-   dmaAddr:    DMA source address where read from.
+   dmaAddr:        DMA source address where read from.
+\param
+   pDmaVal:        point to 32bit data block.
+\param
+   count32Bit:      32 bit data block count.
 
 \return
    Number of read data units (32 bit)
@@ -417,23 +415,21 @@ IFX_uint32_t MEI_ReadDma32Bit(
                            IFX_uint32_t          *pDmaVal,
                            IFX_uint32_t          count32Bit)
 {
-   IFX_uint32_t val, cnt;
+   IFX_uint32_t cnt;
+
+   MEI_REG_ACCESS_ME_DX_PORT_SEL_SET(pMeiDrvCntrl, pMeiDrvCntrl->dslLineNum % MEI_MAX_DFE_INSTANCE_PER_ENTITY);
 
    MEI_REG_ACCESS_ME_DX_AD_LONG_SET(pMeiDrvCntrl, destAddr);
 
    for (cnt = 0; cnt < count32Bit; cnt++)
    {
-      /* read first LO 16bit word */
-      val = (IFX_uint32_t)( (MEI_REG_ACCESS_ME_DX_DATA_GET(pMeiDrvCntrl)) & 0x0000FFFF ) ;
+      /* read 32bit word */
+      pDmaVal[cnt] = MEI_REG_ACCESS_ME_DX_DATA_GET(pMeiDrvCntrl);
 
-      /* read first HI 16bit word */
-      val = (IFX_uint32_t)( (((MEI_REG_ACCESS_ME_DX_DATA_GET(pMeiDrvCntrl)) & 0x0000FFFF) << 16) | val ) ;
-
-      pDmaVal[cnt] = val;
 #if TRACE_MEI_MEI_ACCESS_FCT == 1
       PRN_DBG_INT_NL( MEI_REG, MEI_DRV_PRN_LEVEL_LOW,
             ("MEI[%02d]: ReadDma32Bit - addr = 0x%08X, val = 0x%08X" MEI_DRV_CRLF,
-            (IFX_uint32_t)pMeiDrvCntrl->dslLineNum, destAddr, val ));
+            (IFX_uint32_t)pMeiDrvCntrl->dslLineNum, destAddr, pDmaVal[cnt] ));
 #endif
    }
 
@@ -447,10 +443,11 @@ IFX_uint32_t MEI_ReadDma32Bit(
 \param
    pMeiDrvCntrl:   points to the MEI interface register set
 \param
-   dmaAddr:    DMA source address where read from.
-
+   dmaAddr:        DMA source address where read from.
 \param
-   value32bit: 32 bit value to write.
+   pData:          point to 32bit data block.
+\param
+   dataCount:      32 bit data block count.
 
 \return
    Number of written data units (32 bit)
@@ -464,7 +461,9 @@ IFX_uint32_t MEI_WriteDma32Bit(
                            IFX_int32_t           retryCnt)
 {
    IFX_uint32_t cnt;
-   IFX_uint16_t tmpRegValue;
+   IFX_uint32_t tmpRegValue;
+
+   MEI_REG_ACCESS_ME_DX_PORT_SEL_SET(pMeiDrvCntrl, pMeiDrvCntrl->dslLineNum % MEI_MAX_DFE_INSTANCE_PER_ENTITY);
 
    MEI_REG_ACCESS_ME_DX_AD_LONG_SET(pMeiDrvCntrl, destAddr);
 
@@ -475,12 +474,8 @@ IFX_uint32_t MEI_WriteDma32Bit(
             ("MEI[%02d]: WriteDma32Bit - addr = 0x%08X, val = 0x%08X" MEI_DRV_CRLF,
             (IFX_uint32_t)pMeiDrvCntrl->dslLineNum, destAddr, pData[cnt] ));
 #endif
-
-      /* write LO 16bit word */
-      MEI_REG_ACCESS_ME_DX_DATA_SET( pMeiDrvCntrl, (IFX_uint16_t)(pData[cnt] & 0x0000FFFF) );
-
-      /* write HI 16bit word */
-      MEI_REG_ACCESS_ME_DX_DATA_SET( pMeiDrvCntrl, (IFX_uint16_t)((IFX_uint32_t)((pData[cnt] & 0xFFFF0000) >> 16)) );
+      /* write 32bit word */
+      MEI_REG_ACCESS_ME_DX_DATA_SET( pMeiDrvCntrl, pData[cnt]);
    }
 
    /* check for DMA error */
@@ -501,7 +496,7 @@ IFX_uint32_t MEI_WriteDma32Bit(
 
 
 /**
-   Reset the indicated VINAX device subsystems.
+   Reset the indicated MEI device subsystems.
 
 \param
    pMeiDrvCntrl:   points to the MEI interface register set.
@@ -524,28 +519,68 @@ IFX_int32_t MEI_ResetDfeBlocks(
                            IFX_boolean_t        resetMode,
                            IFX_int32_t          selMask)
 {
-   IFX_uint16_t tmpReg = 0;
-
-   tmpReg = MEI_REG_ACCESS_ME_RST_CTRL_GET(pMeiDrvCntrl);
+   IFX_uint32_t arc_debug = 0;
 
    if (resetMode)
    {
-      /* activate - set reset flag */
-      tmpReg |= ((IFX_uint16_t)(selMask & (ME_RST_CTRL_ALL)));
-   }
-   else
-   {
-      /* deactivate - release reset flag */
-      tmpReg &= ((IFX_uint16_t)(~selMask & (ME_RST_CTRL_ALL)));
-   }
+      /* Get ARC_DEBUG*/
+      if (MEI_ReadDbg(pMeiDrvCntrl, MEI_REG_ARC_DEBUG,
+            ME_DBG_DECODE_DEBUG_DEC_AUX, 1, &arc_debug) != 1)
+      {
+         PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+            ("MEI_DRV: ARC_DEBUG read failed!" MEI_DRV_CRLF));
+         return (IFX_int32_t)IFX_ERROR;
+      }
+
+      /* halt ARC*/
+      arc_debug |= (1 << 1);
+
+      /* Set ARC_DEBUG*/
+      if (MEI_WriteDbg(pMeiDrvCntrl, MEI_REG_ARC_DEBUG,
+            ME_DBG_DECODE_DEBUG_DEC_AUX, 1, &arc_debug) != 1)
+      {
+         PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+            ("MEI_DRV: ARC_DEBUG write failed!" MEI_DRV_CRLF));
+         return (IFX_int32_t)IFX_ERROR;
+      }
+
+      /* Wait after halting ARC*/
+      MEI_DRVOS_Wait_ms(20);
+
+#if (MEI_SUPPORT_DEVICE_VR9 == 1)
+      /*Temporary workaround, to be removed after availability of the RCU API (per device)*/
+      if (MEI_GET_ENTITY_FROM_DEVNUM(pMeiDrvCntrl->dslLineNum))
+      {
+         *MEI_RCU_SLAVE_RST_REQ |= (MEI_RCU_RST_REQ_DFE | MEI_RCU_RST_REQ_AFE);
+      }
+      else
+      {
+#endif
+         /* Set RCU register. Reset DFE and AFE parts*/
+         /* Reset cleared after approx. 20 cycles (36 MHz clock) */
+         *MEI_RCU_RST_REQ |= (MEI_RCU_RST_REQ_DFE | MEI_RCU_RST_REQ_AFE);
+#if (MEI_SUPPORT_DEVICE_VR9 == 1)
+      }
+#endif
+
+      /* Wait after RCU reset register */
+      MEI_DRVOS_Wait_ms(10);
 
 #if TRACE_MEI_MEI_ACCESS_FCT == 1
    PRN_DBG_USR_NL( MEI_MEI_ACCESS, MEI_DRV_PRN_LEVEL_NORMAL,
-              ("MEI[%02d]: MEI_ResetDfeBlocks - %s reset VINAX: 0x%04X" MEI_DRV_CRLF,
-              (IFX_uint32_t)pMeiDrvCntrl->dslLineNum, (resetMode)?"act":"deact", tmpReg));
+              ("MEI[%02d]: MEI_ResetDfeBlocks - reset VR9" MEI_DRV_CRLF,
+              (IFX_uint32_t)pMeiDrvCntrl->dslLineNum));
 #endif
-
-   MEI_REG_ACCESS_ME_RST_CTRL_SET( pMeiDrvCntrl, tmpReg );
+   }
+#if TRACE_MEI_MEI_ACCESS_FCT == 1
+   else
+   {
+      PRN_DBG_USR_NL( MEI_MEI_ACCESS, MEI_DRV_PRN_LEVEL_NORMAL,
+                 ("MEI[%02d]: MEI_ResetDfeBlocks - reset deactivation is not"
+                 " supported for VR9" MEI_DRV_CRLF,
+                 (IFX_uint32_t)pMeiDrvCntrl->dslLineNum));
+   }
+#endif
 
    return IFX_SUCCESS;
 }
@@ -553,6 +588,15 @@ IFX_int32_t MEI_ResetDfeBlocks(
 IFX_int32_t MEI_InterfaceRecover(
                            MEI_MEI_DRV_CNTRL_T *pMeiDrvCntrl)
 {
+   /* Set RCU register. Reset DFE and AFE parts*/
+   /* Reset cleared after approx. 20 cycles (36 MHz clock)*/
+   *MEI_RCU_RST_REQ |= (MEI_RCU_RST_REQ_DFE | MEI_RCU_RST_REQ_AFE);
+
+   /* Wait after RCU reset register */
+   MEI_DRVOS_Wait_ms(10);
+
+   /* Maybe something else?*/
+
    return IFX_SUCCESS;
 }
 
@@ -616,7 +660,6 @@ IFX_int32_t MEI_UnMaskInterrupts(
          MEI_REG_ACCESS_ME_ARC2ME_STAT_GET(pMeiDrvCntrl) ));
 #endif
 
-
    return IFX_SUCCESS;
 }
 
@@ -629,7 +672,7 @@ IFX_int32_t MEI_UnMaskInterrupts(
 \param
    offset:     Relative byte offset within the MEI register set.
 \param
-   pRegVal:    Points to the return field (16 bit) where to write the value.
+   pRegVal:    Points to the return field (32 bit) where to write the value.
 
 \return
    TRUE if success.
@@ -640,11 +683,11 @@ IFX_boolean_t MEI_GetMeiReg(
                            IFX_uint8_t         off_byte,
                            MEI_MeiRegVal_t     *pRegVal)
 {
-   IFX_uint8_t off_16bit = off_byte / MEI_MEI_DMA_DATA_WIDTH;
+   IFX_uint8_t off_32bit = off_byte / MEI_MEI_DMA_DATA_WIDTH;
 
    if (
-       /* (off_16bit < MEI_REG_OFFSET_FIRST) ||*/  /* currently 0 */
-       (off_16bit > MEI_REG_OFFSET_LAST) ||        /* max offset */
+       /* (off_32bit < MEI_REG_OFFSET_FIRST) ||*/  /* currently 0 */
+       (off_32bit > MEI_REG_OFFSET_LAST) ||        /* max offset */
        (off_byte % MEI_MEI_DMA_DATA_WIDTH)             /* alignment */
       )
    {
@@ -656,9 +699,9 @@ IFX_boolean_t MEI_GetMeiReg(
       return IFX_FALSE;
    }
 
-   *pRegVal = MEI_REG_ACCESS_OFFSET_GET(pMeiDrvCntrl, off_16bit);
+   *pRegVal = MEI_REG_ACCESS_OFFSET_GET(pMeiDrvCntrl, off_32bit);
 
-   TRACE_RD_MEI_OFF( MEI_DRV_PRN_LEVEL_LOW, pMeiDrvCntrl, off_16bit, *pRegVal);
+   TRACE_RD_MEI_OFF( MEI_DRV_PRN_LEVEL_LOW, pMeiDrvCntrl, off_32bit, *pRegVal);
 
    return IFX_TRUE;
 }
@@ -683,11 +726,11 @@ IFX_boolean_t MEI_SetMeiReg(
                            IFX_uint8_t          off_byte,
                            MEI_MeiRegVal_t      regVal)
 {
-   IFX_uint8_t off_16bit = off_byte / MEI_MEI_DMA_DATA_WIDTH;
+   IFX_uint8_t off_32bit = off_byte / MEI_MEI_DMA_DATA_WIDTH;
 
    if (
-       /* (off_16bit < MEI_REG_OFFSET_FIRST) ||*/  /* currently 0 */
-       (off_16bit > MEI_REG_OFFSET_LAST) ||        /* max offset */
+       /* (off_32bit < MEI_REG_OFFSET_FIRST) ||*/  /* currently 0 */
+       (off_32bit > MEI_REG_OFFSET_LAST) ||        /* max offset */
        (off_byte % MEI_MEI_DMA_DATA_WIDTH)             /* alignment */
       )
    {
@@ -699,9 +742,9 @@ IFX_boolean_t MEI_SetMeiReg(
       return IFX_FALSE;
    }
 
-   TRACE_WR_MEI_OFF( MEI_DRV_PRN_LEVEL_LOW, pMeiDrvCntrl, off_16bit, regVal);
+   TRACE_WR_MEI_OFF( MEI_DRV_PRN_LEVEL_LOW, pMeiDrvCntrl, off_32bit, regVal);
 
-   MEI_REG_ACCESS_OFFSET_SET(pMeiDrvCntrl, off_16bit, regVal);
+   MEI_REG_ACCESS_OFFSET_SET(pMeiDrvCntrl, off_32bit, regVal);
 
    return IFX_TRUE;
 }
@@ -745,25 +788,23 @@ IFX_int32_t MEI_WriteDbg(
             (IFX_uint32_t)pMeiDrvCntrl->dslLineNum, destAddr, dbgDest, dataCount) );
 #endif
 
+   MEI_REG_ACCESS_ME_DBG_PORT_SEL_SET(pMeiDrvCntrl, pMeiDrvCntrl->dslLineNum);
+
    MEI_EnableDbgAccess(pMeiDrvCntrl, dbgDest);
 
    for (count=0; count<dataCount; count++)
    {
 #if TRACE_MEI_MEI_REG_ACCESS == 1
       PRN_DBG_USR_NL( MEI_REG, MEI_DRV_PRN_LEVEL_LOW,
-            ("MEI[%02d] wr: addr LO/HI[0x%02X] = 0x%08X, data LO/HI[0x%02X]: 0x%08X" MEI_DRV_CRLF,
+            ("MEI[%02d] wr: addr [0x%02X] = 0x%08X, data [0x%02X]: 0x%08X" MEI_DRV_CRLF,
             (IFX_uint32_t)pMeiDrvCntrl->dslLineNum,
-            MEI_REG_OFF_ME_DBG_WR_AD_LO, destAddr,
-            MEI_REG_OFF_ME_DBG_DATA_LO, (IFX_uint32_t)*pData ));
+            MEI_REG_OFF_ME_DBG_WR_AD, destAddr,
+            MEI_REG_OFF_ME_DBG_DATA, (IFX_uint32_t)*pData ));
 #endif
 
       /* set address */
       MEI_REG_ACCESS_ME_DBG_WR_AD_LONG_SET(pMeiDrvCntrl, destAddr);
 
-      /* write data - Trigger: high data field write
-         --> ME_DBG_DATA.S_VAL.LO = ((*pData) & 0x0000FFFF);
-         --> ME_DBG_DATA.S_VAL.HI = (((*pData) & 0xFFFF0000) >> 16);
-      */
       MEI_REG_ACCESS_ME_DBG_DATA_LONG_SET(pMeiDrvCntrl, *pData);
 
       if ( MEI_PollForDbgDone(pMeiDrvCntrl, MEI_MEI_DBG_POLL_WAIT_COUNT) == IFX_FALSE )
@@ -818,14 +859,12 @@ IFX_int32_t MEI_ReadDbg(
             (IFX_uint32_t)pMeiDrvCntrl->dslLineNum, srcAddr, dbgSrc, dataCount) );
 #endif
 
+   MEI_REG_ACCESS_ME_DBG_PORT_SEL_SET(pMeiDrvCntrl, pMeiDrvCntrl->dslLineNum);
+
    MEI_EnableDbgAccess(pMeiDrvCntrl, dbgSrc);
 
    for (count=0; count<dataCount; count++)
    {
-      /* set read address - Trigger: address high write
-         --> ME_DBG_RD.AD.LO = (srcAddr & 0x0000FFFF);
-         --> ME_DBG_RD.AD.HI = ((srcAddr & 0xFFFF0000) >> 16);
-      */
       MEI_REG_ACCESS_ME_DBG_RD_AD_LONG_SET(pMeiDrvCntrl, srcAddr);
 
       if ( MEI_PollForDbgDone(pMeiDrvCntrl, MEI_MEI_DBG_POLL_WAIT_COUNT) == IFX_FALSE )
@@ -836,10 +875,10 @@ IFX_int32_t MEI_ReadDbg(
 
 #if TRACE_MEI_MEI_REG_ACCESS == 1
       PRN_DBG_USR_NL( MEI_REG, MEI_DRV_PRN_LEVEL_LOW,
-            ("MEI[%02d] rd: addr LO/HI[0x%02X] = 0x%08X, data LO/HI[0x%02X]: 0x%08X" MEI_DRV_CRLF,
+            ("MEI[%02d] rd: addr [0x%02X] = 0x%08X, data [0x%02X]: 0x%08X" MEI_DRV_CRLF,
             (IFX_uint32_t)pMeiDrvCntrl->dslLineNum,
-            MEI_REG_OFF_ME_DBG_RD_AD_LO, srcAddr,
-            MEI_REG_OFF_ME_DBG_DATA_LO, *pTempData ));
+            MEI_REG_OFF_ME_DBG_RD_AD, srcAddr,
+            MEI_REG_OFF_ME_DBG_DATA, *pTempData ));
 #endif
 
       pTempData++;
@@ -876,7 +915,7 @@ IFX_uint32_t MEI_WriteDma16Bit( MEI_MEI_DRV_CNTRL_T *pMeiDrvCntrl,
 {
    IFX_uint32_t count = 0;
    IFX_uint16_t *pTmpData;
-   IFX_uint16_t tmpRegValue;
+   IFX_uint32_t tmpRegValue;
 
 #if TRACE_MEI_MEI_ACCESS_FCT == 1
    PRN_DBG_USR_NL( MEI_REG, MEI_DRV_PRN_LEVEL_NORMAL,
@@ -884,23 +923,34 @@ IFX_uint32_t MEI_WriteDma16Bit( MEI_MEI_DRV_CNTRL_T *pMeiDrvCntrl,
       (IFX_uint32_t)pMeiDrvCntrl->dslLineNum, retryCnt, destAddr, dataCount) );
 #endif
 
-   do {
+   MEI_REG_ACCESS_ME_DX_PORT_SEL_SET(pMeiDrvCntrl, pMeiDrvCntrl->dslLineNum % MEI_MAX_DFE_INSTANCE_PER_ENTITY);
 
-      pTmpData = pData;
+   pTmpData = pData;
+
+   do {
 
       /* set DMA address */
       MEI_REG_ACCESS_ME_DX_AD_LONG_SET(pMeiDrvCntrl, destAddr);
 
-      for (count=0; count<dataCount; count++)
+      while (count < dataCount - (dataCount % 2))
       {
-         MEI_REG_ACCESS_ME_DX_DATA_SET(pMeiDrvCntrl, *pTmpData);
+         tmpRegValue = (((pTmpData[count] << 16) & 0xFFFF0000) | (pTmpData[count+1] & 0x0000FFFF));
 
-#if TRACE_MEI_MEI_REG_ACCESS == 1
-      PRN_DBG_USR_NL( MEI_REG, MEI_DRV_PRN_LEVEL_LOW,
-               ("MEI[%02d]: DMA write(%d) [0x%X] = 0x%04X\n\r",
-               (IFX_uint32_t)pMeiDrvCntrl->dslLineNum, retryCnt, destAddr + (count<<1), *pTmpData));
-#endif
-         pTmpData++;
+         tmpRegValue = SWAP32_DMA_WIDTH_ORDER(tmpRegValue);
+
+         MEI_REG_ACCESS_ME_DX_DATA_SET(pMeiDrvCntrl, tmpRegValue);
+
+         count += 2;
+      }
+
+      /* write unaligned block - last */
+      if (count < dataCount)
+      {
+         tmpRegValue = ((pTmpData[count++] << 16) & 0xFFFF0000);
+
+         tmpRegValue = SWAP32_DMA_WIDTH_ORDER(tmpRegValue);
+
+         MEI_REG_ACCESS_ME_DX_DATA_SET(pMeiDrvCntrl, tmpRegValue);
       }
 
       /* check for DMA error */
@@ -967,6 +1017,7 @@ IFX_uint32_t MEI_ReadDma16Bit(
                            IFX_uint32_t          dataCount)
 {
    IFX_uint32_t count = 0;
+   IFX_uint32_t tmpRegValue;
 
 #if TRACE_MEI_MEI_ACCESS_FCT == 1
       PRN_DBG_USR_NL( MEI_MEI_ACCESS, MEI_DRV_PRN_LEVEL_LOW,
@@ -974,19 +1025,28 @@ IFX_uint32_t MEI_ReadDma16Bit(
             (IFX_uint32_t)pMeiDrvCntrl->dslLineNum, srcAddr,  dataCount) );
 #endif
 
+   MEI_REG_ACCESS_ME_DX_PORT_SEL_SET(pMeiDrvCntrl, pMeiDrvCntrl->dslLineNum % MEI_MAX_DFE_INSTANCE_PER_ENTITY);
+
    /* set DMA address */
    MEI_REG_ACCESS_ME_DX_AD_LONG_SET(pMeiDrvCntrl, srcAddr);
 
-   for (count=0; count<dataCount; count++)
-   {
-      *pData = MEI_REG_ACCESS_ME_DX_DATA_GET(pMeiDrvCntrl);
 
-#if (TRACE_MEI_MEI_REG_ACCESS == 1)
-      PRN_DBG_USR_NL( MEI_REG, MEI_DRV_PRN_LEVEL_NORMAL,
-            ("MEI[%02d]: DMA read[0x%08X] = 0x%04X" MEI_DRV_CRLF,
-            (IFX_uint32_t)pMeiDrvCntrl->dslLineNum, srcAddr + count, *pData));
-#endif
-      pData++;
+   while (count < dataCount)
+   {
+      tmpRegValue = MEI_REG_ACCESS_ME_DX_DATA_GET(pMeiDrvCntrl);
+
+      tmpRegValue = SWAP32_DMA_WIDTH_ORDER(tmpRegValue);
+
+      pData[count] = (tmpRegValue & 0xFFFF0000) >> 16;
+
+      count++;
+
+      /* high word */
+      if (count < dataCount)
+      {
+         pData[count] = (tmpRegValue & 0x00000FFFF);
+         count++;
+      }
    }
 
    return count;
@@ -1013,25 +1073,43 @@ IFX_uint32_t MEI_ReadDma16Bit(
 */
 IFX_uint32_t MEI_GetDma(
                            MEI_MEI_DRV_CNTRL_T *pMeiDrvCntrl,
-                           IFX_uint16_t             *pData,
-                           IFX_uint32_t              dataCount)
+                           IFX_uint16_t        *pData,
+                           IFX_uint32_t        dataCount)
 {
-   IFX_uint32_t count;
+   IFX_uint32_t count = 0, tmpRegValue;
 
-   for (count=0; count<dataCount; count++)
+   MEI_REG_ACCESS_ME_DX_PORT_SEL_SET(pMeiDrvCntrl, pMeiDrvCntrl->dslLineNum % MEI_MAX_DFE_INSTANCE_PER_ENTITY);
+
+   while (count < dataCount)
    {
-      *pData = MEI_REG_ACCESS_ME_DX_DATA_GET(pMeiDrvCntrl);
+      tmpRegValue = MEI_REG_ACCESS_ME_DX_DATA_GET(pMeiDrvCntrl);
 
-#if TRACE_MEI_MEI_REG_ACCESS == 1
+      tmpRegValue = SWAP32_DMA_WIDTH_ORDER(tmpRegValue);
+
+      pData[count] = (tmpRegValue & 0xFFFF0000) >> 16;
+
+#if (TRACE_MEI_MEI_REG_ACCESS == 1)
       PRN_DBG_USR_NL( MEI_REG, MEI_DRV_PRN_LEVEL_NORMAL,
-             ("MEI[%02d]: DMA Get[0x%X]: 0x%04X" MEI_DRV_CRLF,
-             (IFX_uint32_t)pMeiDrvCntrl->dslLineNum, count<<1, (IFX_uint32_t)(*pData)));
+         ("MEI[%02d]: DMA Get[0x%X]: 0x%04X" MEI_DRV_CRLF,
+         (IFX_uint32_t)pMeiDrvCntrl->dslLineNum, count<<1, (IFX_uint32_t)(*pData)));
 #endif
+      count++;
 
-      pData++;
+      /* high word */
+      if (count < dataCount)
+      {
+         pData[count] = (tmpRegValue & 0x00000FFFF);
+
+#if (TRACE_MEI_MEI_REG_ACCESS == 1)
+         PRN_DBG_USR_NL( MEI_REG, MEI_DRV_PRN_LEVEL_NORMAL,
+            ("MEI[%02d]: DMA Get[0x%X]: 0x%04X" MEI_DRV_CRLF,
+            (IFX_uint32_t)pMeiDrvCntrl->dslLineNum, count<<1, (IFX_uint32_t)(*pData)));
+#endif
+         count++;
+      }
    }
 
-#if TRACE_MEI_MEI_ACCESS_FCT == 1
+#if (TRACE_MEI_MEI_ACCESS_FCT == 1)
    PRN_DBG_USR_NL( MEI_REG, MEI_DRV_PRN_LEVEL_LOW,
           ("MEI[%02d]: Get DMA done - count = %d" MEI_DRV_CRLF,
           (IFX_uint32_t)pMeiDrvCntrl->dslLineNum, count));
@@ -1052,33 +1130,59 @@ static IFX_uint32_t MEI_CmpDma(
                          IFX_uint16_t         *pData,
                          IFX_uint32_t         dataCount)
 {
+   IFX_uint32_t nRet = IFX_SUCCESS;
    IFX_uint32_t count;
-   IFX_uint16_t tmpValue, dxStatReg;
+   IFX_uint16_t tmpValue[2];
+   IFX_uint32_t *pTmpValue, dxStatReg;
+
+   pTmpValue = (IFX_uint32_t*)tmpValue;
+
+   MEI_REG_ACCESS_ME_DX_PORT_SEL_SET(pMeiDrvCntrl, pMeiDrvCntrl->dslLineNum % MEI_MAX_DFE_INSTANCE_PER_ENTITY);
 
    /* set DMA address */
    MEI_REG_ACCESS_ME_DX_AD_LONG_SET(pMeiDrvCntrl, destAddr);
 
-   for (count=0; count<dataCount; count++)
+   while (count < dataCount)
    {
-      tmpValue = MEI_REG_ACCESS_ME_DX_DATA_GET(pMeiDrvCntrl);
+      *pTmpValue = MEI_REG_ACCESS_ME_DX_DATA_GET(pMeiDrvCntrl);
 
-      if (tmpValue != pData[count] )
+      *pTmpValue = SWAP32_DMA_WIDTH_ORDER(*pTmpValue);
+
+      if (tmpValue[0] != pData[count] )
       {
          dxStatReg = MEI_REG_ACCESS_ME_DX_STAT_GET(pMeiDrvCntrl);
 
-         PRN_ERR_INT_NL( MEI_MEI_ACCESS, MEI_DRV_PRN_LEVEL_ERR,
-                ("MEI[%02d]: Cmp DMA ERROR - "
-                 "dAddr = 0x%08X, (hData[%d]= 0x%04X) != (mData= 0x%04X), DXStat = 0x%04X" MEI_DRV_CRLF,
-                 (IFX_uint32_t)pMeiDrvCntrl->dslLineNum, destAddr, count,
-                 pData[count], tmpValue, dxStatReg) );
-
-         if (dxStatReg & ME_DX_STAT_DX_ERR)
-         {
-            MEI_REG_ACCESS_ME_DX_STAT_SET(pMeiDrvCntrl, ME_DX_STAT_DX_ERR);
-         }
-
-         return IFX_ERROR;
+         nRet = IFX_ERROR;
+         break;
       }
+      count++;
+
+      if (count < dataCount)
+      {
+         if (tmpValue[1] != pData[count] )
+         {
+            dxStatReg = MEI_REG_ACCESS_ME_DX_STAT_GET(pMeiDrvCntrl);
+
+            nRet = IFX_ERROR;
+            break;
+         }
+         count++;
+      }
+   }
+
+   if (nRet != IFX_SUCCESS)
+   {
+      PRN_ERR_INT_NL( MEI_MEI_ACCESS, MEI_DRV_PRN_LEVEL_ERR,
+             ("MEI[%02d]: Cmp DMA ERROR - "
+              "dAddr = 0x%08X, (hData[%d]= 0x%04X) != (mData= 0x%04X), DXStat = 0x%04X" MEI_DRV_CRLF,
+              (IFX_uint32_t)pMeiDrvCntrl->dslLineNum, destAddr, count,
+              pData[count], tmpValue, dxStatReg) );
+
+      if (dxStatReg & ME_DX_STAT_DX_ERR)
+      {
+         MEI_REG_ACCESS_ME_DX_STAT_SET(pMeiDrvCntrl, ME_DX_STAT_DX_ERR);
+      }
+      return nRet;
    }
 
    dxStatReg = MEI_REG_ACCESS_ME_DX_STAT_GET(pMeiDrvCntrl);
@@ -1097,11 +1201,9 @@ static IFX_uint32_t MEI_CmpDma(
           ("MEI[%02d]: Cmp DMA success - dAddr = 0x%08X, count = %d, DXStat = 0x%04X" MEI_DRV_CRLF,
           (IFX_uint32_t)pMeiDrvCntrl->dslLineNum, destAddr, count, dxStatReg) );
 
-
-   return IFX_SUCCESS;
+   return nRet;
 }
 #endif /* #if (MEI_PROTECTED_MEI_DMA_ACCESS == 1) */
-
 
 
 /**
@@ -1173,7 +1275,6 @@ IFX_int32_t MEI_WriteMailBox(
    return (mbCount);
 }
 
-
 /**
    MEI MailBox - set the Mailbox address and read the Mailbox Code.
 \param
@@ -1189,18 +1290,23 @@ IFX_uint16_t MEI_GetMailBoxCode(
                            MEI_MEI_DRV_CNTRL_T *pMeiDrvCntrl,
                            IFX_uint32_t          mbAddr)
 {
-   MEI_MeiRegVal_t mbCode;
+   IFX_uint32_t tmpRegVal = 0;
+   IFX_uint16_t mbCode;
 
-#if TRACE_MEI_MEI_ACCESS_FCT == 1
+#if (TRACE_MEI_MEI_ACCESS_FCT == 1)
       PRN_DBG_USR_NL( MEI_REG, MEI_DRV_PRN_LEVEL_LOW,
             ("MEI[%02d]: MEI_GetMailBoxCode - ARC2ME addr = 0x%08X" MEI_DRV_CRLF,
             (IFX_uint32_t)pMeiDrvCntrl->dslLineNum, mbAddr) );
 #endif
 
+   MEI_REG_ACCESS_ME_DX_PORT_SEL_SET(pMeiDrvCntrl, pMeiDrvCntrl->dslLineNum % MEI_MAX_DFE_INSTANCE_PER_ENTITY);
+
    /* set DMA address */
    MEI_REG_ACCESS_ME_DX_AD_LONG_SET(pMeiDrvCntrl, mbAddr);
+   tmpRegVal = MEI_REG_ACCESS_ME_DX_DATA_GET(pMeiDrvCntrl);
 
-   mbCode = (MEI_MeiRegVal_t)MEI_REG_ACCESS_ME_DX_DATA_GET(pMeiDrvCntrl);
+   tmpRegVal = SWAP32_DMA_WIDTH_ORDER(tmpRegVal);
+   mbCode    = (tmpRegVal & 0xFFFF0000) >> 16;
 
    /* return the mailbox code */
    return mbCode;
@@ -1212,7 +1318,7 @@ IFX_uint16_t MEI_GetMailBoxCode(
 \param
    pMeiDrvCntrl:   points to the MEI interface register set
 \param
-   pMeiMbBlk:  Points to the Mailbox block (message + mailboc code).
+   pMeiMbBlk:  Points to the Mailbox block.
 \param
    mbCount:    MEI Mailbox unit count (16 bit)
 
@@ -1249,12 +1355,13 @@ IFX_int32_t MEI_GetMailBoxMsg(
       goto MEI_GET_MAILBOX_MSG_ERROR;
    }
 
-   /* set DMA address: start + mbCode */
-   MEI_REG_ACCESS_ME_DX_AD_LONG_SET(pMeiDrvCntrl, (mbAddr + CMV_MSGHDR_FCT_OPCODE_OFF_8BIT));
+   MEI_REG_ACCESS_ME_DX_PORT_SEL_SET(pMeiDrvCntrl, pMeiDrvCntrl->dslLineNum % MEI_MAX_DFE_INSTANCE_PER_ENTITY);
 
-   MEI_GetDma( pMeiDrvCntrl,
-               &pMeiMbBlk->mbRaw.rawMsg[1],     /* mailbox code already read */
-               CMV_HEADER_16BIT_SIZE -1 );
+   /* set DMA address */
+   MEI_REG_ACCESS_ME_DX_AD_LONG_SET(pMeiDrvCntrl, mbAddr);
+
+   /* read msg header */
+   MEI_GetDma( pMeiDrvCntrl, &pMeiMbBlk->mbRaw.rawMsg[0], CMV_HEADER_16BIT_SIZE );
 
    /* size field contains number of 16 bit payload elements of the message */
    payloadSize_16bit = P_CMV_MSGHDR_PAYLOAD_SIZE_GET(pTmpRead);
@@ -1264,16 +1371,16 @@ IFX_int32_t MEI_GetMailBoxMsg(
    {
       /* invalid msg size */
       PRN_ERR_INT_NL( MEI_MEI_ACCESS, MEI_DRV_PRN_LEVEL_ERR,
-           ("MEI[0x%08X] ERROR: MEI_GetMailBoxMsg - buffer[%d] to small for msg[%d]" MEI_DRV_CRLF,
+           ("MEI[0x%02X] ERROR: MEI_GetMailBoxMsg - buffer[%d] to small for msg[%d]" MEI_DRV_CRLF,
             (IFX_uint32_t)pMeiDrvCntrl->dslLineNum, mbCount,
             (CMV_HEADER_16BIT_SIZE + payloadSize_16bit) ));
 
       goto MEI_GET_MAILBOX_MSG_ERROR;
    }
 
+   /* Get Payload*/
    MEI_GetDma( pMeiDrvCntrl,
-               pTmpRead->payload.params_16Bit,
-               payloadSize_16bit);
+               pTmpRead->payload.params_16Bit, payloadSize_16bit);
 
    /* check DMA read action */
    tmpRegValue = MEI_REG_ACCESS_ME_DX_STAT_GET(pMeiDrvCntrl);
@@ -1297,7 +1404,7 @@ IFX_int32_t MEI_GetMailBoxMsg(
            (CMV_HEADER_16BIT_SIZE + payloadSize_16bit) ));
 #endif
 
-   /* header + payload (inlcudes the previous read mailbox code) */
+   /* header + payload */
    return (CMV_HEADER_16BIT_SIZE + payloadSize_16bit);
 
 MEI_GET_MAILBOX_MSG_ERROR:
@@ -1336,11 +1443,11 @@ IFX_boolean_t MEI_ReleaseMailboxMsg(
    /* Release mailbox - msg read done */
    MEI_MAILBOX_MSG_READ_DONE(pMeiDrvCntrl);
 
-#if TRACE_MEI_MEI_ACCESS_FCT == 1
+#if (TRACE_MEI_MEI_ACCESS_FCT == 1)
    PRN_DBG_USR_NL( MEI_REG, MEI_DRV_PRN_LEVEL_LOW,
-          ("MEI[%02d]: MEI_ReleaseMailboxMsg done - ARC2ME_STAT = 0x%04X" MEI_DRV_CRLF,
-           (IFX_uint32_t)pMeiDrvCntrl->dslLineNum,
-           MEI_REG_ACCESS_ME_ARC2ME_STAT_GET(pMeiDrvCntrl) ));
+      ("MEI[%02d]: MEI_ReleaseMailboxMsg done - ARC2ME_STAT = 0x%04X" MEI_DRV_CRLF,
+      (IFX_uint32_t)pMeiDrvCntrl->dslLineNum,
+      MEI_REG_ACCESS_ME_ARC2ME_STAT_GET(pMeiDrvCntrl) ));
 #endif
 
    return IFX_TRUE;
@@ -1354,7 +1461,7 @@ IFX_boolean_t MEI_ReleaseMailboxMsg(
 \param
    pMeiDrvCntrl:   points to the MEI interface register set
 \param
-   offset      :  offset (16 Bit) within the MEI register interface.
+   offset      :  offset (32 Bit) within the MEI register interface.
 
 \return
    register value.
@@ -1374,7 +1481,7 @@ MEI_MeiRegVal_t MEI_RegAccOffGet(
 \param
    pMeiDrvCntrl:   points to the MEI interface register set
 \param
-   offset      :  offset (16 Bit) within the MEI register interface.
+   offset      :  offset (32 Bit) within the MEI register interface.
 \param
    regValue:      new register value to set.
 \return
@@ -1404,17 +1511,27 @@ IFX_void_t MEI_RegAccOffSet(
 IFX_int32_t MEI_InterfaceDetect(
                            MEI_MEI_DRV_CNTRL_T *pMeiDrvCntrl)
 {
-   IFX_uint16_t hwVers = 0xFFFF;
+   IFX_uint32_t hwVers = 0xFFFFFFFF;
+
+   /* Power up MEI */
+   /*DSL_DFE_PMU_SETUP(IFX_PMU_ENABLE);*/
 
    if (pMeiDrvCntrl->pMeiIfCntrl->pVirtMeiRegIf)
    {
-      MEI_REG_ACCESS_ME_VERSION_SET(pMeiDrvCntrl, 0x0000);
+      MEI_REG_ACCESS_ME_VERSION_SET(pMeiDrvCntrl, 0x00000000);
       hwVers = MEI_REG_ACCESS_ME_VERSION_GET(pMeiDrvCntrl);
 
-      if (hwVers == 0x0201)
+#if (MEI_SUPPORT_DEVICE_VR9 == 1)
+      if (hwVers == 0x00000230)
       {
          return IFX_SUCCESS;
       }
+#elif (MEI_SUPPORT_DEVICE_VR10 == 1)
+      if (hwVers == 0x00000240)
+      {
+         return IFX_SUCCESS;
+      }
+#endif
    }
 
    return IFX_ERROR;
@@ -1422,179 +1539,36 @@ IFX_int32_t MEI_InterfaceDetect(
 
 IFX_int32_t MEI_BasicChipInit(IFX_void_t)
 {
+   /* Power up MEI */
+   DSL_DFE_PMU_SETUP(IFX_PMU_ENABLE);
+
+   if (ifx_pmu_pg_dsl_dfe_enable() != 0)
+   {
+      PRN_ERR_USR_NL( MEI_MEI_ACCESS, MEI_DRV_PRN_LEVEL_ERR,
+            ("MEI: ERROR - DSL DFE PG enable failed!" MEI_DRV_CRLF));
+/* ignore for VR10 (for emulator) */
+#if (MEI_SUPPORT_DEVICE_VR10 != 1)
+      return IFX_ERROR;
+#endif
+   }
+
    return IFX_SUCCESS;
 }
 
 IFX_int32_t MEI_BasicChipExit(IFX_void_t)
 {
+   if (ifx_pmu_pg_dsl_dfe_disable() != 0)
+   {
+      PRN_ERR_USR_NL( MEI_MEI_ACCESS, MEI_DRV_PRN_LEVEL_ERR,
+            ("MEI: ERROR - DSL DFE PG disable failed!" MEI_DRV_CRLF));
+      return IFX_ERROR;
+   }
+
+   /* Power down MEI */
+   DSL_DFE_PMU_SETUP(IFX_PMU_DISABLE);
+
    return IFX_SUCCESS;
 }
-
-#if (MEI_SUPPORT_ROM_CODE == 1)
-
-/**
-   Indicate codeswap done.
-
-\param
-   pMeiDrvCntrl:   points to the MEI interface register set
-
-\return
-   none
-*/
-IFX_void_t MEI_RegNotifyCodeSwapDone(
-                           MEI_MEI_DRV_CNTRL_T *pMeiDrvCntrl)
-{
-   MEI_NOTIFY_CODESWAP_DONE(pMeiDrvCntrl);
-
-   return;
-}
-
-
-/**
-   Release the ROM code interrupt.
-   - set when the ROM code is entered.
-
-\param
-   pMeiDrvCntrl:   points to the MEI interface register set.
-
-\return
-   - TRUE: always
-*/
-IFX_boolean_t MEI_ReleaseRomInt(
-                           MEI_MEI_DRV_CNTRL_T *pMeiDrvCntrl)
-{
-
-   /* Release ROM interrupt */
-   MEI_RELEASE_ROM_INT(pMeiDrvCntrl);
-
-   return IFX_TRUE;
-}
-
-/**
-   MEI MailBox - read a boot message from the MEI MailBox interface.
-
-   1. The ME transfers the message from the ARC-to-MEI Mailbox buffer via DMA.
-   2. The ME clears the ARC_MSGAV bit in the ME_ARC2ME_STAT register to notify the
-      ARC that a message has been read out.
-   3. Check ME_DX_STAT register to see that no Data Transfer errors have occurred.
-
-\param
-   pMeiDrvCntrl:   points to the MEI interface register set
-\param
-   pMsg:       Points to the Mailbox message.
-\param
-   msgSize:    Size of the message [byte].
-
-\return
-   success: number of read mailbox units.
-   IFX_ERROR: in case of error.
-
-\attention
-   - Called on int-level
-*/
-IFX_int32_t MEI_GetMailBoxBootMsg(
-                           MEI_MEI_DRV_CNTRL_T *pMeiDrvCntrl,
-                           MEI_Mailbox_t       *pMeiMbBlk,
-                           IFX_uint32_t          mbCount,
-                           IFX_boolean_t         releaseMsg)
-{
-   IFX_uint16_t paramCount_32bit, tmpRegValue;
-
-#if TRACE_MEI_MEI_ACCESS_FCT == 1
-      PRN_DBG_USR_NL( MEI_MEI_ACCESS, MEI_DRV_PRN_LEVEL_LOW,
-             ("MEI[%02d]: MEI_GetMailBoxBootMsg - mbCount = %d" MEI_DRV_CRLF,
-             (IFX_uint32_t)pMeiDrvCntrl->dslLineNum, mbCount ));
-#endif
-
-
-   if ( mbCount < MEI_BOOT_HEADER_16BIT_SIZE)
-   {
-      /* invalid msg size */
-      PRN_ERR_INT_NL( MEI_MEI_ACCESS, MEI_DRV_PRN_LEVEL_ERR,
-           ( "MEI[0x%08X] ERROR: MEI_GetMailBoxBootMsg - "
-             "bootmsg[%d] to small for BOOT header" MEI_DRV_CRLF,
-              (IFX_uint32_t)pMeiDrvCntrl->dslLineNum, mbCount ));
-
-      goto MEI_GET_MAILBOX_BOOT_MSG_ERROR;
-   }
-
-   /*
-      get the header at first
-      - address already set by get mailbox code
-      - set mailbox boot code --> already read
-   */
-   pMeiMbBlk->MbxCode = MEI_MBOX_CODE_BOOT;
-
-   /* go on with the msg header */
-   MEI_GetDma( pMeiDrvCntrl,
-               &pMeiMbBlk->FctCode,
-               MEI_BOOT_HEADER_16BIT_SIZE - 1);
-
-   /* check DMA read action */
-   tmpRegValue = MEI_REG_ACCESS_ME_DX_STAT_GET(pMeiDrvCntrl);
-   if (tmpRegValue & ME_DX_STAT_DX_ERR)
-   {
-      /* clear error flag */
-      MEI_REG_ACCESS_ME_DX_STAT_SET(pMeiDrvCntrl, ME_DX_STAT_DX_ERR);
-      PRN_ERR_INT_NL( MEI_MEI_ACCESS, MEI_DRV_PRN_LEVEL_ERR,
-            ("MEI[%02d]: Get Boot MsgHdr - DMA ERROR, ME_DX_STAT = 0x%04X" MEI_DRV_CRLF,
-            (IFX_uint32_t)pMeiDrvCntrl->dslLineNum, tmpRegValue) );
-      goto MEI_GET_MAILBOX_BOOT_MSG_ERROR;
-   }
-
-   paramCount_32bit = pMeiMbBlk->Size;
-
-   /* check payload size */
-   if ( paramCount_32bit > sizeof(pMeiMbBlk->Params) )
-   {
-      /* invalid msg size */
-      PRN_ERR_INT_NL( MEI_MEI_ACCESS, MEI_DRV_PRN_LEVEL_ERR,
-           ( "MEI[0x%08X] ERROR: MEI_GetMailBoxBootMsg - "
-             "Params[%d] incoming > msg buffer[%d]" MEI_DRV_CRLF,
-              (IFX_uint32_t)pMeiDrvCntrl->dslLineNum, paramCount_32bit,
-              sizeof(pMeiMbBlk->Params) ));
-
-      goto MEI_GET_MAILBOX_BOOT_MSG_ERROR;
-   }
-
-   MEI_GetDma( pMeiDrvCntrl,
-               (IFX_uint16_t *)pMeiMbBlk->Params,
-               MEI_PARAM_COUNT_32_TO_16(paramCount_32bit) );
-
-   /* check DMA read action */
-   tmpRegValue = MEI_REG_ACCESS_ME_DX_STAT_GET(pMeiDrvCntrl);
-   if (tmpRegValue & ME_DX_STAT_DX_ERR)
-   {
-      /* clear error flag */
-      MEI_REG_ACCESS_ME_DX_STAT_SET(pMeiDrvCntrl, ME_DX_STAT_DX_ERR);
-      PRN_ERR_INT_NL( MEI_MEI_ACCESS, MEI_DRV_PRN_LEVEL_ERR,
-            ("MEI[%02d]: Get Boot Msg - DMA ERROR, ME_DX_STAT = 0x%04X" MEI_DRV_CRLF,
-            (IFX_uint32_t)pMeiDrvCntrl->dslLineNum, tmpRegValue) );
-      goto MEI_GET_MAILBOX_BOOT_MSG_ERROR;
-   }
-
-   /* Release mailbox - msg read done */
-   if (releaseMsg)
-      MEI_MAILBOX_MSG_READ_DONE(pMeiDrvCntrl);
-
-   PRN_DBG_INT_NL( MEI_MEI_ACCESS, MEI_DRV_PRN_LEVEL_LOW,
-        ( "MEI[%02d]: MEI_GetMailBoxBootMsg done - count %d [16 bit]" MEI_DRV_CRLF,
-           (IFX_uint32_t)pMeiDrvCntrl->dslLineNum,
-           (MEI_BOOT_HEADER_16BIT_SIZE + MEI_PARAM_COUNT_32_TO_16(paramCount_32bit)) ));
-
-   return ( MEI_BOOT_HEADER_16BIT_SIZE + MEI_PARAM_COUNT_32_TO_16(paramCount_32bit) );
-
-MEI_GET_MAILBOX_BOOT_MSG_ERROR:
-
-   /* Release mailbox - msg read done */
-   if (releaseMsg)
-      MEI_MAILBOX_MSG_READ_DONE(pMeiDrvCntrl);
-
-   return IFX_ERROR;
-}
-
-#endif      /* MEI_SUPPORT_ROM_CODE */
-
 
 #if (MEI_SUPPORT_MEI_DEBUG == 1)
 
@@ -1609,21 +1583,20 @@ MEI_GET_MAILBOX_BOOT_MSG_ERROR:
 */
 IFX_void_t MEI_ShowMeiRegs(
                            MEI_MEI_DRV_CNTRL_T *pMeiDrvCntrl,
-                           IFX_uint8_t           devNum)
+                           IFX_uint8_t          devNum)
 {
    int meiIdx = 0;
    int maxMeiIdx = (sizeof(MEI_MEI_REG_IF_U)/MEI_MEI_REGISTER_WIDTH);
 
    while (meiIdx < maxMeiIdx)
    {
-      MEI_PRINT_USR("MEI[%02d] 0x%02X: 0x%04X  0x%04X" MEI_DRV_CRLF,
-              devNum, meiIdx*MEI_MEI_REGISTER_WIDTH,
-              ( ( meiIdx    < maxMeiIdx) ? MEI_REG_ACCESS_OFFSET_GET(pMeiDrvCntrl,  meiIdx   ) : 0xA5A5 ),
-              ( ((meiIdx+1) < maxMeiIdx) ? MEI_REG_ACCESS_OFFSET_GET(pMeiDrvCntrl, (meiIdx+1)) : 0x5A5A ) );
+      MEI_PRINT_USR("MEI[%02d] 0x%02X: 0x%08X  0x%08X" MEI_DRV_CRLF,
+         devNum, meiIdx*MEI_MEI_REGISTER_WIDTH,
+         ( ( meiIdx    < maxMeiIdx) ? MEI_REG_ACCESS_OFFSET_GET(pMeiDrvCntrl,  meiIdx   ) : 0xA5A5A5A5 ),
+         ( ((meiIdx+1) < maxMeiIdx) ? MEI_REG_ACCESS_OFFSET_GET(pMeiDrvCntrl, (meiIdx+1)) : 0x5A5A5A5A ) );
       meiIdx +=2;
    }
 }
-
 
 
 /**
@@ -1634,12 +1607,14 @@ IFX_void_t MEI_ShowMeiRegs(
 */
 IFX_boolean_t MEI_DmaTest(
                            MEI_MEI_DRV_CNTRL_T *pMeiDrvCntrl,
-                           IFX_uint32_t          destAddr,
-                           IFX_uint32_t          dma_count,
-                           IFX_uint32_t          test_count)
+                           IFX_uint32_t         destAddr,
+                           IFX_uint32_t         dma_count,
+                           IFX_uint32_t         test_count)
 {
    IFX_uint32_t i, addr, count = test_count;
-   IFX_uint16_t result = 0;
+   IFX_uint32_t result = 0;
+
+   MEI_REG_ACCESS_ME_DX_PORT_SEL_SET(pMeiDrvCntrl, pMeiDrvCntrl->dslLineNum % MEI_MAX_DFE_INSTANCE_PER_ENTITY);
 
    while (count > 0)
    {
@@ -1650,13 +1625,13 @@ IFX_boolean_t MEI_DmaTest(
       {
          /* write pattern and check */
          MEI_REG_ACCESS_ME_DX_AD_LONG_SET(pMeiDrvCntrl, addr);
-         MEI_REG_ACCESS_ME_DX_DATA_SET(pMeiDrvCntrl, 0xA5A5);
+         MEI_REG_ACCESS_ME_DX_DATA_SET(pMeiDrvCntrl, 0xA5A5A5A5);
 
          MEI_REG_ACCESS_ME_DX_AD_LONG_SET(pMeiDrvCntrl, addr);
-         MEI_REG_ACCESS_ME_DX_DATA_SET(pMeiDrvCntrl, 0x5A5A);
+         MEI_REG_ACCESS_ME_DX_DATA_SET(pMeiDrvCntrl, 0x5A5A5A5A);
 
          MEI_REG_ACCESS_ME_DX_AD_LONG_SET(pMeiDrvCntrl, addr);
-         if ( (result = MEI_REG_ACCESS_ME_DX_DATA_GET(pMeiDrvCntrl)) != 0x5A5A )
+         if ( (result = MEI_REG_ACCESS_ME_DX_DATA_GET(pMeiDrvCntrl)) != 0x5A5A5A5A )
          {
             /* error */
             count = 0;
@@ -1680,14 +1655,14 @@ IFX_boolean_t MEI_DmaTest(
             }
             return IFX_FALSE;
          }
-         addr += 2;
+         addr += 4;
       }
 
       /* check for DMA error */
       if ( MEI_MAILBOX_WRITE_ERROR(pMeiDrvCntrl) )
       {
          PRN_ERR_USR_NL( MEI_MEI_ACCESS, MEI_DRV_PRN_LEVEL_ERR,
-                ( "MEI[%02d]: !!! ERROR VINAX DMA transfer - TestLoop: %d!!!!" MEI_DRV_CRLF,
+                ( "MEI[%02d]: !!! ERROR VR9 DMA transfer - TestLoop: %d!!!!" MEI_DRV_CRLF,
                   (IFX_uint32_t)pMeiDrvCntrl->dslLineNum, count));
 
          return IFX_FALSE;
@@ -1711,10 +1686,39 @@ IFX_boolean_t MEI_DmaTest(
 
 IFX_int32_t MEI_LowLevelInit(MEI_MEI_DRV_CNTRL_T *pMeiDrvCntrl)
 {
-   /* Nothing to do*/
+   IFX_uint32_t arc_cri_ccr0 = 0;
+
+   /* Set Port#0 for debug access*/
+   MEI_REG_ACCESS_ME_DBG_PORT_SEL_SET(pMeiDrvCntrl, 0x0);
+
+   /* Set Port#0 for DMA access*/
+   MEI_REG_ACCESS_ME_DX_PORT_SEL_SET(pMeiDrvCntrl, 0x0);
+
+   /* Enable CLKs*/
+   MEI_REG_ACCESS_ME_CLK_CTRL_SET(pMeiDrvCntrl, 0x1);
+
+   /* Get CRI_CCR0*/
+   /* TODO: crosscheck if this register access is really needed*/
+   if (MEI_ReadDbg(pMeiDrvCntrl, 0x31F00, 0x1, 1, &arc_cri_ccr0) != 1)
+   {
+      PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+         ("MEI_DRV: ARC_STATUS32 read failed!" MEI_DRV_CRLF));
+      return (IFX_int32_t)IFX_ERROR;
+   }
+
+   /* enable ac_clk signal*/
+   arc_cri_ccr0 |= (1 << 4);
+
+   /* Set CRI_CCR0*/
+   if (MEI_WriteDbg(pMeiDrvCntrl, 0x31F00, 0x1, 1, &arc_cri_ccr0) != 1)
+   {
+      PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+         ("MEI_DRV: CRI_CCR0 write failed!" MEI_DRV_CRLF));
+      return (IFX_int32_t)IFX_ERROR;
+   }
+
    return IFX_SUCCESS;
 }
 
-
-#endif      /* #if (MEI_SUPPORT_DEVICE_VINAX == 1)*/
+#endif      /* #if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1)*/
 

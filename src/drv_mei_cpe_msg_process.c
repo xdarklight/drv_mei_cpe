@@ -1,8 +1,7 @@
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -10,7 +9,7 @@
 ******************************************************************************/
 
 /* ==========================================================================
-   Description : Message Handling between the driver and the VINAX device.
+   Description : Message Handling between the driver and the VRX device.
    ========================================================================== */
 
 /* ============================================================================
@@ -20,13 +19,13 @@
 /* get at first the driver configuration */
 #include "drv_mei_cpe_config.h"
 
-#if (MEI_SUPPORT_DEVICE_VINAX == 1) || (MEI_SUPPORT_DEVICE_VR9 == 1)
+#if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1)
 
 #include "ifx_types.h"
 
-/* add VINAX OS Layer */
+/* add VRX OS Layer */
 #include "drv_mei_cpe_os.h"
-/* add VINAX debug/printout part */
+/* add VRX debug/printout part */
 #include "drv_mei_cpe_dbg.h"
 
 #include "drv_mei_cpe_interface.h"
@@ -35,6 +34,10 @@
 
 #include "drv_mei_cpe_msg_process.h"
 #include "drv_mei_cpe_driver_msg.h"
+
+#if (MEI_SUPPORT_DSM == 1)
+#include "drv_mei_cpe_dsm.h"
+#endif /* (MEI_SUPPORT_DSM == 1) */
 
 #include "drv_mei_cpe_dbg_driver.h"
 
@@ -297,10 +300,10 @@ IFX_void_t MEI_TraceCmvMsg( MEI_DEV_T *pMeiDev,
    ========================================================================= */
 
 /**
-   Swap the 32 bit payload from host endianess to VINAX endianes.
+   Swap the 32 bit payload from host endianess to VRX endianes.
 
 \param
-   pMeiDev     points to the VINAX device struct.
+   pMeiDev     points to the VRX device struct.
 \param
    pMsg        points to the CMV message
 \param
@@ -493,7 +496,7 @@ MEI_STATIC IFX_int32_t MEI_SetMailboxAddress(MEI_DEV_T *pMeiDev)
    - clear the pending ACK in case of timeout.
 
 \param
-   pMeiDev  points to the current VINAX device.
+   pMeiDev  points to the current VRX device.
 \param
    pDynCmd    points to the dynamic cmd data of the current instance.
 \return
@@ -511,7 +514,7 @@ MEI_STATIC IFX_int32_t MEI_MBox_WaitForAck(
              ("MEI_DRV[%02d]: MEI_MBox_WaitForAck - check device" MEI_DRV_CRLF,
              MEI_DRV_LINENUM_GET(pMeiDev)));
 
-      MEI_PollIntPerVnxLine(pMeiDev, e_MEI_DEV_ACCESS_MODE_PASSIV_POLL);
+      MEI_PollIntPerVrxLine(pMeiDev, e_MEI_DEV_ACCESS_MODE_PASSIV_POLL);
 
 
       /* setup timeout counter for ACK */
@@ -525,7 +528,7 @@ MEI_STATIC IFX_int32_t MEI_MBox_WaitForAck(
          MEI_DRVOS_EventWait_timeout(
                      &pMeiDev->eventMailboxRecv,
                      MEI_MIN_MAILBOX_POLL_TIME_MS);
-         MEI_PollIntPerVnxLine(pMeiDev, e_MEI_DEV_ACCESS_MODE_PASSIV_POLL);
+         MEI_PollIntPerVrxLine(pMeiDev, e_MEI_DEV_ACCESS_MODE_PASSIV_POLL);
          MEI_DEC_TIMEOUT_CNT(pMeiDev);
       }
    }
@@ -610,7 +613,7 @@ MEI_STATIC IFX_int32_t MEI_WriteMailboxLoopBack(
    Get and distribute an incoming ACK mailbox message to the waiting instances.
 
 \param
-   pMeiDev: Points to the VINAX device struct.
+   pMeiDev: Points to the VRX device struct.
 
 \return
    NONE - all statistics will be set within the device struct.
@@ -900,13 +903,76 @@ MEI_RECV_ACK_MB_MSG_WAKEUP:
    return;
 }
 
+#if (MEI_SUPPORT_DSM == 1)
+/**
+   Receive the DSM autonomous message (EVT)
 
+\param
+   pMeiDev: Points to the VRX device struct.
+\param
+   pMsg:    Points to the received "EVT_DSM" message.
+
+\return
+   none
+
+\attention
+   - Called on int-level
+*/
+MEI_STATIC IFX_void_t MEI_Recv_MODEM_EVT_DSM( MEI_DEV_T *pMeiDev,
+                                              CMV_STD_MESSAGE_T *pMsg)
+{
+   EVT_DSM_ErrorVectorReady_t dsmErbParams;
+   if (pMsg == NULL)
+   {
+      /* error receive mailbox message while init state */
+      PRN_ERR_INT_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+           ("MEI_DRV[%02d]: ERROR MEI_Recv_MODEM_EVT_DSM - null ptr" MEI_DRV_CRLF,
+             MEI_DRV_LINENUM_GET(pMeiDev)));
+
+      return;
+   }
+
+   /* interprete message - (Read Replay || indication) && (msg index == 0) */
+   if (   (   (P_CMV_MSGHDR_FCT_OPCODE_GET(pMsg) == D2H_CMV_READ_REPLY)
+           || (P_CMV_MSGHDR_FCT_OPCODE_GET(pMsg) == D2H_CMV_INDICATE)  )
+       && (pMsg->header.index == 0)
+      )
+   {
+      memset(&dsmErbParams, 0x00, sizeof(EVT_DSM_ErrorVectorReady_t));
+      dsmErbParams.ErrVecProcResult = pMsg->payload.params_16Bit[0];
+      dsmErbParams.ErrVecSize = pMsg->payload.params_16Bit[1];
+
+      PRN_ERR_INT_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL,
+           ("MEI_DRV[%02d]: DSM EVT ErrorVectorReady - ErrVecProcResult = %i, "
+            "ErrVecSize = %i" MEI_DRV_CRLF, MEI_DRV_LINENUM_GET(pMeiDev),
+             dsmErbParams.ErrVecProcResult, dsmErbParams.ErrVecSize));
+
+      MEI_VRX_DSM_EvtErbHandler(pMeiDev, &dsmErbParams);
+
+      MEI_LOG_CMV_MSG( pMeiDev, pMsg, "DSM EVT ErrorVectorReady", MEI_DRV_PRN_LEVEL_LOW);
+   }
+   else
+   {
+      /* error receive mailbox message while init state */
+      PRN_ERR_INT_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+           ("MEI_DRV[%02d]: ERROR DSM EVT ErrorVectorReady - "
+            "func opcode = 0x%02X != 0x%02X/0x%02X, msgId=0x%04X != 0x%04X" MEI_DRV_CRLF,
+             MEI_DRV_LINENUM_GET(pMeiDev),
+             P_CMV_MSGHDR_FCT_OPCODE_GET(pMsg), D2H_CMV_READ_REPLY, D2H_CMV_INDICATE,
+             P_CMV_MSGHDR_MSGID_GET(pMsg), EVT_DSM_ERRORVECTORREADY));
+
+      MEI_LOG_CMV_MSG( pMeiDev, pMsg, "ERR DSM EVT ErrorVectorReady", MEI_DRV_PRN_LEVEL_HIGH);
+   }
+
+   return;
+}
+#endif /* (MEI_SUPPORT_DSM == 1) */
 
 /**
    Receive the MODEM FSM STATE message
 
 \param
-   pMeiDev: Points to the VINAX device struct.
+   pMeiDev: Points to the VRX device struct.
 \param
    pMsg:    Points to the received "FSM STATE" message.
 
@@ -968,7 +1034,7 @@ MEI_STATIC IFX_void_t MEI_Recv_MODEM_FSM_STATE( MEI_DEV_T *pMeiDev,
    Receive the AUTONOMOUS MODEM READ message
 
 \param
-   pMeiDev: Points to the VINAX device struct.
+   pMeiDev: Points to the VRX device struct.
 \param
    pMsg:    Points to the received "Modem Ready" message.
 
@@ -1092,7 +1158,7 @@ IFX_int32_t MEI_NfcCallBackSet(
    Distribute a message over all open instances.
 
 \param
-   pMeiDev: Points to the VINAX device struct.
+   pMeiDev: Points to the VRX device struct.
 \param
    pNfcRootInstance: points to the root of the open instance list.
 \param
@@ -1379,6 +1445,13 @@ MEI_STATIC IFX_void_t MEI_RecvAutonomMailboxMsg(
          break;
 #endif /* (MEI_DRV_CLEAR_EOC_ENABLE == 1)*/
 
+#if (MEI_SUPPORT_DSM == 1)
+      /* new downstream DSM ERB was written by the DSL FW into the SDRAM */
+      case EVT_DSM_ERRORVECTORREADY:
+         MEI_Recv_MODEM_EVT_DSM(pMeiDev, (CMV_STD_MESSAGE_T *)&tempMsg);
+         break;
+#endif /* (MEI_SUPPORT_DSM == 1) */
+
       case D2H_CMV_MSGID_MODEM_READY:
          /* "Modem Ready": signals the new driver state "Modem READY" */
          MEI_Recv_AUTO_MODEM_READY(pMeiDev, (CMV_MESSAGE_MODEM_RDY_T *)&tempMsg);
@@ -1394,6 +1467,14 @@ MEI_STATIC IFX_void_t MEI_RecvAutonomMailboxMsg(
    /* ==================================================
       Distribute the message
       ================================================== */
+#if (MEI_SUPPORT_DSM == 1)
+   if (CMV_MSGHDR_MSGID_GET(tempMsg.mbCmv.cmv) == EVT_DSM_ERRORVECTORREADY)
+   {
+      /* do not distribute DSM messages */
+      return;
+   }
+#endif /* (MEI_SUPPORT_DSM == 1) */
+
    distCount = MEI_DistributeAutoMsg(
                               pMeiDev,
                               pMeiDev->pRootNfcRecvFirst,
@@ -1431,7 +1512,7 @@ MEI_STATIC IFX_void_t MEI_RecvAutonomMailboxMsg(
    read buffer.
 
 \param
-   pMeiDynCntrl: Points to the VINAX dynamic device control struct.
+   pMeiDynCntrl: Points to the VRX dynamic device control struct.
 \param
    ppBuf:   [OUT] returns the pointer to the message buffer.
 
@@ -1490,7 +1571,7 @@ MEI_STATIC IFX_int32_t MEI_GetNextRdNfcMsg(
                 ("MEI_DRV[%02d-%02d]: MEI_GetNextRdNfcMsg - check device" MEI_DRV_CRLF,
                   MEI_DRV_DYN_LINENUM_GET(pMeiDynCntrl), pMeiDynCntrl->openInstance));
 
-         MEI_PollIntPerVnxLine(pMeiDynCntrl->pMeiDev, e_MEI_DEV_ACCESS_MODE_PASSIV_POLL);
+         MEI_PollIntPerVrxLine(pMeiDynCntrl->pMeiDev, e_MEI_DEV_ACCESS_MODE_PASSIV_POLL);
 
          /*
             check NFC buffer again
@@ -1529,7 +1610,7 @@ MEI_STATIC IFX_int32_t MEI_GetNextRdNfcMsg(
    to the read buffer.
 
 \param
-   pMeiDynCntrl: Points to the VINAX dynamic device control struct.
+   pMeiDynCntrl: Points to the VRX dynamic device control struct.
 
 \return
    NONE
@@ -2092,7 +2173,7 @@ MEI_STATIC IFX_int32_t MEI_ModemNfcRead(
    Enable the mailbox loop within the driver.
 
 \param
-   pMeiDev: Points to the VINAX device control struct.
+   pMeiDev: Points to the VRX device control struct.
 
 \return
    New loop status:
@@ -2157,7 +2238,7 @@ IFX_boolean_t MEI_MailboxLoop( MEI_DEV_T *pMeiDev,
    Mailbox Wait - wait for an expected mailbox msg.
 
 \param
-   pMeiDev  points to the current VINAX device.
+   pMeiDev  points to the current VRX device.
 
 \return
    IFX_SUCCESS:   responce received.
@@ -2200,7 +2281,7 @@ IFX_int32_t MEI_WaitForMailbox(MEI_DEV_T *pMeiDev)
    - set Mailbox Code
 
 \param
-   pMeiDev     points to the VINAX device struct.
+   pMeiDev     points to the VRX device struct.
 \param
    pMsg        points to the CMV message
 \param
@@ -2275,7 +2356,7 @@ IFX_int32_t MEI_SetCmvHeader( MEI_DEV_T *pMeiDev,
    - interprete BIT_SIZE, Function Opcode, message ID
 
 \param
-   pMeiDev     points to the VINAX device struct.
+   pMeiDev     points to the VRX device struct.
 \param
    pMsg        points to the CMV message
 \param
@@ -2315,9 +2396,9 @@ IFX_void_t MEI_MsgId2CmvHeader( MEI_DEV_T *pMeiDev,
    Check the own instance buffer and free it if busy.
 
 \param
-   pMeiDynCntrl: Points to the dynamic VINAX device control struct.
+   pMeiDynCntrl: Points to the dynamic VRX device control struct.
 \param
-   pMeiDev     points to the VINAX device struct.
+   pMeiDev     points to the VRX device struct.
 \param
    pDynCmd:      points to the dynamic command block
 
@@ -2357,10 +2438,10 @@ IFX_int32_t MEI_WaitForInstance(
 
 /*
    Write a mailbox message from the user standard interface via the
-   device access functions (MEI) to the VINAX device.
+   device access functions (MEI) to the VRX device.
 
 \param
-   pMeiDynCntrl: Points to the dynamic VINAX device control struct.
+   pMeiDynCntrl: Points to the dynamic VRX device control struct.
 \param
    pMBMsg:         Points to the mailbox message (mailbox code + message).
 \param
@@ -2385,7 +2466,6 @@ IFX_int32_t MEI_WriteMailbox( MEI_DYN_CNTRL_T    *pMeiDynCntrl,
    PRN_DBG_USR( MEI_DRV, MEI_DRV_PRN_LEVEL_LOW, MEI_DRV_LINENUM_GET(pMeiDev),
           ("MEI_DRV[%02d - %02d] Write MBox msg[%d]" MEI_DRV_CRLF,
            MEI_DRV_LINENUM_GET(pMeiDev), pMeiDynCntrl->openInstance, mbMsgSize));
-
 
    MEI_DBG_MSG_TRC_DUMP(pMeiDev, &pMBMsg->mbCmv.cmv);
    MEI_TRACE_CMV_MSG(pMeiDev, &pMBMsg->mbCmv.cmv, "CMD msg wr", MEI_DRV_PRN_LEVEL_LOW);
@@ -2426,11 +2506,11 @@ IFX_int32_t MEI_WriteMailbox( MEI_DYN_CNTRL_T    *pMeiDynCntrl,
       MEI_GET_TICK_MS_TIME_TRACE(start_ms);
       while(1)
       {
-         /* wait: for an response from the VINAX boot loader */
+         /* wait: for an response from the VRX boot loader */
          if (pMeiDev->eModePoll == e_MEI_DEV_ACCESS_MODE_PASSIV_POLL)
          {
             /** poll for interrupts manually */
-            MEI_ProcessIntPerVnxLine(pMeiDev);
+            MEI_ProcessIntPerVrxLine(pMeiDev);
          }
 
          if (MEI_DRV_MAILBOX_STATE_GET(pMeiDev) != e_MEI_MB_FREE)
@@ -2533,7 +2613,7 @@ IFX_int32_t MEI_WriteMailbox( MEI_DYN_CNTRL_T    *pMeiDynCntrl,
          pMeiDev->pCurrDynCmd = pDynCmd;
       }
 
-      /* set VINAX device status */
+      /* set VRX device status */
       MEI_DRV_MAILBOX_STATE_SET(pMeiDev, e_MEI_MB_PENDING_ACK_1);
 
       /* return value and statistics */
@@ -2552,11 +2632,11 @@ IFX_int32_t MEI_WriteMailbox( MEI_DYN_CNTRL_T    *pMeiDynCntrl,
 
 
 /**
-   Read a mailbox message from the VINAX mailbox via the device access
+   Read a mailbox message from the VRX mailbox via the device access
    functions (MEI) to the internal driver buffers.
 
 \param
-   pMeiDev: Points to the VINAX device struct.
+   pMeiDev: Points to the VRX device struct.
 
 \return
    NONE - all statistics will be set within the device struct.
@@ -2721,7 +2801,7 @@ IFX_int32_t MEI_CheckAck(MEI_DYN_CNTRL_T *pMeiDynCntrl)
 
       case e_MEI_MB_BUF_RESET_DFE:
          PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
-               ("MEI_DRV[%02d - %02d]: ERROR ReadAck - RESET VINAX" MEI_DRV_CRLF,
+               ("MEI_DRV[%02d - %02d]: ERROR ReadAck - RESET VRX" MEI_DRV_CRLF,
                 MEI_DRV_DYN_LINENUM_GET(pMeiDynCntrl), pMeiDynCntrl->openInstance));
          len = -e_MEI_ERR_DEV_RESET;
          break;
@@ -2746,7 +2826,7 @@ IFX_int32_t MEI_CheckAck(MEI_DYN_CNTRL_T *pMeiDynCntrl)
    - add the buffer to the device NFC list.
 
 \remarks
-   To allow receiving notifications from the VINAX device the current
+   To allow receiving notifications from the VRX device the current
    driver instance must be able to handle and store the incoming messages.
    The required buffers must be set in a "per open instance" way.
    Therefore the device instance manages a list of all open instances which are
@@ -2823,7 +2903,7 @@ IFX_int32_t MEI_IoctlNfcEnable(
    }
    pDynNfc->numOfBuf = (IFX_uint8_t)nfcBufPerInst;
 
-   /* chain the open instance to the VINAX device list for NFC handling */
+   /* chain the open instance to the VRX device list for NFC handling */
    pDynNfc->pRecvDataCntrl     = pRecvDataCntrl;
    pMeiDynCntrl->pInstDynNfc = pDynNfc;
 
@@ -2849,7 +2929,7 @@ IFX_int32_t MEI_IoctlNfcEnable(
    IFX_SUCCESS
 
 \remarks
-   To allow receiving notifications from the VINAX device the current
+   To allow receiving notifications from the VRX device the current
    driver instance must be able to handle and store the incoming messages.
    The required buffers must be set in a "per open instance" way.
    Therefore the device instance manages a list of all open instances which are
@@ -2865,7 +2945,7 @@ IFX_int32_t MEI_IoctlNfcDisable(MEI_DYN_CNTRL_T *pMeiDynCntrl)
    MEI_DEV_T            *pMeiDev = pMeiDynCntrl->pMeiDev;
    MEI_DYN_NFC_DATA_T   *pDynNfc;
 
-   /* dechain the instance form the VINAX device NFC list */
+   /* dechain the instance form the VRX device NFC list */
    if (pMeiDynCntrl->pInstDynNfc)
    {
       PRN_DBG_USR( MEI_DRV, MEI_DRV_PRN_LEVEL_LOW, MEI_DRV_LINENUM_GET(pMeiDev),
@@ -2909,7 +2989,7 @@ IFX_int32_t MEI_IoctlNfcDisable(MEI_DYN_CNTRL_T *pMeiDynCntrl)
    IFX_SUCCESS
 
 \remarks
-   To allow receiving notifications from the VINAX device the current
+   To allow receiving notifications from the VRX device the current
    driver instance must be able to handle and store the incoming messages.
    The required buffers must be set in a "per open instance" way.
    Therefore the device instance manages a list of all open instances which are
@@ -3014,7 +3094,7 @@ IFX_int32_t MEI_IoctlAutoMsgCtlSet(
    IFX_SUCCESS
 
 \remarks
-   To allow receiving notifications from the VINAX device the current
+   To allow receiving notifications from the VRX device the current
    driver instance must be able to handle and store the incoming messages.
    The required buffers must be set in a "per open instance" way.
    Therefore the device instance manages a list of all open instances which are
@@ -3052,37 +3132,37 @@ IFX_int32_t MEI_IoctlAutoMsgCtlGet(
    Add a new dynamic NFC receive struct to the device specific list.
 
 \remarks
-   To allow receiving notifications from the VINAX device the current
+   To allow receiving notifications from the VRX device the current
    driver instance must be able to handle and store the incoming messages.
    The required buffers must be set in a "per open instance" way.
    Therefore the device instance manages a list of all open instances which are
    enabled to receive incoming NFC's
 
 \param
-   pMeiDynCntrl: Points to the VINAX dynamic device control struct.
+   pMeiDynCntrl: Points to the VRX dynamic device control struct.
 \param
-   pVinaxDynNfc:   Points to the new dynamic NFC handling struct.
+   pVrxDynNfc:   Points to the new dynamic NFC handling struct.
 
 \return
    - TRUE:  NFC struct added to the device.
    - FALSE: ERROR - not able to add NFC struct to the device.
 */
 IFX_boolean_t MEI_AddNfcToDevList( MEI_DYN_CNTRL_T    *pMeiDynCntrl,
-                                     MEI_DYN_NFC_DATA_T *pVinaxDynNfc)
+                                     MEI_DYN_NFC_DATA_T *pVrxDynNfc)
 {
    MEI_DEV_T          *pMeiDev;
 
    /*
       check params
    */
-   if ( !pMeiDynCntrl || !pVinaxDynNfc )
+   if ( !pMeiDynCntrl || !pVrxDynNfc )
    {
       PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
              ("MEI_DRV [??]: AddNfcToDevList - invalid params" MEI_DRV_CRLF) );
       return IFX_FALSE;
    }
 
-   /* get VINAX device struct */
+   /* get VRX device struct */
    pMeiDev = pMeiDynCntrl->pMeiDev;
 
    PRN_DBG_USR( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL, MEI_DRV_LINENUM_GET(pMeiDev),
@@ -3092,21 +3172,21 @@ IFX_boolean_t MEI_AddNfcToDevList( MEI_DYN_CNTRL_T    *pMeiDynCntrl,
    /*
       Add the NFC element to the end of the list.
    */
-   pVinaxDynNfc->pNext = NULL;
+   pVrxDynNfc->pNext = NULL;
 
    if (pMeiDev->pRootNfcRecvLast)
    {
       /* list not empty */
-      pVinaxDynNfc->pPrev                = pMeiDev->pRootNfcRecvLast;
-      pMeiDev->pRootNfcRecvLast->pNext = pVinaxDynNfc;
-      pMeiDev->pRootNfcRecvLast        = pVinaxDynNfc;
+      pVrxDynNfc->pPrev                = pMeiDev->pRootNfcRecvLast;
+      pMeiDev->pRootNfcRecvLast->pNext = pVrxDynNfc;
+      pMeiDev->pRootNfcRecvLast        = pVrxDynNfc;
    }
    else
    {
       /* list empty */
-      pVinaxDynNfc->pPrev          = NULL;
-      pMeiDev->pRootNfcRecvLast  = pVinaxDynNfc;
-      pMeiDev->pRootNfcRecvFirst = pVinaxDynNfc;
+      pVrxDynNfc->pPrev          = NULL;
+      pMeiDev->pRootNfcRecvLast  = pVrxDynNfc;
+      pMeiDev->pRootNfcRecvFirst = pVrxDynNfc;
    }
 
    return IFX_TRUE;
@@ -3117,23 +3197,23 @@ IFX_boolean_t MEI_AddNfcToDevList( MEI_DYN_CNTRL_T    *pMeiDynCntrl,
    Remove a dynamic NFC receive struct from the device specific list.
 
 \remarks
-   To allow receiving notifications from the VINAX device the current
+   To allow receiving notifications from the VRX device the current
    driver instance must be able to handle and store the incoming messages.
    The required buffers must be set in a "per open instance" way.
    Therefore the device instance manages a list of all open instances which are
    enabled to receive incoming NFC's
 
 \param
-   pMeiDynCntrl: Points to the VINAX dynamic device control struct.
+   pMeiDynCntrl: Points to the VRX dynamic device control struct.
 \param
-   pVinaxDynNfc:   Points to the new dynamic NFC handling struct.
+   pVrxDynNfc:   Points to the new dynamic NFC handling struct.
 
 \return
    - TRUE:  NFC struct added to the device.
    - FALSE: ERROR - not able to add NFC struct to the device.
 */
 IFX_boolean_t MEI_RemoveNfcFromDevList( MEI_DYN_CNTRL_T    *pMeiDynCntrl,
-                                              MEI_DYN_NFC_DATA_T **ppVinaxDynNfc)
+                                              MEI_DYN_NFC_DATA_T **ppVrxDynNfc)
 {
    MEI_DEV_T          *pMeiDev;
    MEI_DYN_NFC_DATA_T *pDynNfc;
@@ -3141,7 +3221,7 @@ IFX_boolean_t MEI_RemoveNfcFromDevList( MEI_DYN_CNTRL_T    *pMeiDynCntrl,
    /*
       check params, check NFC enabled
    */
-   if ( !pMeiDynCntrl || !ppVinaxDynNfc )
+   if ( !pMeiDynCntrl || !ppVrxDynNfc )
    {
       PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
              ("MEI_DRV [??]: RemoveNfcFromDevList - invalid params" MEI_DRV_CRLF) );
@@ -3149,7 +3229,7 @@ IFX_boolean_t MEI_RemoveNfcFromDevList( MEI_DYN_CNTRL_T    *pMeiDynCntrl,
       return IFX_FALSE;
    }
 
-   /* get VINAX device struct */
+   /* get VRX device struct */
    pMeiDev = pMeiDynCntrl->pMeiDev;
 
    if ( (pDynNfc = pMeiDynCntrl->pInstDynNfc) == NULL )
@@ -3191,7 +3271,7 @@ IFX_boolean_t MEI_RemoveNfcFromDevList( MEI_DYN_CNTRL_T    *pMeiDynCntrl,
 
    /* remove it form dynamic control struct and return it back */
    pMeiDynCntrl->pInstDynNfc = NULL;
-   *ppVinaxDynNfc = pDynNfc;
+   *ppVrxDynNfc = pDynNfc;
 
    return IFX_TRUE;
 }
@@ -3266,7 +3346,7 @@ IFX_int32_t MEI_WriteMsgAndCheck(
 
 
 /**
-   Write a message (IFX format) to the VINAX device.
+   Write a message (IFX format) to the VRX device.
 
 \param
    pMeiDynCntrl   - private dynamic device data (per open instance)
@@ -3295,7 +3375,7 @@ IFX_int32_t MEI_IoctlCmdMsgWrite(
 
    MEI_MEI_MAILBOX_T     *pMailbox;
 
-   PRN_DBG_USR( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL, MEI_DRV_LINENUM_GET(pMeiDev),
+   PRN_DBG_USR( MEI_DRV, MEI_DRV_PRN_LEVEL_LOW, MEI_DRV_LINENUM_GET(pMeiDev),
          ("MEI_DRV[%02d - %02d]: MEI_IoctlCmdMsgWrite(0x%04X) - count %d" MEI_DRV_CRLF,
            MEI_DRV_LINENUM_GET(pMeiDev), pMeiDynCntrl->openInstance, pUserMsg->msgId, pUserMsg->paylSize_byte));
 
@@ -3816,7 +3896,7 @@ IFX_int32_t MEI_IoctlNfcMsgRead(
 #if (MEI_SUPPORT_RAW_MSG == 1)
 
 /**
-   Write a raw message to the VINAX device.
+   Write a raw message to the VRX device.
 
 \param
    pMeiDynCntrl   - private dynamic device data (per open instance)
@@ -3976,7 +4056,7 @@ IFX_int32_t MEI_IoctlRawAckRead( MEI_DYN_CNTRL_T *pMeiDynCntrl,
 
 
 /**
-   Write a raw message to the VINAX device and wait for the corresponding ACK.
+   Write a raw message to the VRX device and wait for the corresponding ACK.
 
 \param
    pMeiDynCntrl   - private dynamic device data (per open instance)
@@ -4122,5 +4202,5 @@ IFX_int32_t MEI_IoctlRawNfcRead( MEI_DYN_CNTRL_T *pMeiDynCntrl,
 
 #endif      /* #if (MEI_SUPPORT_RAW_MSG == 1) */
 
-#endif /* #if (MEI_SUPPORT_DEVICE_VINAX == 1) || (MEI_SUPPORT_DEVICE_VR9 == 1)*/
+#endif /* #if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1)*/
 

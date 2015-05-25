@@ -1,18 +1,17 @@
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
 
 ******************************************************************************/
-#ifndef _DRV_MEI_CPE_DOWNLOAD_VR9_H
-#define _DRV_MEI_CPE_DOWNLOAD_VR9_H
+#ifndef _DRV_MEI_CPE_DOWNLOAD_VRX_H
+#define _DRV_MEI_CPE_DOWNLOAD_VRX_H
 
 /* ==========================================================================
-   Description : VINAX Firmware Download definitions (ROM START).
+   Description : VRX Firmware Download definitions (ROM START).
    ========================================================================== */
 
 #ifdef __cplusplus
@@ -29,8 +28,8 @@ extern "C"
 
 #include "ifx_types.h"
 
-#if (MEI_SUPPORT_DEVICE_VR9 == 1)
-#include "drv_mei_cpe_mei_vr9.h"
+#if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1)
+#include "drv_mei_cpe_mei_vrx.h"
 #else
 #include "drv_mei_cpe_mei_ar9.h"
 #endif
@@ -41,7 +40,7 @@ extern "C"
 
 #if (MEI_SUPPORT_PCI_SLAVE_FW_DOWNLOAD == 1)
 
-# if (MEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_ADTRAN == 1)
+# if (MEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_BONDING_EXTERNAL == 1)
 #  define MEI_PCI_SLAVE_DDR_POOL_START_ADDRESS   (0x81E00000)
 #  define MEI_PCI_SLAVE_PCI_POOL_START_ADDRESS   (0x18000000)
 # elif (MEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_BONDING == 1)
@@ -57,6 +56,20 @@ extern "C"
 /* VR9 FW image chunk size [bytes] */
 #define MEI_FW_IMAGE_CHUNK_SIZE_BYTE            (64*1024)
 
+/* Fw bootloader default size */
+#ifndef MEI_FW_DEFAULT_BOOTLOADER_SIZE_BYTE
+#define MEI_FW_DEFAULT_BOOTLOADER_SIZE_BYTE     (3332)
+#endif
+
+/* Fw bootloader max size */
+#ifndef MEI_FW_MAX_BOOTLOADER_SIZE_BYTE
+#define MEI_FW_MAX_BOOTLOADER_SIZE_BYTE         (4096)
+#endif
+
+#if (MEI_FW_MAX_BOOTLOADER_SIZE_BYTE > MEI_FW_IMAGE_CHUNK_SIZE_BYTE)
+#error Max bootloader size are more then chunk size!
+#endif
+
 #define MEI_FW_IMAGE_CHUNK_ZERO_BITS_COUNT      (5)
 #define MEI_FW_IMAGE_CHUNK_OVERHEAD_SIZE_BYTE \
            (1 << MEI_FW_IMAGE_CHUNK_ZERO_BITS_COUNT)
@@ -64,9 +77,27 @@ extern "C"
 #define MEI_FW_IMAGE_CHUNK_ADDR_MASK \
            (~(MEI_FW_IMAGE_CHUNK_OVERHEAD_SIZE_BYTE - 1))
 
-#define MEI_FW_IMAGE_MAX_CHUNK_COUNT            MEI_TOTAL_BAR_REGISTER_COUNT
+#define MEI_FW_IMAGE_MAX_CHUNK_COUNT            (MEI_TOTAL_BAR_REGISTER_COUNT)
 
+/* Image: VDSL cache (3) + ADSL cache (3) + ADSL & VDSL image (8) */
+/* BAR: VDSL cache (3) + ADSL cache (3) + ADSL & VDSL image (8) + */
+/* ERB chunk + Data chunk + Debug data chunk                      */
+#define MEI_FW_IMAGE_MAX_CHUNK_COUNT_TYPE_0     (MEI_TOTAL_BAR_REGISTER_COUNT)
+
+/* VR10 only */
+/* Image: VDSL cache (3) + ADSL cache (3) + ADSL & VDSL image (11) */
+/* BAR: ADSL | VDSL cache (3) + ADSL & VDSL image (11) +           */
+/* ERB chunk + Data chunk + Debug data chunk                       */
+#define MEI_FW_IMAGE_MAX_CHUNK_COUNT_TYPE_1     (MEI_TOTAL_BAR_REGISTER_COUNT + 3)
+
+/* Image: VDSL cache (3) + ADSL cache (3) + ADSL & VDSL image (11+11)             */
+/* BAR: [ADSL cache (3) + ADSL image (11)] | [VDSL cache (3) + VDSL image (11)] + */
+/* ERB chunk + Data chunk + Debug data chunk                                      */
+#define MEI_FW_IMAGE_MAX_CHUNK_COUNT_TYPE_2     (MEI_TOTAL_BAR_REGISTER_COUNT + 14)
+
+#define MEI_FW_IMAGE_ERB_CHUNK_INDEX            (14)
 #define MEI_FW_IMAGE_DATA_CHUNK_INDEX           (15)
+#define MEI_FW_IMAGE_DEBUG_CHUNK_INDEX          (16)
 
 /* VR9 FW image header size [bytes] (including Page#0)*/
 #define MEI_FW_IMAGE_HEADER_SIZE_BYTE  sizeof(MEI_FW_IMAGE_CNTRL_T)
@@ -75,6 +106,35 @@ extern "C"
 #define MEI_FW_IMAGE_MAX_SIZE_BYTE \
    (MEI_FW_IMAGE_CHUNK_SIZE_BYTE * (MEI_FW_IMAGE_MAX_CHUNK_COUNT - 1) + \
     MEI_BAR16_SIZE_BYTE)
+
+/* VRX FW Image maximum supported cache chunks for one flavour (ADSL or VDSL) */
+#define MEI_FW_IMAGE_MAX_CACHE_CHUNK_COUNT          (3)
+
+/* VRX FW Image maximum supported cache size for one flavour (ADSL or VDSL) */
+#define MEI_FW_IMAGE_MAX_CACHE_SIZE_BYTE \
+   (MEI_FW_IMAGE_CHUNK_SIZE_BYTE * MEI_FW_IMAGE_MAX_CACHE_CHUNK_COUNT)
+
+/* VRX FW Image maximum supported cache size for PDBRAM */
+#define MEI_FW_IMAGE_MAX_PDBRAM_CACHE_SIZE_BYTE (140*1024)
+
+/* VRX FW Image maximum supported image size for one flavour (ADSL or VDSL) */
+#define MEI_FW_IMAGE_MAX_XDSL_SIZE_BYTE \
+   (MEI_FW_IMAGE_CHUNK_SIZE_BYTE * 11)
+
+/* VRX FW Image maximum size supported for different mem layout types */
+/* Type 0 only for old revision, could erase ERB block by ADSL (one more chunk)*/
+#define MEI_FW_IMAGE_MAX_SIZE_TYPE_0_BYTE \
+   (MEI_FW_IMAGE_MAX_CACHE_SIZE_BYTE + MEI_FW_IMAGE_MAX_XDSL_SIZE_BYTE + \
+    MEI_FW_IMAGE_CHUNK_SIZE_BYTE)
+
+#define MEI_FW_IMAGE_MAX_SIZE_TYPE_1_BYTE \
+   (2*MEI_FW_IMAGE_MAX_CACHE_SIZE_BYTE + MEI_FW_IMAGE_MAX_XDSL_SIZE_BYTE)
+
+#define MEI_FW_IMAGE_MAX_SIZE_TYPE_2_BYTE \
+   (2*MEI_FW_IMAGE_MAX_CACHE_SIZE_BYTE + 2*MEI_FW_IMAGE_MAX_XDSL_SIZE_BYTE)
+
+/* Max debug data Debug Data (e.g. RTT) */
+#define MEI_FW_IMAGE_MAX_DEBUG_DATA (1024*1024)
 
 /* VR9 FW combined image unique Signature#0*/
 #define MEI_FW_IMAGE_SIGNATURE0   (0x2468)
@@ -85,8 +145,17 @@ extern "C"
 /* VR9 FW Port Mode Control Structure address within ARC internal memory*/
 #define MEI_FW_PORT_MODE_CONTROL_STRUCTURE_ADDR   (0x0080)
 
+/* VRX FW Page#2 offset in 32bit words*/
+#define MEI_FW_IMAGE_PAGE2_OFFSET_32BIT   (18)
+
 /* VR9 FW Page#3 offset in 32bit words*/
 #define MEI_FW_IMAGE_PAGE3_OFFSET_32BIT   (21)
+
+/* VRX FW Page#10 offset in 32bit words*/
+#define MEI_FW_IMAGE_PAGE10_OFFSET_32BIT  (63)
+
+/* VRX FW PartitionsPage offset in 32bit words*/
+#define MEI_FW_IMAGE_PARTITIONS_PAGE_OFFSET_32BIT   (27)
 
 #define MEI_FW_XDSL_MODE_VDSL   (0x0)
 #define MEI_FW_XDSL_MODE_ADSL   (0x1)
@@ -100,6 +169,10 @@ extern "C"
 #define MEI_FW_PORT_MODE_LOCK   (0x1)
 #define MEI_FW_PORT_MODE_UNLOCK (0x0)
 
+#if (MEI_SUPPORT_DEVICE_VR10 == 1)
+#define MEI_HYBRID_TYPE_A       (0x6)
+#define MEI_HYBRID_TYPE_BJ      (0x3)
+#endif
 
 #define MEI_FW_BOOTLOADER_ERR_INVAL_IMAGE        (0xE1)
 #define MEI_FW_BOOTLOADER_ERR_INVAL_MEMEXT_SEL   (0xE2)
@@ -274,6 +347,17 @@ typedef struct MEI_fw_image_port_mode_control_dma32_s
 typedef MEI_FW_PORT_MODE_CONTROL_T MEI_FW_IMAGE_PAGE0_T;
 
 /**
+   Describes xDSL FW image Page#2 (for revision 1).
+*/
+typedef struct MEI_fw_image_combined_page2_s
+{
+   IFX_uint32_t fwRevision;
+   IFX_uint32_t fwMemLayout_Type;
+   IFX_uint32_t debug_data_size;
+   IFX_uint32_t bootloader_size;
+} MEI_FW_IMAGE_PAGE2_T;
+
+/**
    Describes xDSL FW image Page#3 (CACHE info).
 */
 typedef struct MEI_fw_image_combined_page3_s
@@ -282,6 +366,22 @@ typedef struct MEI_fw_image_combined_page3_s
    IFX_uint32_t reserved;
    IFX_uint32_t cachedRegionSize_Byte;
 } MEI_FW_IMAGE_PAGE3_T;
+
+typedef struct MEI_fw_image_partitions_page_s
+{
+   IFX_uint32_t vDSL_image_offset_ARC;
+   IFX_uint32_t vDSL_image_offset;
+   IFX_uint32_t vDSL_image_size;
+   IFX_uint32_t aDSL_image_offset_ARC;
+   IFX_uint32_t aDSL_image_offset;
+   IFX_uint32_t aDSL_image_size;
+   IFX_uint32_t vDSL_cache_offset_ARC;
+   IFX_uint32_t vDSL_cache_offset;
+   IFX_uint32_t vDSL_cache_size;
+   IFX_uint32_t aDSL_cache_offset_ARC;
+   IFX_uint32_t aDSL_cache_offset;
+   IFX_uint32_t aDSL_cache_size;
+} MEI_FW_IMAGE_PARTITIONS_PAGE_T;
 
 /**
    MEI Firmware image control data.
@@ -314,7 +414,83 @@ typedef enum
    eMEI_FW_IMAGE_CHUNK_DATA,
    /** reallocatable image chunk*/
    eMEI_FW_IMAGE_CHUNK_REALLOC,
+#if (MEI_SUPPORT_DSM == 1)
+   /** DSM Vectoring chunk for ERB buffer */
+   eMEI_FW_IMAGE_CHUNK_ERB,
+#endif /* (MEI_SUPPORT_DSM == 1) */
 } MEI_FW_IMAGE_CHUNK_TYPE_E;
+
+/**
+   MEI Firmware partitions information for fw layout type 2
+*/
+typedef struct MEI_fw_partitions_s
+{
+   /** bootloader size [bytes] */
+   /** bootloader offset is 0 */
+   IFX_uint32_t bootloader_size;
+
+   /** VDSL cache offset [bytes] */
+   IFX_uint32_t vDSL_cache_offset;
+   /** VDSL cache size [bytes] */
+   IFX_uint32_t vDSL_cache_size;
+   /** bootloader + VDSL cache first chunk */
+   IFX_uint32_t vDSL_cache_chunk_idx;
+
+   /** ADSL cache offset [bytes] */
+   IFX_uint32_t aDSL_cache_offset;
+   /** ADSL cache size [bytes] */
+   IFX_uint32_t aDSL_cache_size;
+   /** bootloader + ADSL cache first chunk */
+   IFX_uint32_t aDSL_cache_chunk_idx;
+
+   /** VDSL full image offset [bytes] */
+   IFX_uint32_t vDSL_image_offset;
+   /** VDSL full image size [bytes] */
+   IFX_uint32_t vDSL_image_size;
+   /** VDSL fullimage first chunk */
+   IFX_uint32_t vDSL_image_chunk_idx;
+
+   /** ADSL full image offset [bytes] */
+   IFX_uint32_t aDSL_image_offset;
+   /** ADSL full image size [bytes] */
+   IFX_uint32_t aDSL_image_size;
+   /** ADSL fullimage first chunk */
+   IFX_uint32_t aDSL_image_chunk_idx;
+
+   /** Debug Data (e.g. RTT)  */
+   IFX_uint32_t debug_data_size;
+} MEI_FW_PARTITIONS;
+
+/**
+   MEI Firmware binary partitions available types
+*/
+typedef enum
+{
+   /** bootloader  */
+   eMEI_FW_PARTITION_BOOTLOADER,
+   /** xDSL cache */
+   eMEI_FW_PARTITION_XDSL_CACHE,
+   /** xDSL full image */
+   eMEI_FW_PARTITION_XDSL_IMAGE
+} MEI_FW_PARTITION_TYPE;
+
+typedef enum
+{
+   /** original revision 0 */
+   eMEI_FW_REVISION_OLD,
+   /** new revision 1 (for layout type 2) */
+   eMEI_FW_REVISION_NEW
+} MEI_FW_REVISION;
+
+typedef enum
+{
+   /** original mem layout type 0 */
+   eMEI_FW_MEM_LAYOUT_TYPE_0,
+   /** mem layout type 1 (ADSL cache excluded) */
+   eMEI_FW_MEM_LAYOUT_TYPE_1,
+   /** mem layout type 2 (cache and image according to the current xDSL mode) */
+   eMEI_FW_MEM_LAYOUT_TYPE_2
+} MEI_FW_MEM_LAYOUT_TYPE;
 
 typedef struct
 {
@@ -373,8 +549,17 @@ typedef struct MEI_fw_download_cntrl_s
    /** Default Port Mode Control Structure (extracted from the FW header)*/
    MEI_FW_PORT_MODE_CONTROL_T defaultPortModeCtrl;
    /** FW image chunk control data*/
-   MEI_FW_IMAGE_CHUNK_CTRL_T  imageChunkCtrl[MEI_FW_IMAGE_MAX_CHUNK_COUNT];
+   MEI_FW_IMAGE_CHUNK_CTRL_T  imageChunkCtrl[MEI_FW_IMAGE_MAX_CHUNK_COUNT_TYPE_2];
 } MEI_FW_DOWNLOAD_CNTRL_T;
+
+/**
+   Firmware binary partitions info
+*/
+typedef struct MEI_fw_parts_cntrl_s
+{
+   unsigned char *pImage;
+   IFX_boolean_t bHandleNeed;
+}  MEI_FW_PARTS_CNTRL_T;
 
 /* ==========================================================================
    Global Variable Definitions
@@ -405,6 +590,6 @@ IFX_void_t MEI_VR9_PciSlavePoolDelete(
 }
 #endif
 
-#endif   /* #ifndef _DRV_MEI_CPE_DOWNLOAD_VR9_H */
+#endif   /* #ifndef _DRV_MEI_CPE_DOWNLOAD_VRX_H */
 
 

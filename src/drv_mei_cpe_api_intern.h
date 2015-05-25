@@ -2,9 +2,8 @@
 #define _DRV_MEI_CPE_API_INTERN_H
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -12,7 +11,7 @@
 ******************************************************************************/
 
 /* ============================================================================
-   Description : VINAX Driver internal API
+   Description : VRX Driver internal API
    ========================================================================= */
 
 /**
@@ -221,7 +220,7 @@ extern IFX_int32_t MEI_InternalRequestConfig(
 
 #if (MEI_SUPPORT_VDSL2_ADSL_SWAP == 1)
 /**
-   Swap the VINAX between VDSL2 and ADSL (driver layer internal)
+   Swap the VRX between VDSL2 and ADSL (driver layer internal)
 
    \param pMeiDynCntrl
       Pointer to the dynamic MEI control structure.
@@ -338,7 +337,7 @@ extern IFX_int32_t MEI_InternalFirmwareDownload(
                               MEI_DYN_CNTRL_T        *pMeiDynCntrl,
                               IOCTL_MEI_fwDownLoad_t *pArgFwDl);
 
-#if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_AR9 == 1)
+#if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1) || (MEI_SUPPORT_DEVICE_AR9 == 1)
 /**
    Do an Optimized FW Download (driver layer internal)
 
@@ -360,9 +359,9 @@ extern IFX_int32_t MEI_InternalFirmwareDownload(
 extern IFX_int32_t MEI_InternalOptFirmwareDownload(
                               MEI_DYN_CNTRL_T           *pMeiDynCntrl,
                               IOCTL_MEI_fwOptDownLoad_t *pArgFwDl);
-#endif /* (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_AR9 == 1)*/
+#endif /* (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1) || (MEI_SUPPORT_DEVICE_AR9 == 1)*/
 
-#if (MEI_SUPPORT_DEVICE_VR9 == 1)
+#if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1)
 /**
    Set FW xDSL/DualPort mode control.
 
@@ -394,7 +393,7 @@ extern IFX_int32_t MEI_InternalFwModeCtrlSet(
 extern IFX_int32_t MEI_InternalFwModeStatGet(
                               MEI_DYN_CNTRL_T           *pMeiDynCntrl,
                               IOCTL_MEI_FwModeStatGet_t *pArgFwModeStat);
-#endif /* (MEI_SUPPORT_DEVICE_VR9 == 1)*/
+#endif /* (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1)*/
 
 #if (MEI_SUPPORT_DFE_GPA_ACCESS == 1)
 /**
@@ -679,6 +678,43 @@ extern IFX_int32_t MEI_InternalMsgSend(
                               IOCTL_MEI_messageSend_t *pArgMsgs);
 
 /**
+   This function triggers to send a specified message which requests data from
+   the local device and waits for appropriate answer.
+
+   \param pMeiDynCntrl
+      Pointer to the dynamic MEI control structure.
+
+   \param nMsgID
+      Specifies the message ID as defined in the VRX firmware
+      message specification. It includes the message type and
+      subtype.
+
+   \param nLength
+      Number of bytes of the message payload.
+
+   \param nData
+      Pointer to the message payload data.
+
+   \param nLenAck
+      Available buffer size for received ack.
+
+   \param pDataAck
+      Pointer to buffer for receiving ack message.
+
+   \return
+      0 or positive if successful, negative value if an error has been occurred.
+      In case of an error please refer to the definition of MEI_ERROR_CODES
+      for details.
+*/
+extern IFX_int32_t MEI_InternalSendMessage(
+                              MEI_DYN_CNTRL_T      *pMeiDynCntrl,
+                              const IFX_uint16_t   nMsgID,
+                              const IFX_uint16_t   nLength,
+                              const IFX_uint8_t    *pData,
+                              const IFX_uint16_t   nLenAck,
+                              IFX_uint8_t          *pDataAck);
+
+/**
    Check for a available autonomous (NFC) message and read.
    (driver layer internal)
 
@@ -701,6 +737,42 @@ extern IFX_int32_t MEI_InternalMsgSend(
 extern IFX_int32_t MEI_InternalNfcMsgRead(
                               MEI_DYN_CNTRL_T       *pMeiDynCntrl,
                               IOCTL_MEI_message_t   *pArgMsg);
+
+#if (MEI_SUPPORT_DSM == 1)
+/**
+   Specifies the callback function type that has to be used for registering (by
+   PP driver) and signaling of interrupts (by the MEI Driver) for G.Vector
+   related ERB ([E]rror [R]eported [B]lock) data availability.
+
+   \param p_error_vector
+      Pointer to base address of the memory that is allocated by MEI driver
+      within SDRAM and shared between DSL Subsystem (Firmware and Software) and
+      PP Subsystem (Software).
+      The data consists of one 32 bit "err_vec_size" value followed by one
+      complete Ethernet frame (ERB data plus header) according G.993.5 (refer
+      to G.993.5, 04/2010, "Figure 7-9: Format of the Ethernet encapsulation of
+      backchannel data message") but without FCS, which will be added by the
+      PP related handling.
+      The "err_vec_size" value gives the number of bytes for the complete
+      Ethernet frame excluding the "err_vec_size" size (4 bytes) itself.
+      This data is provided/written by the DSL Firmware. In case of ERB data
+      exceeds 1019 bytes (max. "Protocol Payload Data" is defined as 1024 byte,
+      which is a restriction that is of relevance for transmitting it
+      alternatively via the EOC) the needed segmentation has to be done by the
+      PP related handling, means segment the ERB data to fit it within multiple
+      of 1019 bytes blocks and embedding them within multiple frames adjusting
+      the "LENGTH" as well as the SEGMENT CODE" of each Ethernet frame
+      accordingly.
+
+   \return
+      0 or positive if successful, negative value if an error has been occurred
+      within context of G.Vector related handling of the PP driver.
+      \todo Check if dedicated error codes should be defined from PP driver
+            point of view.
+*/
+typedef IFX_int32_t (*mei_dsm_cb_func_t) (IFX_uint32_t *p_error_vector);
+
+#endif /* (MEI_SUPPORT_DSM == 1) */
 
 #if (MEI_DRV_ATM_OAM_ENABLE == 1)
 
@@ -860,7 +932,7 @@ extern IFX_int32_t MEI_InternalCEocInit(
                               IOCTL_MEI_CEOC_init_t  *pArgCEocInit);
 
 /**
-   Setup and configure the vinax device for the ClearEOC (driver layer internal).
+   Setup and configure the vrx device for the ClearEOC (driver layer internal).
 
    \param pMeiDynCntrl
       Pointer to the dynamic MEI control structure.

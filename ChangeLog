@@ -1,18 +1,138 @@
 NEXT VERSION
 
-V1.2.1 - 2012-09-24
+V1.4.1 - 2013-07-29
+common:
+- VRX (DSLCPE_SW-742) Change default configuration for DSM (vectoring) feature
+  enable
+  Default for AppType "6" is that vectoring is disabled (not vectoring friendly
+  anymore) - partly revert from DSLCPE_SW-735
+
+V1.4.0 - 2013-07-10
+common:
+- VRX (DSLCPE_SW-735) Default configuration for DSM (vectoring) feature enable
+- VRX (DSLCPE_SW-706) Include support for G.Vector within MEI driver.
+  Removed DSM only for VR9 preprocessor restriction.
+  Added PP driver callback function access mutex.
+- Klocwork issues/warnings fixes.
+- VRX318 (DSLCPE_SW-705) Add GPIO configuration for LIF detection handling in
+  case of AnnexB FW.
+  Added P0_ALSEL0, P0_ALSEL1 configuration set within initialisation phase.
+- VRX (DSLCPE_SW-716) Error Prints on the console from MEI Driver.
+  Extended fw vectoring support for not support/partly support/full support.
+- Allow vectoring friendly mode config also for firmware binaries with
+  AppType "6"
+- VRX (DSLCPE_SW-723) Rework the VDSL MEI driver to optimize the BAR register usage.
+  Added revision 1 (new) support. Added fw layout type 2 support.
+Bug fix(es):
+- VRX (DSLCPE_SW-725) G.993.5 DS Vectoring status is not working via "dsmsg"
+  command
+  Fixed mapping within MEI_VRX_DSM_StatusGet function.
+
+V1.3.10 - 2013-04-05
+common:
+- Changed empty bootloader size debug message level to warning.
+- VRX (DSLCPE_SW-632) build issue: WARNING: drivers/char/builtin.o(.init.text+0x1794):
+  Section mismatch in reference from the function MEI_module_init().
+  Fixed build warnings.
+
+V1.3.9 - 2013-03-22
+- (DSLCPE_SW-694) Message header files update to VRX FWMCAT Rev2.0
+
+V1.3.8 - 2013-02-27
+User interface definition change(s):
+- (DSLCPE_SW-678) [VRX] API for FW R6 Release - Handling for new FW application
+  type (which supports G.Vector)
+  Reduced vectoring related parameters within ioctl's FIO_MEI_DSM_CONFIG_SET
+  and FIO_MEI_DSM_CONFIG_GET
+common:
+- (DSLCPE_SW-678) [VRX] API for FW R6 Release - Handling for new FW application
+  type (which supports G.Vector).
+  Added Fw vectoring support handling, added new error code
+  e_MEI_ERR_NOT_SUPPORTED_BY_FIRMWARE.
+- Fix compile warnings for mei_test_application for mac address handling.
+- (DSLCPE_SW-680) [VRX] API for FW R6 Release - Include API formated message
+  dump within MEI. Added debug prints at DSL CPE style. Added new option 'G'
+  for mei_test_application (debug level set).
+
+V1.3.7 - 2013-01-25
+common:
+- (DSLCPE_SW-649) Updates MEI driver common parts for VRX200 and VRX318,
+  added new prefix MEI_VRX.
+- (DSLCPE_SW-666) [VRX318] Changed implementation for shared PDBRAM usage.
+Bug fix(es):
+- [VRX318] Fixed uncorrect PDBRAM share control bits access.
+
+V1.3.6 - 2012-12-03
+Bug fix(es):
+- (DSLCPE_SW-658) [VRX318] In case of bonding the second line gets stuck
+  Corrected reset handling for VRX318 in bonding mode.
+
+V1.3.5 - 2012-11-26
+common:
+- (DSLCPE_SW-622) [VRX200] G.Vector - Extend MEI driver to support error vector
+  handling
+  + Updated Vectoring status ioctls handling
+  + Updated ERB event handler (n_mei_dropped_no_pp_cb counter added)
+- Added new error code "e_MEI_ERR_INCOMPLETE_RETURN_VALUES" (returned in case of
+  requesting DSM status values in case of link is not in showtime)
+
+V1.3.4 - 2012-11-23
+common:
+- Added debug and test functionality for timing profiling of DSM (vectoring)
+  related L2 backchannel handling
+
+V1.3.3 - 2012-11-16
+common:
+- (DSLCPE_SW-647) [VRX318] Make usage of flexible Bootloader size in VRx318
+  firmware binary. Added passing bootloader size from firmware image header.
+- (DSLCPE_SW-622) [VRX200] G.Vector - Extend MEI driver to support error vector
+  handling.
 Bug fix(es):
 - (DSLCPE_SW-645) [VRX200] Reboot command results in system hang
   Added signal handling for active polling thread.
+- Fixed empty (always zero) debug print (PDBRAM address at device init).
+
+V1.3.2 - 2012-09-21
+common:
+- (DSLCPE_SW-644) [VRX318] Extension for Annex hybrid type detection.
+   Updated LIF bits passing to PortModeControlStructure.
+- (DSLCPE_SW-643) [VRX318] Add support for shared PDBRAM usage.
+   Added MEI_VR10_PDBRAM_AccessGet function.
+
+V1.3.1 - 2012-08-30
+common:
+- (DSLCPE_SW-631) [VRX318] Usage of PCIe driver for generation of virtual addresses.
+   Optimised for several lines use.
+
+V1.3.0 - 2012-08-27
+common:
+- Reduce changelog up to V0.1.0
+- (DSLCPE_SW-611) Remove unnecessary preprocessor options
+- (DSLCPE_SW-609) Updated bonding_external definition
+- (DSLCPE_SW-618 )Extend low level (MEI) driver for support of new SMART PHY.
+   Added VR10 device;
+   Updated mei driver for VR10 (PDBRAM handling);
+   Updated mei test application (new options -P, -e);
+   Disable ifx_pmu_pg_dsl_dfe_enable function for VR10;
+   Updated chip version handling for VR10;
+   Updated RCU address fro VR10;
+   Updated debug printouts;
+   Updated BAR0, BAR1, BAR2 init;
+   Added BARx (x < 3) PDBRAM address translation for VR10;
+   Added BARx (x >=3) SDRAM address translation for VR10;
+   Renamed *vr9 files to *vrx
+- Updated Lantiq license
+- Added debug function (MEI_DBG_CECK_BOOTLOADER_START) to check successful
+  bootloader start
 
 V1.2.0 - 2012-01-20
 new configuration option(s) added:
  + --enable-pci-slave=yes | no
- + --enable-pci-slave-addr=adtran | bonding
+ + --enable-pci-slave-addr=bonding | bonding_external
 common:
 - DSLCPE_SW-580 Use install-process and dir to copy header files to the staging dir.
   src/Makefile.am extended as specified.
-- PCI slave address range selection added (ADTRAN and Offchip bonding)
+- PCI slave address range selection added (BONDING_EXTERNAL and Offchip bonding)
 merge from the bonding branch (dsl_cpe_api_maint_4_10_1):
    VRX:
    - On-chip SLAVE port FW download handling updated.
@@ -152,87 +272,3 @@ IOCTL:
   + FIO_MEI_FW_MODE_STAT_GET (VR9 device specific)
 - New error code(s) added
   + e_MEI_ERR_INVAL_FW_IMAGE
-
-V0.0.8 - 2009-09-18
-common:
-- VR9 implementation added:
-  + Additional (not documented) handling added within FW download
-Bug fix(es):
-- FIO_MEI_DMA_WRITE ioctl wrong behavior.
-  MEI_DRVOS_CpyFromUser() function return value checking fixed.
-
-V0.0.7 - 2009-08-11
-- Additional rework of doxygen inline comments for initial generation of
-  drivers UMPR.
-- "mei_cpe_drv_states" DSM diagram changed.
-
-V0.0.6 - 2009-08-10
-- Rework of doxygen inline comments for initial generation of drivers UMPR
-
-V0.0.5 - 2009-06-22
-- VINAX<->AR9 mapping: HDLC handling added for the FE parameters request.
-- VINAX<->AR9 mapping added for the following MCAT messages:
-  + CMD_SysVendorID_O_Get
-  + CMD_SysVendorVersionNumO_Get
-  + CMD_SysVendorSerialNum_O_Get
-  + CMD_HS_StandardInfoFE_SPAR1Get
-  + CMD_CRC_StatsFE_NoTR1Get
-  + CMD_FEC_StatsFE_NoTR1Get
-  + CMD_LinePerfCountNE_NoTR1Get
-  + CMD_LinePerfCountNE_NoTR1Set
-  + CMD_LinePerfCountFE_NoTR1Get
-
-V0.0.4 - 2009-06-19
-- Combined VDSL/ADSL firmware image handling added with FW download sequence.
-
-V0.0.3 - 2009-05-15
-- VINAX<->AR9 mapping added for the following MCAT messages:
-  + CMD_XTSE_Configure
-  + CMD_BearerChsDS_Get
-  + CMD_BearerChsUS_Get
-  + CMD_VersionInfoGet
-  + CMD_XTSE_StatusGet
-  + CMD_ADSL_FrameDataDS_LP0Get
-  + CMD_ADSL_FrameDataDS_LP1Get
-  + CMD_ADSL_FrameDataUS_LP0Get
-  + CMD_ADSL_FrameDataUS_LP1Get
-  + CMD_ADSL_BAT_US_Get
-  + CMD_ADSL_BAT_DS_Get
-  + CMD_SNR_NE_TableEntriesGet
-  + CMD_ADSL_GainTableUS_Get
-  + CMD_ADSL_GainTableDS_Get
-  + CMD_LineStatusDS_Get
-  + CMD_LineStatusUS_Get
-  + CMD_HW_ConfigSet
-  + CMD_CRC_StatsNE_NoTR1Get
-  + CMD_FEC_StatsNE_NoTR1Get
-  + CMD_CRC_StatsNE_NoTR1Set
-  + CMD_FEC_StatsNE_NoTR1Set
-  + CMD_G997_ATM_StatsGet
-  + CMD_G997_ATM_StatsSet
-
-V0.0.2 - 2009-05-07
-- AR9 message mapping layer added.
-- VINAX<->AR9 mapping added for the following MCAT messages:
-  + CMD_ModemFSM_StateGet
-  + CMD_ModemFSM_StateSet
-- new file(s) added:
-  + cmv_message_format_ar9.h
-  + drv_mei_cpe_msg_process_ar9.c
-  + drv_mei_cpe_mei_access_ar9.c
-  + drv_mei_cpe_msg_map_ar9.c
-  + drv_mei_cpe_msg_map_ar9.h
-  + auto_header/drv_mei_cpe_vinax_msg_config_pmd.h
-  + auto_header/drv_mei_cpe_vinax_msg_const.h
-  + auto_header/drv_mei_cpe_vinax_msg_debug.h
-  + auto_header/drv_mei_cpe_vinax_msg_dmt_scope.h
-  + auto_header/drv_mei_cpe_vinax_msg_ghs_status.h
-  + auto_header/drv_mei_cpe_vinax_msg_olr.h
-  + auto_header/drv_mei_cpe_vinax_msg_perf_pmd.h
-  + auto_header/drv_mei_cpe_vinax_msg_tc_counters.h
-  + auto_header/drv_mei_cpe_vinax_msg_utopia_posphy.h
-  + auto_header/drv_mei_cpe_vinax_msg_xtc.h
-
-V0.0.1 - 2009-04-30
-- initial version based on the Vinax driver ver.1.6.9
-

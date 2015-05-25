@@ -1,10 +1,9 @@
-#ifndef _DRV_MEI_CPE_MEI_ACCESS_VINAX_H
-#define _DRV_MEI_CPE_MEI_ACCESS_VINAX_H
+#ifndef _DRV_MEI_CPE_MEI_ACCESS_VRX_H
+#define _DRV_MEI_CPE_MEI_ACCESS_VRX_H
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -12,7 +11,7 @@
 ******************************************************************************/
 
 /* ==========================================================================
-   Description : MEI driver - VINAX MEI Register access macros
+   Description : MEI driver - VRX MEI Register access macros
    Remarks:
    ========================================================================== */
 
@@ -29,10 +28,8 @@ extern "C"
 #include "drv_mei_cpe_config.h"
 
 /* MEI register definitions */
-#if (MEI_SUPPORT_DEVICE_VINAX == 1)
-   #include "drv_mei_cpe_mei_vinax.h"
-#elif (MEI_SUPPORT_DEVICE_VR9 == 1)
-   #include "drv_mei_cpe_mei_vr9.h"
+#if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1)
+   #include "drv_mei_cpe_mei_vrx.h"
 #elif (MEI_SUPPORT_DEVICE_AR9 == 1)
    #include "drv_mei_cpe_mei_ar9.h"
 #endif
@@ -125,106 +122,6 @@ extern "C"
 /* ============================================================================
    MEI Register Access Macros (xDSL chipset specific)
    ========================================================================= */
-
-#  if (MEI_SUPPORT_DEVICE_VINAX == 1)
-
-/** ME to ARC4 Interrupt Status Register */
-#define MEI_REG_ACCESS_ME_ME2ARC_STAT_SET(pMeiDrvCntrl, val) \
-            MEI_REG_WRAP_SET((pMeiDrvCntrl)->pMeiIfCntrl->pVirtMeiRegIf->regStruct.ME_ME2ARC_STAT, (val))
-#define MEI_REG_ACCESS_ME_ME2ARC_STAT_GET(pMeiDrvCntrl) \
-            MEI_REG_WRAP_GET((pMeiDrvCntrl)->pMeiIfCntrl->pVirtMeiRegIf->regStruct.ME_ME2ARC_STAT)
-
-/** Debug Write Address Register Low */
-#define MEI_REG_ACCESS_ME_DBG_WR_AD_LO_SET(pMeiDrvCntrl, val) \
-            MEI_REG_WRAP_SET((pMeiDrvCntrl)->pMeiIfCntrl->pVirtMeiRegIf->regStruct.ME_DBG_WR_AD.us.LO, (val & 0xFFFF))
-#define MEI_REG_ACCESS_ME_DBG_WR_AD_LO_GET(pMeiDrvCntrl) \
-            MEI_REG_WRAP_GET((pMeiDrvCntrl)->pMeiIfCntrl->pVirtMeiRegIf->regStruct.ME_DBG_WR_AD.us.LO)
-
-/** Debug Write Address Register High */
-#define MEI_REG_ACCESS_ME_DBG_WR_AD_HI_SET(pMeiDrvCntrl, val) \
-            MEI_REG_WRAP_SET((pMeiDrvCntrl)->pMeiIfCntrl->pVirtMeiRegIf->regStruct.ME_DBG_WR_AD.us.HI, (val & 0xFFFF))
-#define MEI_REG_ACCESS_ME_DBG_WR_AD_HI_GET(pMeiDrvCntrl) \
-            MEI_REG_WRAP_GET((pMeiDrvCntrl)->pMeiIfCntrl->pVirtMeiRegIf->regStruct.ME_DBG_WR_AD.us.HI)
-
-/** Debug Write Address Register LO/High */
-#define MEI_REG_ACCESS_ME_DBG_WR_AD_LONG_SET(pMeiDrvCntrl, val) \
-            MEI_REG_ACCESS_ME_DBG_WR_AD_LO_SET(pMeiDrvCntrl, (val & 0x0000FFFF) ); \
-            MEI_REG_ACCESS_ME_DBG_WR_AD_HI_SET(pMeiDrvCntrl, ((val & 0xFFFF0000) >> 16) )
-
-#define MEI_REG_ACCESS_ME_DBG_WR_AD_LONG_GET(pMeiDrvCntrl) \
-            ( MEI_REG_ACCESS_ME_DBG_WR_AD_LO_GET(pMeiDrvCntrl) | \
-              ((MEI_REG_ACCESS_ME_DBG_WR_AD_HI_GET(pMeiDrvCntrl) << 16) & 0xFFFF0000) )
-
-/** Debug Read Address Register Low */
-#define MEI_REG_ACCESS_ME_DBG_RD_AD_LO_SET(pMeiDrvCntrl, val) \
-            MEI_REG_WRAP_SET((pMeiDrvCntrl)->pMeiIfCntrl->pVirtMeiRegIf->regStruct.ME_DBG_RD_AD.us.LO, (val & 0xFFFF))
-#define MEI_REG_ACCESS_ME_DBG_RD_AD_LO_GET(pMeiDrvCntrl) \
-            MEI_REG_WRAP_GET((pMeiDrvCntrl)->pMeiIfCntrl->pVirtMeiRegIf->regStruct.ME_DBG_RD_AD.us.LO)
-
-/** Debug Read Address Register High */
-#define MEI_REG_ACCESS_ME_DBG_RD_AD_HI_SET(pMeiDrvCntrl, val) \
-            MEI_REG_WRAP_SET((pMeiDrvCntrl)->pMeiIfCntrl->pVirtMeiRegIf->regStruct.ME_DBG_RD_AD.us.HI, (val & 0xFFFF))
-#define MEI_REG_ACCESS_ME_DBG_RD_AD_HI_GET(pMeiDrvCntrl) \
-            MEI_REG_WRAP_GET((pMeiDrvCntrl)->pMeiIfCntrl->pVirtMeiRegIf->regStruct.ME_DBG_RD_AD.us.HI)
-
-/** Debug Read Address Register LO/High */
-#define MEI_REG_ACCESS_ME_DBG_RD_AD_LONG_SET(pMeiDrvCntrl, val) \
-            MEI_REG_ACCESS_ME_DBG_RD_AD_LO_SET(pMeiDrvCntrl, (val & 0x0000FFFF) ); \
-            MEI_REG_ACCESS_ME_DBG_RD_AD_HI_SET(pMeiDrvCntrl, ((val & 0xFFFF0000) >> 16) )
-
-#define MEI_REG_ACCESS_ME_DBG_RD_AD_LONG_GET(pMeiDrvCntrl) \
-            ( MEI_REG_ACCESS_ME_DBG_RD_AD_LO_GET(pMeiDrvCntrl) | \
-              ((MEI_REG_ACCESS_ME_DBG_RD_AD_HI_GET(pMeiDrvCntrl) << 16) & 0xFFFF0000) )
-
-/** Debug Data Register Low */
-#define MEI_REG_ACCESS_ME_DBG_DATA_LO_SET(pMeiDrvCntrl, val) \
-            MEI_REG_WRAP_SET((pMeiDrvCntrl)->pMeiIfCntrl->pVirtMeiRegIf->regStruct.ME_DBG_DATA.us.LO, (val & 0xFFFF))
-#define MEI_REG_ACCESS_ME_DBG_DATA_LO_GET(pMeiDrvCntrl) \
-            MEI_REG_WRAP_GET((pMeiDrvCntrl)->pMeiIfCntrl->pVirtMeiRegIf->regStruct.ME_DBG_DATA.us.LO)
-
-/** Debug Data Register High */
-#define MEI_REG_ACCESS_ME_DBG_DATA_HI_SET(pMeiDrvCntrl, val) \
-            MEI_REG_WRAP_SET((pMeiDrvCntrl)->pMeiIfCntrl->pVirtMeiRegIf->regStruct.ME_DBG_DATA.us.HI, (val & 0xFFFF))
-#define MEI_REG_ACCESS_ME_DBG_DATA_HI_GET(pMeiDrvCntrl) \
-            MEI_REG_WRAP_GET((pMeiDrvCntrl)->pMeiIfCntrl->pVirtMeiRegIf->regStruct.ME_DBG_DATA.us.HI)
-
-/** Debug Data Register LO/High */
-#define MEI_REG_ACCESS_ME_DBG_DATA_LONG_SET(pMeiDrvCntrl, val) \
-            MEI_REG_ACCESS_ME_DBG_DATA_LO_SET(pMeiDrvCntrl, (val & 0x0000FFFF) ); \
-            MEI_REG_ACCESS_ME_DBG_DATA_HI_SET(pMeiDrvCntrl, ((val & 0xFFFF0000) >> 16) )
-
-#define MEI_REG_ACCESS_ME_DBG_DATA_LONG_GET(pMeiDrvCntrl) \
-            ( MEI_REG_ACCESS_ME_DBG_DATA_LO_GET(pMeiDrvCntrl) | \
-            ((MEI_REG_ACCESS_ME_DBG_DATA_HI_GET(pMeiDrvCntrl) << 16) & 0xFFFF0000) )
-
-/** Data Transfer Address Register Low  */
-#define MEI_REG_ACCESS_ME_DX_AD_LO_SET(pMeiDrvCntrl, val) \
-            MEI_REG_WRAP_SET((pMeiDrvCntrl)->pMeiIfCntrl->pVirtMeiRegIf->regStruct.ME_DX_AD.us.LO, (val & 0xFFFF))
-#define MEI_REG_ACCESS_ME_DX_AD_LO_GET(pMeiDrvCntrl) \
-            MEI_REG_WRAP_GET((pMeiDrvCntrl)->pMeiIfCntrl->pVirtMeiRegIf->regStruct.ME_DX_AD.us.LO)
-
-/** Data Transfer Address Register High */
-#define MEI_REG_ACCESS_ME_DX_AD_HI_SET(pMeiDrvCntrl, val) \
-            MEI_REG_WRAP_SET((pMeiDrvCntrl)->pMeiIfCntrl->pVirtMeiRegIf->regStruct.ME_DX_AD.us.HI, (val & 0xFFFF))
-#define MEI_REG_ACCESS_ME_DX_AD_HI_GET(pMeiDrvCntrl) \
-            MEI_REG_WRAP_GET((pMeiDrvCntrl)->pMeiIfCntrl->pVirtMeiRegIf->regStruct.ME_DX_AD.us.HI)
-
-/** Data Transfer Address Register LO/High */
-#define MEI_REG_ACCESS_ME_DX_AD_LONG_SET(pMeiDrvCntrl, val) \
-            MEI_REG_ACCESS_ME_DX_AD_LO_SET(pMeiDrvCntrl, (val & 0x0000FFFF) ); \
-            MEI_REG_ACCESS_ME_DX_AD_HI_SET(pMeiDrvCntrl, ((val & 0xFFFF0000) >> 16) )
-
-#define MEI_REG_ACCESS_ME_DX_AD_LONG_GET(pMeiDrvCntrl) \
-            ( MEI_REG_ACCESS_ME_DX_AD_LO_GET(pMeiDrvCntrl) | \
-              ((MEI_REG_ACCESS_ME_DX_AD_HI_GET(pMeiDrvCntrl) << 16) & 0xFFFF0000) )
-
-/** Memory wait states allowed for data transfer accesses. */
-#define MEI_REG_ACCESS_ME_DX_MWS_SET(pMeiDrvCntrl, val) \
-            MEI_REG_WRAP_SET((pMeiDrvCntrl)->pMeiIfCntrl->pVirtMeiRegIf->regStruct.ME_DX_MWS, (val & 0xFFFF))
-#define MEI_REG_ACCESS_ME_DX_MWS_GET(pMeiDrvCntrl) \
-            MEI_REG_WRAP_GET((pMeiDrvCntrl)->pMeiIfCntrl->pVirtMeiRegIf->regStruct.ME_DX_MWS)
-
-#  elif (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_AR9 == 1)
 /** Debug port select Register */
 #define MEI_REG_ACCESS_ME_DBG_PORT_SEL_SET(pMeiDrvCntrl, val) \
             MEI_REG_WRAP_SET((pMeiDrvCntrl)->pMeiIfCntrl->pVirtMeiRegIf->regStruct.ME_DBG_PORT_SEL, (val))
@@ -286,9 +183,6 @@ extern "C"
 #define MEI_REG_ACCESS_ME_XDATA_BASE_SH_GET(pMeiDrvCntrl) \
             (pMeiDrvCntrl)->pMeiIfCntrl->pVirtMeiRegIf->regStruct.ME_XDATA_BASE_SH
 
-#  endif
-
-
 /* ============================================================================
    Target Control Macros (common)
   ========================================================================= */
@@ -328,48 +222,7 @@ extern "C"
 #define ME_ARC2ME_STAT_ARC_MSGAV_GET(pMeiDev) \
             (pMeiDev->meiDrvCntrl.intMsgMask)
 
-#   if (MEI_SUPPORT_DEVICE_VINAX == 1)
-/*
-   Notify the ARC about mailbox message read done.
-      NOTE: write '1' to clear the corresponding flag
-*/
-#define MEI_MAILBOX_MSG_READ_DONE(pMeiDrvCntrl) \
-            MEI_REG_ACCESS_ME_ARC2ME_STAT_SET(pMeiDrvCntrl, (ME_ARC2ME_STAT_ARC_MSGAV) )
-/*
-   Release the ROM code interrupt.
-      NOTE: write '1' to clear the corresponding flag
-*/
-#define MEI_RELEASE_ROM_INT(pMeiDrvCntrl) \
-            MEI_REG_ACCESS_ME_ARC2ME_STAT_SET(pMeiDrvCntrl, (ME_ARC2ME_STAT_ARC_GP_INT1) )
-/*
-   ME Config: switch ON Bus Master Flag for this device.
-*/
-#define MEI_ME_CONFIG_BUS_MASTER_ON(pMeiDrvCntrl) \
-            MEI_REG_ACCESS_ME_CONFIG_SET(pMeiDrvCntrl, (MEI_REG_ACCESS_ME_CONFIG_GET(pMeiDrvCntrl) | ME_CONFIG_BMSTR) )
-/*
-   ME Config: switch OFF Bus Master Flag for this device.
-*/
-#define MEI_ME_CONFIG_BUS_MASTER_OFF(pMeiDrvCntrl) \
-            MEI_REG_ACCESS_ME_CONFIG_SET(pMeiDrvCntrl, (MEI_REG_ACCESS_ME_CONFIG_GET(pMeiDrvCntrl) & ~(ME_CONFIG_BMSTR)) )
-/*
-   Notify the ARC for a new Mailbox message.
-*/
-#define MEI_MAILBOX_NFC_NEW_MSG(pMeiDrvCntrl) \
-            MEI_REG_ACCESS_ME_ME2ARC_INT_SET(pMeiDrvCntrl, ME_ME2ARC_INT_ME_MSGAV )
-/*
-   Notify the ARC about code swap done.
-*/
-#define MEI_NOTIFY_CODESWAP_DONE(pMeiDrvCntrl) \
-            MEI_REG_ACCESS_ME_ME2ARC_INT_SET(pMeiDrvCntrl, ME_ME2ARC_INT_ME_CS_DONE )
-/*
-   Check the Mailbox ready for next msg.
-*/
-#define MEI_MAILBOX_BUSY_FOR_WR(pMeiDrvCntrl) \
-            (MEI_REG_ACCESS_ME_ME2ARC_STAT_GET(pMeiDrvCntrl) & ME_ME2ARC_STAT_ME_MSGAV)
-
-#define MEI_IS_RESET_MODE_SUPPORTED(x) (IFX_TRUE)
-
-#   elif (MEI_SUPPORT_DEVICE_VR9 == 1)
+#   if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1)
 /*
    Notify the ARC about mailbox message read done.
       NOTE: write '1' to clear the corresponding flag
@@ -429,6 +282,6 @@ extern "C"
 }
 #endif
 
-#endif   /* #ifndef _DRV_MEI_CPE_MEI_ACCESS_VINAX_H */
+#endif   /* #ifndef _DRV_MEI_CPE_MEI_ACCESS_VRX_H */
 
 

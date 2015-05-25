@@ -2,9 +2,8 @@
 #define _DRV_MEI_CPE_API_H
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -36,11 +35,11 @@
 #include "drv_mei_cpe_mei_interface.h"
 #include "drv_mei_cpe_api_intern.h"
 
-#if (MEI_SUPPORT_DEVICE_VINAX == 1)
-   #include "drv_mei_cpe_download_vinax.h"
-#elif (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_AR9 == 1)
-   #include "drv_mei_cpe_download_vr9.h"
-#endif
+#include "drv_mei_cpe_download_vrx.h"
+
+#if (MEI_SUPPORT_DSM == 1)
+#include "drv_mei_cpe_dsm_common.h"
+#endif /* (MEI_SUPPORT_DSM == 1) */
 
 #if (MEI_SUPPORT_ROM_CODE == 1)
 /* get ROM handler definitions */
@@ -62,7 +61,13 @@
 /** protection flag for the timeout values set from outside */
 #define MEI_CFG_DEF_WAIT_PROTECTION_FLAG            0x80000000
 /** default startup cfg: max wait time for the MODEM READY online msg */
+#if (MEI_SUPPORT_DEVICE_VR10 == 1)
+#define MEI_CFG_DEF_WAIT_FOR_MODEM_READY_SEC        30000
+#define MEI_CFG_DEF_WAIT_FOR_PDBRAM_ACCESS_TOTAL    100
+#define MEI_CFG_DEF_WAIT_FOR_PDBRAM_ACCESS_ATTEMPT  20
+#else
 #define MEI_CFG_DEF_WAIT_FOR_MODEM_READY_SEC        10000
+#endif
 /** default startup cfg: max wait time for the MODEM READY online msg (bootmode 7) */
 #define MEI_CFG_DEF_WAIT_FOR_MODEM_READY_BM7_SEC    4000
 /** default startup cfg: max wait time for normal msg responce */
@@ -121,7 +126,6 @@
 #define MEI_FSM_STATE_SET_PRE_ACT_ALL      (  MEI_FSM_STATE_SET_PRE_ACT_ETHOAM_ENABLE \
                                               | MEI_FSM_STATE_SET_PRE_ACT_ATMOAM_ENABLE \
                                               | MEI_FSM_STATE_SET_PRE_ACT_ATMOAM_ENABLE )
-
 
 /* ==========================================================================
    Global macros - swap big/little endianes
@@ -287,7 +291,6 @@
 #define MEI_DRV_DYN_LINENUM_GET(pMeiDynCntrl) \
                         (pMeiDynCntrl)->pMeiDev->meiDrvCntrl.dslLineNum
 
-
 /** get the MEI device MEI physical address out form the MEI device struct */
 #define MEI_DRV_MEI_PHY_ADDR_GET(pMeiDev) \
                         (pMeiDev)->meiDrvCntrl.pMeiIfCntrl->phyBaseAddr
@@ -296,8 +299,6 @@
 #define MEI_DRV_MEI_PHY_ADDR_SET(pMeiDev, newMeiPhyAddr) \
                         (pMeiDev)->meiDrvCntrl.pMeiIfCntrl->phyBaseAddr = (IFX_ulong_t)newMeiPhyAddr;
 
-
-
 /** get the MEI device MEI virtual address out form the MEI device struct */
 #define MEI_DRV_MEI_VIRT_ADDR_GET(pMeiDev) \
                         (pMeiDev)->meiDrvCntrl.pMeiIfCntrl->pVirtMeiRegIf
@@ -305,6 +306,36 @@
 /** set the MEI device MEI virtual address to the MEI device struct */
 #define MEI_DRV_MEI_VIRT_ADDR_SET(pMeiDev, pNewMeiVirtAddr) \
                         (pMeiDev)->meiDrvCntrl.pMeiIfCntrl->pVirtMeiRegIf = pNewMeiVirtAddr;
+
+#if (MEI_SUPPORT_DEVICE_VR10 == 1)
+/** get the MEI physical address at PCIe bus */
+#define MEI_DRV_PCIE_PHY_MEMBASE_GET(pMeiDrvCntrl) \
+                                    (pMeiDrvCntrl)->MEI_pcie_phy_membase
+
+/** get the MEI virtual address at PCIe bus */
+#define MEI_DRV_PCIE_VIRT_MEMBASE_GET(pMeiDrvCntrl) \
+                                    (pMeiDrvCntrl)->MEI_pcie_virt_membase
+
+/** get the MEI irq at PCIe bus */
+#define MEI_DRV_PCIE_IRQ_GET(pMeiDrvCntrl) \
+                                    (pMeiDrvCntrl)->MEI_pcie_irq
+
+/** get the PDBRAM physical address out form the MEI device struct */
+#define MEI_DRV_PDBRAM_PHY_ADDR_GET(pMeiDev) \
+                        (pMeiDev)->meiDrvCntrl.pMeiIfCntrl->phyPDBRAMaddr
+
+/** set the PDBRAM physical address to the MEI device struct */
+#define MEI_DRV_PDBRAM_PHY_ADDR_SET(pMeiDev, newPDBRAM_PhyAddr) \
+                        (pMeiDev)->meiDrvCntrl.pMeiIfCntrl->phyPDBRAMaddr = (IFX_ulong_t)newPDBRAM_PhyAddr;
+
+/** get the PDBRAM virtual address out form the MEI device struct */
+#define MEI_DRV_PDBRAM_VIRT_ADDR_GET(pMeiDev) \
+                        (pMeiDev)->meiDrvCntrl.pMeiIfCntrl->virtPDBRAMaddr
+
+/** set the PDBRAM virtual address to the MEI device struct */
+#define MEI_DRV_PDBRAM_VIRT_ADDR_SET(pMeiDev, newPDBRAM_VirtAddr) \
+                        (pMeiDev)->meiDrvCntrl.pMeiIfCntrl->virtPDBRAMaddr = (IFX_ulong_t)newPDBRAM_VirtAddr;
+#endif /* (MEI_SUPPORT_DEVICE_VR10 == 1) */
 
 /** get the MEI MEI interface state this interface */
 #define MEI_DRV_MEI_IF_STATE_GET(pMeiDev) \
@@ -350,6 +381,33 @@
 
 /** set the MEI driver mailbox state for this channel */
 #define MEI_TRACE_MB_STATE_CHANGES   0
+
+/** Special test handling that tests whether the bootloader is corrctly
+    startred.
+    \note This handling is only required in case there is no MODEM_READY
+          message received.The following steps are done to check if the
+          bootloader has been started correctly
+          - Modify the port mode control structure header by overwriting the
+            signture1 with a dummy value (0xCAFE) before releasing the ARC from
+            halt
+          - Release the ARC from halt
+          - If the bootloader is started it will overwrite the signature1
+            with the default value of MEI_FW_IMAGE_SIGNATURE1 (0xB11D) again
+          - Value of signature1 is checked after timeout waiting for MODEM_READY
+          - In case of signature1 is still the dummy value bootloader has not
+            been started otherwise it should be signature1 default value.
+*/
+#define MEI_DBG_CECK_BOOTLOADER_START   0
+
+/** Special test and debug functionality that provides possibility to measure
+    timings for code part executions and generate a statistic array out of
+    it. ONLY supported for Linux! */
+#if defined(LINUX) && (MEI_SUPPORT_DSM == 1)
+#define MEI_DBG_DSM_PROFILING 0
+#else
+#undef MEI_DBG_DSM_PROFILING
+#define MEI_DBG_DSM_PROFILING 0
+#endif
 
 #if MEI_TRACE_MB_STATE_CHANGES == 1
 #define MEI_DRV_MAILBOX_STATE_SET(pMeiDev, new_mb_state) \
@@ -798,6 +856,58 @@ typedef struct MEI_dev_s
    MEI_TIME_STAT_T          timeStat;
 #endif
 
+   /** Current firmware revision */
+   MEI_FW_REVISION          eFwRevision;
+
+   /** Current firmware memory layout type */
+   MEI_FW_MEM_LAYOUT_TYPE   eFwMemLayoutType;
+
+   /** Partitions information (available for fw layout type 2) */
+   MEI_FW_PARTITIONS        meiPartitions;
+
+   /** Max amount of chunks (depends of fw layout type) */
+   IFX_uint32_t             meiMaxChunkCount;
+   /** Offset of special chunks (linked to the BAR14, BAR15, BAR16) */
+   /** BAR[14] -> chunk[14+meiSpecialChunkOffset] */
+   IFX_uint32_t             meiSpecialChunkOffset;
+
+#if (MEI_SUPPORT_DSM == 1)
+   /** dsm vectoring data */
+   MEI_DSM_VECTOR_DYN_ERB   meiERBbuf;
+
+   #if (MEI_DBG_DSM_PROFILING == 1)
+#error MEI_DBG_DSM_PROFILING included
+   /** Array to store profiling timing data for event handling. */
+   IFX_uint32_t meiDbgProfilingData[32];
+   /** Bool variable to switch on/off the ERB data reset handling (for FW
+       debug purpose) */
+   IFX_boolean_t bErbReset;
+   #endif
+
+   /** Successful firmware downloads including full G.Vector (Annex N)
+       support */
+   IFX_uint32_t meiFwDlCount;
+
+   /** dsm vectoring statistic */
+   IOCTL_MEI_dsmStatistics_t meiDsmStatistic;
+
+   /** dsm vectoring config */
+   IOCTL_MEI_dsmConfig_t meiDsmConfig;
+
+   /** Initial initialization flag. To set initial default confifuration for
+       meiDsmConfig.eVectorControl according to first FW that will be
+       downloaded. */
+   IFX_boolean_t         bDsmConfigInit;
+
+   /** MAC address config */
+   IOCTL_MEI_MacConfig_t meiMacConfig;
+
+   /** dsm vectoring support within firmware */
+   MEI_DSM_VECTOR_FW_SUPPORT_MODE_E nFwVectorSupport;
+
+   IOCTL_MEI_firmwareFeatures_t firmwareFeatures;
+#endif /* (MEI_SUPPORT_DSM == 1) */
+
    /* =======================================================================
       Modem data
    */
@@ -809,17 +919,17 @@ typedef struct MEI_dev_s
       Message handling
    */
    /** handling message protocol: ACK received */
-   IFX_boolean_t           bAckNeedWakeUp;
-   MEI_DRVOS_event_t       eventMailboxRecv;
-   IFX_uint32_t            timeoutCount;
+   IFX_boolean_t         bAckNeedWakeUp;
+   MEI_DRVOS_event_t     eventMailboxRecv;
+   IFX_uint32_t          timeoutCount;
 
    /** handling message protocol: points to the open instance waiting for an ACK */
    MEI_DYN_CMD_DATA_T    *pCurrDynCmd;
 
 #if ( defined(MEI_DRVOS_HAVE_DRV_SELECT) && (MEI_DRVOS_HAVE_DRV_SELECT == 1) )
    /** support for select() */
-   IFX_boolean_t           bNfcNeedWakeUp;
-   MEI_DRVOS_selectQueue_t selNfcWakeupList;
+   IFX_boolean_t         bNfcNeedWakeUp;
+   MEI_DRVOS_event_t     selNfcWakeupList;
 #endif
 
    /** list of all open instances which can receive NFC's, EVT's ALM's */
@@ -850,7 +960,6 @@ typedef struct MEI_dev_s
 #if (MEI_DRV_CLEAR_EOC_ENABLE == 1)
    MEI_CEOC_DEV_CNTRL_T     *pCEocDevCntrl;
 #endif
-
 } MEI_DEV_T;
 
 
@@ -943,15 +1052,15 @@ extern IFX_int32_t MEI_IrqProtectCount;
 extern const char MEI_WHATVERSION[] ;
 
 
-/* VINAX-Driver: Common debug module - declare print level variable */
+/* VRX-Driver: Common debug module - declare print level variable */
 MEI_DRV_PRN_USR_MODULE_DECL(MEI_DRV);
 MEI_DRV_PRN_INT_MODULE_DECL(MEI_DRV);
 
+/* MEI CPE-Driver: fw message dump debug module - create print level variable */
+MEI_DRV_PRN_USR_MODULE_DECL(MEI_MSG_DUMP_API);
+MEI_DRV_PRN_INT_MODULE_DECL(MEI_MSG_DUMP_API);
 
 /** define the boot mode */
-#if (MEI_SUPPORT_DEVICE_VINAX == 1)
-extern IFX_uint8_t  MEI_BootMode;
-#endif /* (MEI_SUPPORT_DEVICE_VINAX == 1)*/
 extern IFX_int32_t  MEI_BlockTimeout;
 extern IFX_uint8_t  MEI_DefDownLoadChipId;
 extern IFX_uint32_t MEI_MaxWaitForModemReady_ms;
@@ -962,10 +1071,20 @@ extern IFX_uint32_t MEI_FsmStateSetMsgPreAction;
 extern IFX_uint32_t MEI_fwModeSelect;
 #endif
 
-
 /* ==========================================================================
    Global Functions Definitions
    ========================================================================== */
+
+#if (MEI_SUPPORT_DEVICE_VR10 == 1)
+extern IFX_int32_t MEI_VR10_PcieEntitiesCheck(
+                           IFX_uint8_t nEntityNum);
+
+extern IFX_int32_t MEI_VR10_PcieEntityInit(
+                           MEI_MEI_DRV_CNTRL_T *pMeiDrvCntrl);
+
+extern IFX_int32_t MEI_VR10_InternalInitDevice(
+                           MEI_DYN_CNTRL_T *pMeiDynCntrl);
+#endif /* (MEI_SUPPORT_DEVICE_VR10 == 1) */
 
 extern IFX_int32_t MEI_CheckIoctlCmdInitState(
                                  MEI_DYN_CNTRL_T *pMeiDynCntrl,
@@ -1055,23 +1174,18 @@ extern IFX_int32_t MEI_ResetDrvStruct(
 
 extern IFX_int32_t MEI_GPIntProcess(MEI_MeiRegVal_t processInt, MEI_DEV_T *pMeiDev);
 
-#if (MEI_SUPPORT_DEVICE_VINAX == 1)
-extern IFX_uint32_t MEI_SetDriverBootMode(
-                                 MEI_DEV_T *pMeiDev);
-#endif /* (MEI_SUPPORT_DEVICE_VINAX == 1)*/
-
 extern IFX_int32_t MEIX_DevMaskCheck(
-                                 IFX_uint32_t               *pVnxDevMask,
+                                 IFX_uint32_t               *pVrxDevMask,
                                  MEI_FCT_CHECK_DEV_STATE  fctCheckDevState);
 
 
 #if (MEI_SUPPORT_IRQ == 1)
-extern MEIX_CNTRL_T * MEI_VnxXDevToIrqListAdd(
+extern MEIX_CNTRL_T * MEI_VrxXDevToIrqListAdd(
                                  IFX_uint8_t    devNum,
                                  IFX_uint32_t   irqNum,
                                  MEIX_CNTRL_T *pMeiXCntrl);
 
-extern IFX_void_t MEI_VnxXDevFromIrqListClear(
+extern IFX_void_t MEI_VrxXDevFromIrqListClear(
                                  MEIX_CNTRL_T *pMeiXCntrl);
 
 
@@ -1083,11 +1197,11 @@ extern IFX_int32_t MEI_ProcessIntPerIrq(
 extern IFX_int32_t MEI_DevPollAllIrq(
                                  MEI_DEV_ACCESS_MODE_E eAccessMode);
 
-extern IFX_int32_t MEI_PollIntPerVnxLine(
+extern IFX_int32_t MEI_PollIntPerVrxLine(
                                  MEI_DEV_T             *pMeiDev,
                                  MEI_DEV_ACCESS_MODE_E eAccessMode);
 
-extern IFX_int32_t MEI_ProcessIntPerVnxLine(
+extern IFX_int32_t MEI_ProcessIntPerVrxLine(
                                  MEI_DEV_T *pMeiDev);
 
 extern IFX_int32_t MEI_DisableDevsPerIrq(
@@ -1121,6 +1235,31 @@ extern IFX_int32_t MEI_DrvCntrlThr(
 
 #endif   /* #if (MEI_SUPPORT_PERIODIC_TASK == 1) */
 
+#if (MEI_SUPPORT_DSM == 1)
+extern IFX_int32_t MEI_IoctlDsmStatisticGet(
+                                 MEI_DYN_CNTRL_T           *pMeiDynCntrl,
+                                 IOCTL_MEI_dsmStatistics_t *pDsmStatistic);
+
+extern IFX_int32_t MEI_IoctlDsmConfigGet(
+                                 MEI_DYN_CNTRL_T          *pMeiDynCntrl,
+                                 IOCTL_MEI_dsmConfig_t    *pDsmConfig);
+
+extern IFX_int32_t MEI_IoctlDsmConfigSet(
+                                 MEI_DYN_CNTRL_T          *pMeiDynCntrl,
+                                 IOCTL_MEI_dsmConfig_t    *pDsmConfig);
+
+extern IFX_int32_t MEI_IoctlDsmStatusGet(
+                                 MEI_DYN_CNTRL_T          *pMeiDynCntrl,
+                                 IOCTL_MEI_dsmStatus_t    *pDsmStatus);
+
+extern IFX_int32_t MEI_IoctlMacConfigGet(
+                                 MEI_DYN_CNTRL_T          *pMeiDynCntrl,
+                                 IOCTL_MEI_MacConfig_t    *pMacConfig);
+
+extern IFX_int32_t MEI_IoctlMacConfigSet(
+                                 MEI_DYN_CNTRL_T          *pMeiDynCntrl,
+                                 IOCTL_MEI_MacConfig_t    *pMacConfig);
+#endif /* (MEI_SUPPORT_DSM == 1) */
 
 /* ==========================================================================
    Extern function definitions from the board driver for debug (trigger)
@@ -1128,7 +1267,7 @@ extern IFX_int32_t MEI_DrvCntrlThr(
 
 #if (MEI_EB_TRIGGER_FCT == 1)
 
-/* inlcude the trigger functions from the VINAX Eval Board driver */
+/* inlcude the trigger functions from the VRX Eval Board driver */
 
 extern IFX_void_t MEI_Eb_DfeTriggerWrite( IFX_uint8_t  DeviceNum,
                                             IFX_uint32_t regOffset,

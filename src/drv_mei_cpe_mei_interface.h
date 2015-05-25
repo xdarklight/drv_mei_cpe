@@ -2,9 +2,8 @@
 #define _DRV_MEI_CPE_MEI_INTERFACE_H
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -12,7 +11,7 @@
 ******************************************************************************/
 
 /* ==========================================================================
-   Description : VINAX driver - MEI interface definitions
+   Description : VRX driver - MEI interface definitions
    Remarks:
    ========================================================================== */
 
@@ -109,7 +108,7 @@ extern "C"
    Target Control Macros
    ========================================================================= */
 
-/** base address of the VINAX peripheral block (PLL chipcfg, etc) */
+/** base address of the VRX peripheral block (PLL chipcfg, etc) */
 #define MEI_PERIPHERAL_CONFIG_OFF   0x000E2000
 #define MEI_PERIPHERAL_CONFIG_SIZE  0x000000FF
 
@@ -143,7 +142,7 @@ extern "C"
 
 
 /* ============================================================================
-   VINAX MEI interface - enumerations
+   VRX MEI interface - enumerations
    ========================================================================= */
 
 /**
@@ -161,7 +160,7 @@ typedef enum
 
 
 /* ============================================================================
-   VINAX Rev 1 MEI interface - data struct typedefs
+   VRX Rev 1 MEI interface - data struct typedefs
    ========================================================================= */
 
 /**
@@ -178,12 +177,18 @@ typedef struct mei_if_cntrl_s
    IFX_ulong_t             phyBaseAddr;
    /** mapped virtual address of the physical MEI register interface */
    MEI_MEI_REG_IF_U      *pVirtMeiRegIf;
+#if (MEI_SUPPORT_DEVICE_VR10 == 1)
+   /** physical address of the PDBRAM */
+   IFX_ulong_t             phyPDBRAMaddr;
+   /** mapped virtual address of the physical MEI register interface */
+   IFX_ulong_t             virtPDBRAMaddr;
+#endif
 } MEI_MEI_IF_CNTRL_T;
 
 
 /**
-   VINAX Rev 2 - device specific MEI Control struct
-   (per device and per MEI Interface).
+   VRX Rev 2 - device specific MEI Control struct (per device and per MEI 
+   Interface). 
 
    This struct contains the data for handling the MEI Interface per devcie
    - physical Address
@@ -221,6 +226,13 @@ typedef struct mei_drv_cntrl_s
    /** used MSG interrupt mask  */
    IFX_uint32_t            intMsgMask;
 
+#if (MEI_SUPPORT_DEVICE_VR10 == 1)
+   /** Memory base addresses provided by PCIe driver */
+   IFX_uint32_t MEI_pcie_phy_membase;
+   IFX_uint32_t MEI_pcie_virt_membase;
+   IFX_uint32_t MEI_pcie_irq;
+#endif
+
    /** MEI control per device */
    MEI_MEI_DEV_CNTRL_T   *pMeiDevCntrl;
 
@@ -238,7 +250,7 @@ extern IFX_int32_t MEI_DummyAccessLoopsRd;
 extern IFX_int32_t MEI_DummyAccessLoopsWr;
 #endif
 
-/* VINAX-Driver: MEI Access debug module - declare print level variable */
+/* VRX-Driver: MEI Access debug module - declare print level variable */
 MEI_DRV_PRN_USR_MODULE_DECL(MEI_MEI_ACCESS);
 MEI_DRV_PRN_INT_MODULE_DECL(MEI_MEI_ACCESS);
 

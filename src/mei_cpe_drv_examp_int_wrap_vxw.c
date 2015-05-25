@@ -1,8 +1,7 @@
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -16,7 +15,7 @@
                E X A M P L E  (vxWorks)
 
             how to setup and use the wrap of
-         the VINAX driver interrupt functions.
+         the VRX driver interrupt functions.
 
    ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! ! !  */
 
@@ -32,24 +31,24 @@
          also a lock will be set to block further changes after the interrupt
          functions are in use.
 
-      After setup this local interrupt functions the VINAX driver will use
+      After setup this local interrupt functions the VRX driver will use
       it for interrupt handling.
 
       Remember:
-         Within the local MEI_IfxIntConnect() the VINAX driver calls
-         the user-intConnect() function with the VINAX driver origional data
+         Within the local MEI_IfxIntConnect() the VRX driver calls
+         the user-intConnect() function with the VRX driver origional data
          (Interrupt Service Routine (ISR) + ISR PARAMS). So the user-intConnect
          has here the chance to catch the driver ISR and parameter.
 
       The example MEI_MyIntConnect_Wrap() function catch and save
-      the VINAX driver internal Interrupt Service Routine (ISR) and
-      the VINAX driver internal ISR parameters for later use within the
+      the VRX driver internal Interrupt Service Routine (ISR) and
+      the VRX driver internal ISR parameters for later use within the
       example-ISR MEI_MyInterruptVxWorks() and after this it registers the
       example ISR and the example params via intConnect() to the
       vxWorks system.
 
       So if an interrupt occured the example-ISR can do his user-specific stuff
-      and additional the origional VINAX driver ISR has to be called.
+      and additional the origional VRX driver ISR has to be called.
 
       SEE:
          MEI_IfxIntConnect(), MEI_MyInterruptVxWorks()
@@ -74,7 +73,7 @@
 #include "logLib.h"
 #include "stdio.h"
 
-/* get the VINAX driver interrupt wrapper functions */
+/* get the VRX driver interrupt wrapper functions */
 #include "drv_mei_cpe_vxworks.h"
 #include "mei_cpe_drv_examp_int_wrap_vxw.h"
 
@@ -114,8 +113,8 @@ LOCAL MEI_MyIsrParams_t MEI_MyIsrParams[8] =
    ========================================================================= */
 
 /*
-   Wrap the VINAX original ISR
-   - do own stuff and also call the origional VINAX Drv ISR
+   Wrap the VRX original ISR
+   - do own stuff and also call the origional VRX Drv ISR
 */
 LOCAL void MEI_MyInterruptVxWorks(int ISRParams)
 {
@@ -153,10 +152,10 @@ LOCAL void MEI_MyInterruptVxWorks(int ISRParams)
 /*
    Wrap the VxWorks intConnect routine.
 
-   The VINAX driver still calls this function with the
-   original VINAX ISR and PARAMS.
+   The VRX driver still calls this function with the
+   original VRX ISR and PARAMS.
 
-   So here we catch the origional VINAX driver informations for later use !!!
+   So here we catch the origional VRX driver informations for later use !!!
 
 */
 LOCAL STATUS MEI_MyIntConnect_Wrap( VOIDFUNCPTR *pIntVector,
@@ -176,7 +175,7 @@ LOCAL STATUS MEI_MyIntConnect_Wrap( VOIDFUNCPTR *pIntVector,
 
    printf("INT Wrap - intConnect\r\n");
 
-   /* save the original VINAX ISR and call it later */
+   /* save the original VRX ISR and call it later */
    MEI_MyIsrParams[IrqIdx].MEI_OrgDrvIsr    = pISRRoutine;
    MEI_MyIsrParams[IrqIdx].MEI_OrgIsrParams = ISRParams;
 
@@ -262,7 +261,7 @@ LOCAL int MEI_MyIntDisable_Wrap(int IRQNum)
      The ioctl(.., FIO_MEI_DEV_INIT, ..) does the IRQ assignment.
 
    Remark:
-      When the VINAX driver do the intConnect it will increment an internal
+      When the VRX driver do the intConnect it will increment an internal
       lock variable. Changes of the interrupt wrap functions are
       only possible if these lock is 0.
       Means: after the first intConnect() the update of the wrapper functions

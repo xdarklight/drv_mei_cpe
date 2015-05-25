@@ -1,7 +1,7 @@
 
 AC_REVISION($Revision: 1.21 $)
 
-AC_INIT(IFX MEI CPE Driver, 1.2.1, , drv_mei_cpe)
+AC_INIT(IFX MEI CPE Driver, 1.4.1, , drv_mei_cpe)
 AC_CONFIG_SRCDIR(src/Makefile.am)
 AM_INIT_AUTOMAKE
 
@@ -22,26 +22,26 @@ MEI_DRV_TARGET_OPTIONS=""
 dnl Select device support
 AM_CONDITIONAL(SELECT_DEVICE_SUPPORT, false)
 AC_ARG_ENABLE(device,
-    AC_HELP_STRING([--enable-device=vinax | vr9 | ar9],[Select Device]),
+    AC_HELP_STRING([--enable-device=vr9 | vr10 | ar9],[Select Device]),
     [
         echo Set Device = $enableval
         case $enableval in
-        vinax)
-            AM_CONDITIONAL(SELECT_DEVICE_SUPPORT, false)
-            AC_SUBST([DSL_DEVICE_NAME],[Vinax])
-            MEI_DRV_TARGET_OPTIONS="$MEI_DRV_TARGET_OPTIONS -DMEI_SUPPORT_DEVICE_VINAX=1 -DMEI_SUPPORT_DEVICE_VR9=0 -DMEI_SUPPORT_DEVICE_AR9=0"
-            ;;
         vr9)
             AM_CONDITIONAL(SELECT_DEVICE_SUPPORT, true)
             AC_SUBST([DSL_DEVICE_NAME],[VR9])
-            MEI_DRV_TARGET_OPTIONS="$MEI_DRV_TARGET_OPTIONS -DMEI_SUPPORT_DEVICE_VINAX=0 -DMEI_SUPPORT_DEVICE_VR9=1 -DMEI_SUPPORT_DEVICE_AR9=0"
+            MEI_DRV_TARGET_OPTIONS="$MEI_DRV_TARGET_OPTIONS -DMEI_SUPPORT_DEVICE_VR9=1 -DMEI_SUPPORT_DEVICE_VR10=0 -DMEI_SUPPORT_DEVICE_AR9=0"
+            ;;
+        vr10)
+            AM_CONDITIONAL(SELECT_DEVICE_SUPPORT, true)
+            AC_SUBST([DSL_DEVICE_NAME],[VR10])
+            MEI_DRV_TARGET_OPTIONS="$MEI_DRV_TARGET_OPTIONS -DMEI_SUPPORT_DEVICE_VR9=0 -DMEI_SUPPORT_DEVICE_VR10=1 -DMEI_SUPPORT_DEVICE_AR9=0"
             ;;
         ar9)
             AM_CONDITIONAL(SELECT_DEVICE_SUPPORT, true)
             AC_SUBST([DSL_DEVICE_NAME],[AR9])
-            MEI_DRV_TARGET_OPTIONS="$MEI_DRV_TARGET_OPTIONS -DMEI_SUPPORT_DEVICE_VINAX=0 -DMEI_SUPPORT_DEVICE_VR9=0 -DMEI_SUPPORT_DEVICE_AR9=1"
+            MEI_DRV_TARGET_OPTIONS="$MEI_DRV_TARGET_OPTIONS -DMEI_SUPPORT_DEVICE_VR9=0 -DMEI_SUPPORT_DEVICE_VR10=0 -DMEI_SUPPORT_DEVICE_AR9=1"
             ;;
-        *) AC_MSG_ERROR([ Select Device, use vinax | vr9 | ar9 ]);
+        *) AC_MSG_ERROR([ Select Device, use vr9 | vr10 | ar9 ]);
              ;;
         esac
     ]
@@ -68,7 +68,7 @@ AC_ARG_ENABLE(debug,
 AC_ARG_ENABLE(error_print,
     AC_HELP_STRING([--enable-error-print],[Enable error messages]),
    [
-        echo Set VINAX Error Print = $enableval
+        echo Set VRX Error Print = $enableval
         case $enableval in
         0|no)
             AC_SUBST([DSL_ENABLE_ERROR_PRINTS],[no])
@@ -193,12 +193,12 @@ AC_ARG_ENABLE(add_appl_ldflags,
     ]
 )
 
-dnl Set VINAX driver feature configure option
+dnl Set VRX driver feature configure option
 AC_ARG_ENABLE(drv_target_opt,
-   AC_HELP_STRING([--enable-drv_target_opt=x],[Set the VINAX driver feature configure option]),
+   AC_HELP_STRING([--enable-drv_target_opt=x],[Set the VRX driver feature configure option]),
     [
         if test -n "$enableval"; then
-            echo Set VINAX Driver target options = $enableval
+            echo Set VRX Driver target options = $enableval
             MEI_DRV_TARGET_OPTIONS="$MEI_DRV_TARGET_OPTIONS $enableval"
         fi
     ]
@@ -269,7 +269,7 @@ AM_CONDITIONAL(ADD_DRV_MODEM_TESTS_SET, false)
 AC_ARG_ENABLE(add_drv_modem_tests,
     AC_HELP_STRING([--enable-add_drv_modem_tests=x],[Set add driver modem tests]),
     [
-        echo Set VINAX DRV_MODEM_TESTS = $enableval
+        echo Set VRX DRV_MODEM_TESTS = $enableval
         case $enableval in
         0|no)
          AM_CONDITIONAL(ADD_DRV_MODEM_TESTS_SET, false)
@@ -337,19 +337,19 @@ AC_ARG_ENABLE(pci-slave,
 
 dnl Enable MEI CPE driver PCI Slave application specific address range
 AC_ARG_ENABLE(pci-slave-addr,
-    AC_HELP_STRING([--enable-pci-slave-addr=adtran | bonding],[Select PCI Slave address range]),
+    AC_HELP_STRING([--enable-pci-slave-addr=bonding | bonding_external],[Select PCI Slave address range]),
     [
         echo Set Device = $enableval
         case $enableval in
-        adtran)
-            AC_SUBST([MEI_PCI_SLAVE_ADDR_RANGE],[ADTRAN])
-            MEI_DRV_TARGET_OPTIONS="$MEI_DRV_TARGET_OPTIONS -DMEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_ADTRAN=1 -DMEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_BONDING=0"
-            ;;
         bonding)
             AC_SUBST([MEI_PCI_SLAVE_ADDR_RANGE],[BONDING])
-            MEI_DRV_TARGET_OPTIONS="$MEI_DRV_TARGET_OPTIONS -DMEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_ADTRAN=0 -DMEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_BONDING=1"
+            MEI_DRV_TARGET_OPTIONS="$MEI_DRV_TARGET_OPTIONS -DMEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_BONDING_EXTERNAL=0 -DMEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_BONDING=1"
             ;;
-        *) AC_MSG_ERROR([ Select PCI Slave address range, use adtran | bonding ]);
+        bonding_external)
+            AC_SUBST([MEI_PCI_SLAVE_ADDR_RANGE],[BONDING_EXTERNAL])
+            MEI_DRV_TARGET_OPTIONS="$MEI_DRV_TARGET_OPTIONS -DMEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_BONDING_EXTERNAL=1 -DMEI_SUPPORT_PCI_SLAVE_ADDR_RANGE_BONDING=0"
+            ;;
+        *) AC_MSG_ERROR([ Select PCI Slave address range, use bonding | bonding_external ]);
              ;;
         esac
     ]

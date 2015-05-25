@@ -2,9 +2,8 @@
 #define _DRV_TEST_MEI_CPE_LINUX_H
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -53,7 +52,7 @@
                                     _MKSTR(MEI_TEST_DRV_VER_TYPE)
 
 /** driver version, what string */
-#define MEI_TEST_DRV_WHAT_STR "@(#)VINAX Driver Test, Version " MEI_TEST_DRV_VER_STR
+#define MEI_TEST_DRV_WHAT_STR "@(#)VRX Driver Test, Version " MEI_TEST_DRV_VER_STR
 
 /** used driver name for registration */
 #define MEI_TEST_DRV_NAME     "mei_test"
@@ -62,11 +61,11 @@
 #define MEI_TEST_MAX_MSG_PAYLOAD_SIZE     268
 
 /**
-   Vinax Line handles.
+   Vrx Line handles.
 */
 typedef struct MEI_TEST_dev_s
 {
-   MEI_DYN_CNTRL_T    *pVnxTestLine[MEI_MAX_DFE_CHAN_DEVICES];
+   MEI_DYN_CNTRL_T    *pVrxTestLine[MEI_MAX_DFE_CHAN_DEVICES];
 } MEI_TEST_dev_t;
 
 

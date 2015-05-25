@@ -4,9 +4,8 @@
 #
 # if no para : use local debug level
 # para 1 ($1): debug level (0 = use local debug level)
-# para 2 ($2): number of lines (default: 2)
-# para 3 ($3): number of devices (default: 2)
-# 
+# para 2 ($2): number of entities (default: 1)
+#
 
 bindir=/opt/lantiq/bin
 
@@ -20,8 +19,7 @@ fi
 drv_dev_base_name=mei_cpe
 drv_obj_file_name=drv_mei_cpe$MODEXT
 
-lines=1
-devices=1
+entities=1
 
 # set debug_level: 1=low, 2=normal, 3=high, 4=off
 debug_level=3
@@ -41,7 +39,7 @@ if [ -e ${bindir}/${drv_obj_file_name} ]; then
    if [ "$debug_level" -le 2 ]; then
       echo "- loading MEI CPE device driver -"
    fi
-   insmod $drv_obj_file_name debug_level=$debug_level 
+   insmod $drv_obj_file_name debug_level=$debug_level
    # add "drv_major_number=$drv_major_number" for fixed major number
 
    if [ $? -ne 0 ]; then
@@ -66,22 +64,12 @@ test ! -d $prefix/ && mkdir $prefix/
 
 # get numbers from params
 if [ $# -ge 1 ]; then
-    lines=$2
-fi
-if [ $# -ge 2 ]; then
-    devices=$3
+    entities=$2
 fi
 
 I=0
-while test $I -lt $lines; do
+while test $I -lt $entities; do
     test ! -e $prefix/$I && mknod $prefix/$I c $major_no `expr $I`
     I=`expr $I + 1`
 done
-
-I=0
-while test $I -lt $devices; do 
-    test ! -e $prefix/cntrl$I && mknod $prefix/cntrl$I c $major_no `expr $I + 128`
-    I=`expr $I + 1`
-done
-
 

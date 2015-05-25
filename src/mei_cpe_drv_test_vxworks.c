@@ -1,8 +1,7 @@
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -11,7 +10,7 @@
 
 
 /* ==========================================================================
-   Description : Small test programm to test the VINAX Driver
+   Description : Small test programm to test the VRX Driver
    ========================================================================== */
 
 /* ==========================================================================
@@ -86,15 +85,15 @@ static int MEI_ParamTable[MEI_NUM_OF_PARAMS];
 #define MEI_TEST_INFO    999
 
 
-struct sVinaxDfeTestTable { int cmd; char *pHelpStr; } pVinaxDfeTestTable[] =
+struct sVrxDfeTestTable { int cmd; char *pHelpStr; } pVrxDfeTestTable[] =
 {
    {MEI_TEST_HELP,    "Printout help info"},
    {MEI_TEST_VER_GET, "Get Driver Version  Args - none"},
 
    {MEI_TEST_CFG_GET, "Request dev config  Args - none"},
-   {MEI_TEST_INI_DEV, "Init VINAX Device   Args - 0: phy Addr,  1: IRQ"},
+   {MEI_TEST_INI_DEV, "Init VRX Device   Args - 0: phy Addr,  1: IRQ"},
    {MEI_TEST_FDL_DEV, "Firmware Download   Args - 0: <file>"},
-   {MEI_TEST_RST_DEV, "Reset VINAX Device  Args - 0: Rst Mode"},
+   {MEI_TEST_RST_DEV, "Reset VRX Device  Args - 0: Rst Mode"},
    {MEI_TEST_INFO,    "                              Rst Mode: 0=RESET, 1=ACT, 2=DEACT"},
    {MEI_TEST_FW_SEL,  "FW Select           Args - 0: <fw mode>"},
    {MEI_TEST_INFO,    "                              fw mode: 0=VDSL2, 1=ADSL"},
@@ -131,7 +130,7 @@ struct sVinaxDfeTestTable { int cmd; char *pHelpStr; } pVinaxDfeTestTable[] =
 /**
    Print Help to specified stream
 */
-static int doVinaxDrvTestHelp_fd(MEIOS_File_t *streamOut)
+static int doVrxDrvTestHelp_fd(MEIOS_File_t *streamOut)
 {
    int testIndex = 0;
 
@@ -141,24 +140,24 @@ static int doVinaxDrvTestHelp_fd(MEIOS_File_t *streamOut)
    }
 
    MEIOS_FPrintf(streamOut,
-      MEIOS_CRLF "VINAX driver - Low Level Tests" MEIOS_CRLF MEIOS_CRLF);
+      MEIOS_CRLF "VRX driver - Low Level Tests" MEIOS_CRLF MEIOS_CRLF);
 
    while (1)
    {
-      if (pVinaxDfeTestTable[testIndex].cmd == -1)
+      if (pVrxDfeTestTable[testIndex].cmd == -1)
          break;
 
-      if (pVinaxDfeTestTable[testIndex].cmd != MEI_TEST_INFO)
+      if (pVrxDfeTestTable[testIndex].cmd != MEI_TEST_INFO)
       {
          MEIOS_FPrintf(streamOut,
             "%3d  %s" MEIOS_CRLF,
-            pVinaxDfeTestTable[testIndex].cmd, pVinaxDfeTestTable[testIndex].pHelpStr);
+            pVrxDfeTestTable[testIndex].cmd, pVrxDfeTestTable[testIndex].pHelpStr);
       }
       else
       {
          MEIOS_FPrintf(streamOut,
             "     %s" MEIOS_CRLF,
-            pVinaxDfeTestTable[testIndex].pHelpStr);
+            pVrxDfeTestTable[testIndex].pHelpStr);
       }
 
       testIndex++;
@@ -166,15 +165,15 @@ static int doVinaxDrvTestHelp_fd(MEIOS_File_t *streamOut)
 
    MEIOS_FPrintf(streamOut,
       MEIOS_CRLF "Usage (device access):" MEIOS_CRLF
-      "\tdoVinaxDrvTest <cmd>, <dev num>, [<arg 0>, <arg 1>, ..., <arg 4>]" MEIOS_CRLF);
+      "\tdoVrxDrvTest <cmd>, <dev num>, [<arg 0>, <arg 1>, ..., <arg 4>]" MEIOS_CRLF);
 
    MEIOS_FPrintf(streamOut,
       MEIOS_CRLF "Usage (device access):" MEIOS_CRLF
-      "\tdoVinaxDrvTest 30, 0, 0x0010, 2, 0, 3  --> request FW version" MEIOS_CRLF MEIOS_CRLF);
+      "\tdoVrxDrvTest 30, 0, 0x0010, 2, 0, 3  --> request FW version" MEIOS_CRLF MEIOS_CRLF);
 
    MEIOS_FPrintf(streamOut,
       MEIOS_CRLF "For VxWorks Proc FS use: " MEIOS_CRLF
-      "\tdoVinaxProcFs <cmd>, [arg 0], [arg 1]" MEIOS_CRLF MEIOS_CRLF);
+      "\tdoVrxProcFs <cmd>, [arg 0], [arg 1]" MEIOS_CRLF MEIOS_CRLF);
 
    return 0;
 }
@@ -182,9 +181,9 @@ static int doVinaxDrvTestHelp_fd(MEIOS_File_t *streamOut)
 /**
    Help
 */
-static int doVinaxDrvTestHelp()
+static int doVrxDrvTestHelp()
 {
-   return doVinaxDrvTestHelp_fd(stdout);
+   return doVrxDrvTestHelp_fd(stdout);
 }
 
 /* ==========================================================================
@@ -195,7 +194,7 @@ static int doVinaxDrvTestHelp()
    Test routine to wrap the user params to the corresponding function.
    Selection of the output stream for printouts added.
 */
-int doVinaxDrvTest_fd(
+int doVrxDrvTest_fd(
                    MEIOS_File_t *streamOut,
                    int cmd, int devNum,
                    int param0, int param1, int param2, int param3, int param4,
@@ -212,7 +211,7 @@ int doVinaxDrvTest_fd(
 
    if ( (cmd == 0) || (cmd == -1) )
    {
-      doVinaxDrvTestHelp_fd(streamOut);
+      doVrxDrvTestHelp_fd(streamOut);
       return 0;
    }
 
@@ -348,7 +347,7 @@ int doVinaxDrvTest_fd(
       default:
          MEIOS_FPrintf(streamOut,
             MEIOS_CRLF "Error - unknown command %d" MEIOS_CRLF, cmd);
-         doVinaxDrvTestHelp_fd(streamOut);
+         doVrxDrvTestHelp_fd(streamOut);
          ret = -1;
    }
 
@@ -364,12 +363,12 @@ int doVinaxDrvTest_fd(
 /**
    Test routine to wrap the user params to the corresponding function
 */
-int doVinaxDrvTest(int cmd, int devNum,
+int doVrxDrvTest(int cmd, int devNum,
                    int param0, int param1, int param2, int param3, int param4,
                    int param5, int param6, int param7, int param8, int param9,
                    int param10, int param11 )
 {
-   return doVinaxDrvTest_fd(
+   return doVrxDrvTest_fd(
             stdout,
             cmd, devNum,
             param0, param1, param2, param3, param4,  param5,

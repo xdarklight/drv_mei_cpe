@@ -1,8 +1,7 @@
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -10,7 +9,7 @@
 ******************************************************************************/
 
 /* ============================================================================
-   Description : VINAX Driver, proc file system replacement, generic part
+   Description : VRX Driver, proc file system replacement, generic part
    ========================================================================= */
 
 /* ============================================================================
@@ -85,7 +84,7 @@
    Local variables
    ========================================================================= */
 
-static struct MEI_CONFIG_PROC_s {char shortCut; char *pHelpStr; } VINAXConfigProc[] =
+static struct MEI_CONFIG_PROC_s {char shortCut; char *pHelpStr; } VRXConfigProc[] =
 {
    {MEI_CONFIG_PROC_COM_TRACE,      "Com Trace Level"},
    {MEI_CONFIG_PROC_COM_TRACE_LOG,  "Com Log Level"},
@@ -133,9 +132,9 @@ MEI_STATIC IFX_void_t MEI_ConfigProc(FILE *streamOut, IFX_char_t shortCut, IFX_i
          {
             /* Common Trace/Log */
             fprintf( streamOut, " %c = %d (%s)" MEI_DRV_CRLF,
-                     VINAXConfigProc[procIndex].shortCut,
+                     VRXConfigProc[procIndex].shortCut,
                      MEI_DRV_PRN_USR_LEVEL_GET(MEI_DRV),
-                     VINAXConfigProc[procIndex].pHelpStr);
+                     VRXConfigProc[procIndex].pHelpStr);
          }
          else
          {
@@ -148,9 +147,9 @@ MEI_STATIC IFX_void_t MEI_ConfigProc(FILE *streamOut, IFX_char_t shortCut, IFX_i
          {
             /* Common Trace/Log */
             fprintf( streamOut, " %c = %d (%s)" MEI_DRV_CRLF,
-                     VINAXConfigProc[procIndex].shortCut,
+                     VRXConfigProc[procIndex].shortCut,
                      MEI_DRV_PRN_INT_LEVEL_GET(MEI_DRV),
-                     VINAXConfigProc[procIndex].pHelpStr);
+                     VRXConfigProc[procIndex].pHelpStr);
          }
          else
          {
@@ -164,9 +163,9 @@ MEI_STATIC IFX_void_t MEI_ConfigProc(FILE *streamOut, IFX_char_t shortCut, IFX_i
          {
             /* MEI Trace/Log */
             fprintf( streamOut, " %c = %d (%s)" MEI_DRV_CRLF,
-                     VINAXConfigProc[procIndex].shortCut,
+                     VRXConfigProc[procIndex].shortCut,
                      MEI_DRV_PRN_USR_LEVEL_GET(MEI_MEI_ACCESS),
-                     VINAXConfigProc[procIndex].pHelpStr);
+                     VRXConfigProc[procIndex].pHelpStr);
          }
          else
          {
@@ -179,9 +178,9 @@ MEI_STATIC IFX_void_t MEI_ConfigProc(FILE *streamOut, IFX_char_t shortCut, IFX_i
          {
             /* ROM Trace/Log */
             fprintf( streamOut, " %c = %d (%s)" MEI_DRV_CRLF,
-                     VINAXConfigProc[procIndex].shortCut,
+                     VRXConfigProc[procIndex].shortCut,
                      MEI_DRV_PRN_USR_LEVEL_GET(MEI_ROM),
-                     VINAXConfigProc[procIndex].pHelpStr);
+                     VRXConfigProc[procIndex].pHelpStr);
          }
          else
          {
@@ -194,9 +193,9 @@ MEI_STATIC IFX_void_t MEI_ConfigProc(FILE *streamOut, IFX_char_t shortCut, IFX_i
          {
             /* ROM Trace/Log */
             fprintf( streamOut, " %c = %d (%s)" MEI_DRV_CRLF,
-                     VINAXConfigProc[procIndex].shortCut,
+                     VRXConfigProc[procIndex].shortCut,
                      MEI_DRV_PRN_INT_LEVEL_GET(MEI_ROM),
-                     VINAXConfigProc[procIndex].pHelpStr);
+                     VRXConfigProc[procIndex].pHelpStr);
          }
          else
          {
@@ -211,9 +210,9 @@ MEI_STATIC IFX_void_t MEI_ConfigProc(FILE *streamOut, IFX_char_t shortCut, IFX_i
          {
             /* FW Mode Selection (VDSL2 / ADSL) */
             fprintf( streamOut, " %c = 0x%X (%s)" MEI_DRV_CRLF,
-                     VINAXConfigProc[procIndex].shortCut,
+                     VRXConfigProc[procIndex].shortCut,
                      MEI_fwModeSelect,
-                     VINAXConfigProc[procIndex].pHelpStr);
+                     VRXConfigProc[procIndex].pHelpStr);
          }
          else
          {
@@ -227,9 +226,9 @@ MEI_STATIC IFX_void_t MEI_ConfigProc(FILE *streamOut, IFX_char_t shortCut, IFX_i
          {
             /* Block Time Out */
             fprintf( streamOut, " %c = %d (%s)" MEI_DRV_CRLF,
-                     VINAXConfigProc[procIndex].shortCut,
+                     VRXConfigProc[procIndex].shortCut,
                      MEI_BlockTimeout,
-                     VINAXConfigProc[procIndex].pHelpStr);
+                     VRXConfigProc[procIndex].pHelpStr);
          }
          else
          {
@@ -247,9 +246,9 @@ MEI_STATIC IFX_void_t MEI_ConfigProc(FILE *streamOut, IFX_char_t shortCut, IFX_i
 
             /* Msg Dump Control */
             fprintf( streamOut, " %c = 0x%08X (%s)" MEI_DRV_CRLF,
-                     VINAXConfigProc[procIndex].shortCut,
+                     VRXConfigProc[procIndex].shortCut,
                      tmpVal,
-                     VINAXConfigProc[procIndex].pHelpStr);
+                     VRXConfigProc[procIndex].pHelpStr);
          }
          else
          {
@@ -267,9 +266,9 @@ MEI_STATIC IFX_void_t MEI_ConfigProc(FILE *streamOut, IFX_char_t shortCut, IFX_i
          {
             /* Block Time Out */
             fprintf( streamOut, " %c = %d (%s)" MEI_DRV_CRLF,
-                     VINAXConfigProc[procIndex].shortCut,
+                     VRXConfigProc[procIndex].shortCut,
                      MEI_msgDumpId,
-                     VINAXConfigProc[procIndex].pHelpStr);
+                     VRXConfigProc[procIndex].pHelpStr);
          }
          else
          {
@@ -282,9 +281,9 @@ MEI_STATIC IFX_void_t MEI_ConfigProc(FILE *streamOut, IFX_char_t shortCut, IFX_i
          {
             /* Common Trace/Log */
             fprintf( streamOut, " %c = %d (%s)" MEI_DRV_CRLF,
-                     VINAXConfigProc[procIndex].shortCut,
+                     VRXConfigProc[procIndex].shortCut,
                      MEI_DRV_PRN_USR_LEVEL_GET(MEI_MSG_DUMP),
-                     VINAXConfigProc[procIndex].pHelpStr);
+                     VRXConfigProc[procIndex].pHelpStr);
          }
          else
          {
@@ -297,9 +296,9 @@ MEI_STATIC IFX_void_t MEI_ConfigProc(FILE *streamOut, IFX_char_t shortCut, IFX_i
          {
             /* Common Trace/Log */
             fprintf( streamOut, " %c = %d (%s)" MEI_DRV_CRLF,
-                     VINAXConfigProc[procIndex].shortCut,
+                     VRXConfigProc[procIndex].shortCut,
                      MEI_DRV_PRN_INT_LEVEL_GET(MEI_MSG_DUMP),
-                     VINAXConfigProc[procIndex].pHelpStr);
+                     VRXConfigProc[procIndex].pHelpStr);
          }
          else
          {
@@ -328,14 +327,14 @@ IFX_void_t MEI_ShowConfigProc(FILE *streamOut)
 {
    IFX_int32_t procIndex = 0;
 
-   fprintf(streamOut, MEI_DRV_CRLF "VINAX VINAX proc config" MEI_DRV_CRLF MEI_DRV_CRLF);
+   fprintf(streamOut, MEI_DRV_CRLF "VRX VRX proc config" MEI_DRV_CRLF MEI_DRV_CRLF);
 
    while (1)
    {
-      if (VINAXConfigProc[procIndex].pHelpStr == NULL)
+      if (VRXConfigProc[procIndex].pHelpStr == NULL)
          break;
 
-      MEI_ConfigProc(streamOut, VINAXConfigProc[procIndex].shortCut, procIndex, -1);
+      MEI_ConfigProc(streamOut, VRXConfigProc[procIndex].shortCut, procIndex, -1);
       procIndex++;
    }
 
@@ -529,7 +528,7 @@ IFX_void_t MEI_ShowNfcProc(FILE *streamOut)
 /*
    Contains the command and help info for the Proc-Fs
 */
-struct MEI_proc_fs_access_table_s { int cmd; char *pHelpStr; } pVinaxProcFsAccessTable[] =
+struct MEI_proc_fs_access_table_s { int cmd; char *pHelpStr; } pVrxProcFsAccessTable[] =
 {
    {MEI_GENERIC_TEST_FS_HELP,    "Print ProcFs help info"},
    {MEI_MEI_TEST_FS_INFO,    " "},
@@ -551,7 +550,7 @@ struct MEI_proc_fs_access_table_s { int cmd; char *pHelpStr; } pVinaxProcFsAcces
 
 
 */
-static int doVinaxProcFsHelp_fd(FILE *streamOut)
+static int doVrxProcFsHelp_fd(FILE *streamOut)
 {
    int testIndex = 0;
 
@@ -560,33 +559,33 @@ static int doVinaxProcFsHelp_fd(FILE *streamOut)
       streamOut = stdout;
    }
 
-   printf(MEI_DRV_CRLF "VINAX driver - Proc FS" MEI_DRV_CRLF MEI_DRV_CRLF);
+   printf(MEI_DRV_CRLF "VRX driver - Proc FS" MEI_DRV_CRLF MEI_DRV_CRLF);
 
    while (1)
    {
-      if (pVinaxProcFsAccessTable[testIndex].cmd == -1)
+      if (pVrxProcFsAccessTable[testIndex].cmd == -1)
          break;
 
-      if (pVinaxProcFsAccessTable[testIndex].cmd != MEI_MEI_TEST_FS_INFO)
+      if (pVrxProcFsAccessTable[testIndex].cmd != MEI_MEI_TEST_FS_INFO)
          fprintf( streamOut,
                   "%3d  %s" MEI_DRV_CRLF,
-                  pVinaxProcFsAccessTable[testIndex].cmd,
-                  pVinaxProcFsAccessTable[testIndex].pHelpStr);
+                  pVrxProcFsAccessTable[testIndex].cmd,
+                  pVrxProcFsAccessTable[testIndex].pHelpStr);
       else
          fprintf( streamOut,
                   "     %s" MEI_DRV_CRLF,
-                  pVinaxProcFsAccessTable[testIndex].pHelpStr);
+                  pVxProcFsAccessTable[testIndex].pHelpStr);
 
       testIndex++;
    }
 
    fprintf(streamOut,
       MEI_DRV_CRLF "Usage (Proc FS access):" MEI_DRV_CRLF
-      "\tdoVinaxProcFs <cmd>, <proc entry>, [<arg 0>, <arg 1>]" MEI_DRV_CRLF MEI_DRV_CRLF);
+      "\tdoVrxProcFs <cmd>, <proc entry>, [<arg 0>, <arg 1>]" MEI_DRV_CRLF MEI_DRV_CRLF);
 
    fprintf(streamOut,
       "Example (Proc FS access):" MEI_DRV_CRLF
-      "\tdoVinaxProcFs 104, 't', 1  --> change trace level" MEI_DRV_CRLF MEI_DRV_CRLF);
+      "\tdoVrxProcFs 104, 't', 1  --> change trace level" MEI_DRV_CRLF MEI_DRV_CRLF);
 
    return 0;
 }
@@ -596,7 +595,7 @@ static int doVinaxProcFsHelp_fd(FILE *streamOut)
 /**
    Access the Proc Filesystem.
 */
-int doVinaxProcFs_fd(
+int doVrxProcFs_fd(
                    FILE *streamOut,
                    int cmd, int procEntry, int param0, int param1, int param2)
 {
@@ -607,7 +606,7 @@ int doVinaxProcFs_fd(
 
    if ( (cmd == 0) || (cmd == -1) )
    {
-      doVinaxProcFsHelp_fd(streamOut);
+      doVrxProcFsHelp_fd(streamOut);
       return 0;
    }
 
@@ -666,9 +665,9 @@ int doVinaxProcFs_fd(
    Wrapper Proc FS.
    - use default stdout stream.
 */
-int doVinaxProcFs(int cmd, int procEntry, int param0, int param1, int param2)
+int doVrxProcFs(int cmd, int procEntry, int param0, int param1, int param2)
 {
-   return doVinaxProcFs_fd(stdout, cmd, procEntry, param0, param1, param2);
+   return doVrxProcFs_fd(stdout, cmd, procEntry, param0, param1, param2);
 }
 
 

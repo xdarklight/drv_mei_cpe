@@ -1,15 +1,14 @@
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
 
 ******************************************************************************/
-#ifndef _DRV_MEI_CPE_DOWNLOAD_VR9_COMMON_H
-#define _DRV_MEI_CPE_DOWNLOAD_VR9_COMMON_H
+#ifndef _DRV_MEI_CPE_DOWNLOAD_VRX_COMMON_H
+#define _DRV_MEI_CPE_DOWNLOAD_VRX_COMMON_H
 
 /* ==========================================================================
    Description : VR9/AR9 Firmware Download definitions .
@@ -60,6 +59,6 @@ extern IFX_int32_t MEI_IoctlFwModeStatGet(
 }
 #endif
 
-#endif   /* #ifndef _DRV_MEI_CPE_DOWNLOAD_VR9_COMMON_H */
+#endif   /* #ifndef _DRV_MEI_CPE_DOWNLOAD_VRX_COMMON_H */
 
 

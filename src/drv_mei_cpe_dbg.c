@@ -1,8 +1,7 @@
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -10,7 +9,7 @@
 ******************************************************************************/
 
 /* ============================================================================
-   Description : VINAX Driver, Debug Part
+   Description : VRX Driver, Debug Part
    ========================================================================= */
 
 /* ============================================================================
@@ -32,7 +31,7 @@
 MEI_DRV_PRN_USR_MODULE_CREATE(DBG_GLOBAL, MEI_DRV_PRN_LEVEL_LOW);
 MEI_DRV_PRN_INT_MODULE_CREATE(DBG_GLOBAL, MEI_DRV_PRN_LEVEL_LOW);
 
-/* VINAX-Driver: global debug control variable */
+/* VRX-Driver: global debug control variable */
 MEI_DRV_PRN_DEBUG_CONTROL_CREATE(0);
 /* MEI_DRV_PRN_DEBUG_CONTROL_CREATE((MEI_DBG_LINE_PRINT_INDICATION | 0x1)); */
 

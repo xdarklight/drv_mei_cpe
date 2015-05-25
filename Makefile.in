@@ -76,8 +76,8 @@ am__nobase_list = $(am__nobase_strip_setup); \
 am__base_list = \
   sed '$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;$$!N;s/\n/ /g' | \
   sed '$$!N;$$!N;$$!N;$$!N;s/\n/ /g'
-am__installdirs = "$(DESTDIR)$(drv_vinax_docdir)"
-DATA = $(drv_vinax_doc_DATA)
+am__installdirs = "$(DESTDIR)$(drv_vrx_docdir)"
+DATA = $(drv_vrx_doc_DATA)
 RECURSIVE_CLEAN_TARGETS = mostlyclean-recursive clean-recursive	\
   distclean-recursive maintainer-clean-recursive
 AM_RECURSIVE_TARGETS = $(RECURSIVE_TARGETS:-recursive=) \
@@ -229,11 +229,11 @@ top_srcdir = @top_srcdir@
 AUTOMAKE_OPTIONS = foreign 1.6 dist-zip nostdinc
 SUBDIRS = src
 DISTCHECK_CONFIGURE_FLAGS = @CONFIGURE_OPTIONS@
-drv_vinax_docdir = ${prefix}/doc/drv_vinax
-drv_vinax_doc_DATA = \
+drv_vrx_docdir = ${prefix}/doc/drv_vrx
+drv_vrx_doc_DATA = \
 	ChangeLog
 
-EXTRA_DIST = $(drv_vinax_doc_DATA)\
+EXTRA_DIST = $(drv_vrx_doc_DATA)\
 	README\
 	AUTHORS\
 	NEWS\
@@ -282,26 +282,26 @@ $(top_srcdir)/configure:  $(am__configure_deps)
 $(ACLOCAL_M4):  $(am__aclocal_m4_deps)
 	$(am__cd) $(srcdir) && $(ACLOCAL) $(ACLOCAL_AMFLAGS)
 $(am__aclocal_m4_deps):
-install-drv_vinax_docDATA: $(drv_vinax_doc_DATA)
+install-drv_vrx_docDATA: $(drv_vrx_doc_DATA)
 	@$(NORMAL_INSTALL)
-	test -z "$(drv_vinax_docdir)" || $(MKDIR_P) "$(DESTDIR)$(drv_vinax_docdir)"
-	@list='$(drv_vinax_doc_DATA)'; test -n "$(drv_vinax_docdir)" || list=; \
+	test -z "$(drv_vrx_docdir)" || $(MKDIR_P) "$(DESTDIR)$(drv_vrx_docdir)"
+	@list='$(drv_vrx_doc_DATA)'; test -n "$(drv_vrx_docdir)" || list=; \
 	for p in $$list; do \
 	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
 	  echo "$$d$$p"; \
 	done | $(am__base_list) | \
 	while read files; do \
-	  echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(drv_vinax_docdir)'"; \
-	  $(INSTALL_DATA) $$files "$(DESTDIR)$(drv_vinax_docdir)" || exit $$?; \
+	  echo " $(INSTALL_DATA) $$files '$(DESTDIR)$(drv_vrx_docdir)'"; \
+	  $(INSTALL_DATA) $$files "$(DESTDIR)$(drv_vrx_docdir)" || exit $$?; \
 	done
 
-uninstall-drv_vinax_docDATA:
+uninstall-drv_vrx_docDATA:
 	@$(NORMAL_UNINSTALL)
-	@list='$(drv_vinax_doc_DATA)'; test -n "$(drv_vinax_docdir)" || list=; \
+	@list='$(drv_vrx_doc_DATA)'; test -n "$(drv_vrx_docdir)" || list=; \
 	files=`for p in $$list; do echo $$p; done | sed -e 's|^.*/||'`; \
 	test -n "$$files" || exit 0; \
-	echo " ( cd '$(DESTDIR)$(drv_vinax_docdir)' && rm -f" $$files ")"; \
-	cd "$(DESTDIR)$(drv_vinax_docdir)" && rm -f $$files
+	echo " ( cd '$(DESTDIR)$(drv_vrx_docdir)' && rm -f" $$files ")"; \
+	cd "$(DESTDIR)$(drv_vrx_docdir)" && rm -f $$files
 
 # This directory's subdirectories are mostly independent; you can cd
 # into them and run `make' without going through this Makefile.
@@ -622,7 +622,7 @@ check: check-recursive
 all-am: Makefile $(DATA)
 installdirs: installdirs-recursive
 installdirs-am:
-	for dir in "$(DESTDIR)$(drv_vinax_docdir)"; do \
+	for dir in "$(DESTDIR)$(drv_vrx_docdir)"; do \
 	  test -z "$$dir" || $(MKDIR_P) "$$dir"; \
 	done
 install: install-recursive
@@ -671,7 +671,7 @@ info: info-recursive
 
 info-am:
 
-install-data-am: install-drv_vinax_docDATA
+install-data-am: install-drv_vrx_docDATA
 
 install-dvi: install-dvi-recursive
 
@@ -717,7 +717,7 @@ ps: ps-recursive
 
 ps-am:
 
-uninstall-am: uninstall-drv_vinax_docDATA
+uninstall-am: uninstall-drv_vrx_docDATA
 
 .MAKE: $(RECURSIVE_CLEAN_TARGETS) $(RECURSIVE_TARGETS) ctags-recursive \
 	install-am install-strip tags-recursive
@@ -729,7 +729,7 @@ uninstall-am: uninstall-drv_vinax_docDATA
 	distcheck distclean distclean-generic distclean-tags \
 	distcleancheck distdir distuninstallcheck dvi dvi-am html \
 	html-am info info-am install install-am install-data \
-	install-data-am install-drv_vinax_docDATA install-dvi \
+	install-data-am install-drv_vrx_docDATA install-dvi \
 	install-dvi-am install-exec install-exec-am install-html \
 	install-html-am install-info install-info-am install-man \
 	install-pdf install-pdf-am install-ps install-ps-am \
@@ -737,7 +737,7 @@ uninstall-am: uninstall-drv_vinax_docDATA
 	installdirs-am maintainer-clean maintainer-clean-generic \
 	mostlyclean mostlyclean-generic pdf pdf-am ps ps-am tags \
 	tags-recursive uninstall uninstall-am \
-	uninstall-drv_vinax_docDATA
+	uninstall-drv_vrx_docDATA
 
 
 # Copy all the spec files. Of cource, only one is actually used.

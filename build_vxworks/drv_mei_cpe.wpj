@@ -39,10 +39,10 @@ ccppc
 	-DVXWORKS \
 	-D__PROTOTYPE_5_0 \
 	-DIKOS_EMULATION=0 \
-	-DVINAX_MEI_SW_EMUL=0 \
+	-DVRX_MEI_SW_EMUL=0 \
 	-DDSL_LINES_PER_DEVICE=1 \
 	-DDSL_MAX_DEVICE_NUMBER=2 \
-	-DVINAX_GENERIC_PROC_FS \
+	-DVRX_GENERIC_PROC_FS \
 	-I$(WIND_BASE)/target/h \
 	-I$(PRJ_DIR)/../src \
 	-I$(PRJ_DIR)/../../target/mpc8xx/src \
@@ -165,8 +165,8 @@ ccppc
 <END>
 
 <BEGIN> BUILD_archive_easy83002_MACRO_CFLAGS
--DVINAX_DRV_CLEAR_EOC_ENABLE \
-	-DVINAX_EXPORT_INTERNAL_API \
+-DVRX_DRV_CLEAR_EOC_ENABLE \
+	-DVRX_EXPORT_INTERNAL_API \
 	-g \
 	-mcpu=860 \
 	-ansi \
@@ -185,11 +185,11 @@ ccppc
 	-DVXWORKS \
 	-D__PROTOTYPE_5_0 \
 	-DIKOS_EMULATION=0 \
-	-DVINAX_MEI_SW_EMUL=0 \
-	-DVINAX_DRV_NFC_BUFFER=4 \
+	-DVRX_MEI_SW_EMUL=0 \
+	-DVRX_DRV_NFC_BUFFER=4 \
 	-DDSL_LINES_PER_DEVICE=1 \
 	-DDSL_MAX_DEVICE_NUMBER=2 \
-	-DVINAX_GENERIC_PROC_FS \
+	-DVRX_GENERIC_PROC_FS \
 	-I$(WIND_BASE)/target/h \
 	-I$(PRJ_DIR)/../src \
 	-I$(PRJ_DIR)/../../target/mpc8xx/src \
@@ -312,11 +312,11 @@ ccppc
 	-D__PROTOTYPE_5_0 \
 	-Wredundant-decls \
 	-DIKOS_EMULATION=0 \
-	-DVINAX_MEI_SW_EMUL=0 \
-	-DVINAX_DRV_NFC_BUFFER=8 \
+	-DVRX_MEI_SW_EMUL=0 \
+	-DVRX_DRV_NFC_BUFFER=8 \
 	-DDSL_LINES_PER_DEVICE=2 \
 	-DDSL_MAX_DEVICE_NUMBER=4 \
-	-DVINAX_GENERIC_PROC_FS \
+	-DVRX_GENERIC_PROC_FS \
 	-I$(WIND_BASE)/target/h \
 	-I$(PRJ_DIR)/../src \
 	-I$(PRJ_DIR)/../../target/mpc8xx/src \
@@ -420,7 +420,7 @@ ccppc
 <END>
 
 <BEGIN> BUILD_archive_easy88002_MACRO_CFLAGS
--DVNX_DEBUG \
+-DVRX_DEBUG \
 	-g \
 	-mcpu=860 \
 	-ansi \
@@ -440,11 +440,11 @@ ccppc
 	-D__PROTOTYPE_5_0 \
 	-Wredundant-decls \
 	-DIKOS_EMULATION=0 \
-	-DVINAX_MEI_SW_EMUL=0 \
-	-DVINAX_DRV_NFC_BUFFER=8 \
+	-DVRX_MEI_SW_EMUL=0 \
+	-DVRX_DRV_NFC_BUFFER=8 \
 	-DDSL_LINES_PER_DEVICE=2 \
 	-DDSL_MAX_DEVICE_NUMBER=4 \
-	-DVINAX_GENERIC_PROC_FS \
+	-DVRX_GENERIC_PROC_FS \
 	-I$(WIND_BASE)/target/h \
 	-I$(PRJ_DIR)/../src \
 	-I$(PRJ_DIR)/../../target/mpc8xx/src \
@@ -557,10 +557,10 @@ ccppc
 	-DVXWORKS \
 	-D__PROTOTYPE_5_0 \
 	-DIKOS_EMULATION=0 \
-	-DVINAX_MEI_SW_EMUL=0 \
+	-DVRX_MEI_SW_EMUL=0 \
 	-DDSL_LINES_PER_DEVICE=1 \
 	-DDSL_MAX_DEVICE_NUMBER=2 \
-	-DVINAX_GENERIC_PROC_FS \
+	-DVRX_GENERIC_PROC_FS \
 	-I. \
 	-I$(WIND_BASE)/target/h \
 	-I$(PRJ_DIR)/../src \
@@ -758,16 +758,6 @@ C/C++ compiler
 
 
 
-<BEGIN> FILE_$(PRJ_DIR)/../src/drv_mei_cpe_mei_access_vinax.c_objects
-drv_mei_cpe_mei_access_vinax.o
-<END>
-
-<BEGIN> FILE_$(PRJ_DIR)/../src/drv_mei_cpe_mei_access_vinax.c_tool
-C/C++ compiler
-<END>
-
-
-
 <BEGIN> FILE_$(PRJ_DIR)/../src/drv_mei_cpe_msg_process.c_objects
 drv_mei_cpe_msg_process.o
 <END>
@@ -837,7 +827,6 @@ C/C++ compiler
 
 <BEGIN> PROJECT_FILES
 $(PRJ_DIR)/../src/mei_cpe_drv_test_vxworks.c \
-	$(PRJ_DIR)/../src/drv_mei_cpe_mei_access_vinax.c \
 	$(PRJ_DIR)/../src/drv_mei_cpe_msg_process.c \
 	$(PRJ_DIR)/../src/drv_mei_cpe_vxworks.c \
 	$(PRJ_DIR)/../src/drv_mei_cpe_vxworks_bsp.c \

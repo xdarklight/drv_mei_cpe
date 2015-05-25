@@ -2,9 +2,8 @@
 #define _DRV_MEI_CPE_ATMOAM_H
 /******************************************************************************
 
-                               Copyright (c) 2011
+                              Copyright (c) 2013
                             Lantiq Deutschland GmbH
-                     Am Campeon 3; 85579 Neubiberg, Germany
 
   For licensing information, see the file 'LICENSE' in the root folder of
   this software module.
@@ -29,7 +28,7 @@
 #include "drv_mei_cpe_interface.h"
 
 /* ==========================================================================
-   Macro defs - VINAX ATM OAM control
+   Macro defs - VRX ATM OAM control
    ========================================================================== */
 
 /** Max timeout for ATM cell transmit done */
@@ -88,22 +87,22 @@
                } while(0)
 
 
-/** set the VINAX drv state - ATM OAM TxBuf */
+/** set the VRX drv state - ATM OAM TxBuf */
 #define MEI_ATMOAM_CFG_STATE_SET(pAtmOamDevCntrl, newstate) (pAtmOamDevCntrl)->eCfgState = newstate
 
-/** get the VINAX drv state - ATM OAM TxBuf */
+/** get the VRX drv state - ATM OAM TxBuf */
 #define MEI_ATMOAM_CFG_STATE_GET(pAtmOamDevCntrl) (pAtmOamDevCntrl)->eCfgState
 
 
-/** set the VINAX drv state - ATM OAM TxBuf */
+/** set the VRX drv state - ATM OAM TxBuf */
 #define MEI_ATMOAM_TXBUF_STATE_SET(pAtmOamDevCntrl, newstate) (pAtmOamDevCntrl)->eTxBufState = newstate
 
-/** get the VINAX drv state - ATM OAM TxBuf */
+/** get the VRX drv state - ATM OAM TxBuf */
 #define MEI_ATMOAM_TXBUF_STATE_GET(pAtmOamDevCntrl) (pAtmOamDevCntrl)->eTxBufState
 
 
 /* ==========================================================================
-   Macro defs - VINAX ATM OAM statistics
+   Macro defs - VRX ATM OAM statistics
    ========================================================================== */
 #if ( (MEI_SUPPORT_STATISTICS == 1) && (MEI_SUPPORT_ATM_OAM_STATISTICS == 1))
 
@@ -148,44 +147,44 @@
 #endif      /* #if ( (MEI_SUPPORT_STATISTICS == 1) && (MEI_SUPPORT_ATM_OAM_STATISTICS == 1)) */
 
 /* ==========================================================================
-   typedefs - VINAX ATM OAM
+   typedefs - VRX ATM OAM
    ========================================================================== */
 
 /**
-   State for the VINAX ATM OAM configurtaionr.
+   State for the VRX ATM OAM configurtaionr.
 */
 typedef enum
 {
    /** initial state after startup, first enable */
    eMEI_ATMOAM_OP_CFG_INITIAL,
-   /** the VINAX ATM OAM configuration is valid */
+   /** the VRX ATM OAM configuration is valid */
    eMEI_ATMOAM_OP_CFG_VALID,
-   /** the VINAX ATM OAM configuration is valid and written to the device */
+   /** the VRX ATM OAM configuration is valid and written to the device */
    eMEI_ATMOAM_OP_CFG_WRITTEN
 } MEI_ATMOAM_OP_CFG_E;
 
 
 /**
-   State for the VINAX ATM OAM internal TX buffer.
+   State for the VRX ATM OAM internal TX buffer.
 */
 typedef enum
 {
    /** initial state after startup, first enable */
    eMEI_ATMOAM_OP_TX_BUF_INITIAL,
-   /** VINAX internal ATM OAM TX buffer - status free */
+   /** VRX internal ATM OAM TX buffer - status free */
    eMEI_ATMOAM_OP_TX_BUF_FREE,
-   /** VINAX internal ATM OAM TX buffer - status busy */
+   /** VRX internal ATM OAM TX buffer - status busy */
    eMEI_ATMOAM_OP_TX_BUF_BUSY,
-   /** VINAX internal ATM OAM TX buffer - status error */
+   /** VRX internal ATM OAM TX buffer - status error */
    eMEI_ATMOAM_OP_TX_BUF_ERROR
 } MEI_ATMOAM_OP_TX_BUF_E;
 
 
 #if ((MEI_SUPPORT_STATISTICS == 1) && (MEI_SUPPORT_ATM_OAM_STATISTICS == 1))
 /**
-   VINAX ATM OAM statistic informations
+   VRX ATM OAM statistic informations
 */
-typedef struct vinax_atmoam_stats_s
+typedef struct vrx_atmoam_stats_s
 {
    /** number of ATM OAM modem insert messages */
    IFX_uint32_t instMsgCnt;
@@ -214,9 +213,9 @@ typedef struct vinax_atmoam_stats_s
 #endif      /* #if ( (MEI_SUPPORT_STATISTICS == 1) && (MEI_SUPPORT_ATM_OAM_STATISTICS == 1)) */
 
 /**
-   VINAX ATM OAM cell buffer
+   VRX ATM OAM cell buffer
 */
-typedef struct vinax_atmoam_cell_buffer_s
+typedef struct vrx_atmoam_cell_buffer_s
 {
    IFX_uint32_t                 atmOamId;
    IFX_uint32_t                 cellCnt;
@@ -224,13 +223,13 @@ typedef struct vinax_atmoam_cell_buffer_s
 } MEI_ATMOAM_CELL_BUFFER_T;
 
 /**
-   VINAX ATM OAM - data for ATM OAM insert extract.
+   VRX ATM OAM - data for ATM OAM insert extract.
 
    - TX buffer state
    - LOCK
    - Statistic data
 */
-typedef struct vinax_atmoam_dev_cntrl_s
+typedef struct vrx_atmoam_dev_cntrl_s
 {
    /** confifure the operation mode for the ATM OAM part */
    IFX_uint32_t               atmOamOpMode;
