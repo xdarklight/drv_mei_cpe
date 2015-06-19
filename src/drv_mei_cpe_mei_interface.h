@@ -2,7 +2,7 @@
 #define _DRV_MEI_CPE_MEI_INTERFACE_H
 /******************************************************************************
 
-                              Copyright (c) 2013
+                              Copyright (c) 2014
                             Lantiq Deutschland GmbH
 
   For licensing information, see the file 'LICENSE' in the root folder of
@@ -177,12 +177,10 @@ typedef struct mei_if_cntrl_s
    IFX_ulong_t             phyBaseAddr;
    /** mapped virtual address of the physical MEI register interface */
    MEI_MEI_REG_IF_U      *pVirtMeiRegIf;
-#if (MEI_SUPPORT_DEVICE_VR10 == 1)
    /** physical address of the PDBRAM */
    IFX_ulong_t             phyPDBRAMaddr;
    /** mapped virtual address of the physical MEI register interface */
    IFX_ulong_t             virtPDBRAMaddr;
-#endif
 } MEI_MEI_IF_CNTRL_T;
 
 
@@ -226,12 +224,10 @@ typedef struct mei_drv_cntrl_s
    /** used MSG interrupt mask  */
    IFX_uint32_t            intMsgMask;
 
-#if (MEI_SUPPORT_DEVICE_VR10 == 1)
    /** Memory base addresses provided by PCIe driver */
    IFX_uint32_t MEI_pcie_phy_membase;
    IFX_uint32_t MEI_pcie_virt_membase;
    IFX_uint32_t MEI_pcie_irq;
-#endif
 
    /** MEI control per device */
    MEI_MEI_DEV_CNTRL_T   *pMeiDevCntrl;

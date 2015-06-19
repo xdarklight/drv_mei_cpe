@@ -1,6 +1,6 @@
 /******************************************************************************
 
-                              Copyright (c) 2013
+                              Copyright (c) 2014
                             Lantiq Deutschland GmbH
 
   For licensing information, see the file 'LICENSE' in the root folder of
@@ -152,10 +152,8 @@ static int __init MEI_TEST_module_init (void)
 {
    int result;
 
-   printk(KERN_INFO "%s" MEI_DRV_CRLF, &MEI_TEST_DRV_WHAT_STR[4]);
-   printk(KERN_INFO "(c) Copyright 2012, Lantiq Deutschland GmbH" MEI_DRV_CRLF);
-
-   printk(KERN_INFO "### VRX - TEST - VRX - TEST ###" MEI_DRV_CRLF);
+   printk(KERN_INFO "%s", &MEI_TEST_DRV_WHAT_STR[4]);
+   printk(KERN_INFO ", (c) 2013 Lantiq Deutschland GmbH" MEI_DRV_CRLF);
 
    MEI_DRV_PRN_USR_LEVEL_SET(MEI_TEST, debug_level);
    MEI_DRV_PRN_INT_LEVEL_SET(MEI_TEST, debug_level);

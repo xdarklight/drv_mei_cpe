@@ -1,6 +1,6 @@
 /******************************************************************************
 
-                              Copyright (c) 2013
+                              Copyright (c) 2014
                             Lantiq Deutschland GmbH
 
   For licensing information, see the file 'LICENSE' in the root folder of
@@ -95,6 +95,11 @@ IFX_int32_t MEI_IrqProtectCount = MEI_IRQ_PROTECT_COUNT;
    - Bit0: enable Clear Eoc
 */
 IFX_uint32_t MEI_FsmStateSetMsgPreAction = 0;
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0))
+/** device tree data */
+MEI_DEVCFG_DATA_T MEI_DevCfgData;
+#endif
 
 /* ============================================================================
    Proc-FS and debug variable definitions
@@ -340,10 +345,18 @@ MEI_STATIC IFX_void_t MEI_MeiDevCntrlFree(
             {
                if (pMeiDevCntrl->meiIf[portIdx].pVirtMeiRegIf)
                {
-                  MEI_DRVOS_Phy2VirtUnmap(
+                  if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR9))
+                  {
+                     /* do not io unremap for VR10, it is already done in PCIe */
+                     MEI_DRVOS_Phy2VirtUnmap(
                         &pMeiDevCntrl->meiIf[portIdx].phyBaseAddr,
                         (IFX_uint32_t)sizeof(MEI_MEI_REG_IF_U),
                         (IFX_uint8_t **)&(pMeiDevCntrl->meiIf[portIdx].pVirtMeiRegIf));
+                  }
+                  else if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
+                  {
+                     MEI_VR10_PcieEntityFree(pMeiXCntrl->entityNum);
+                  }
 
                   pMeiDevCntrl->meiIf[portIdx].pVirtMeiRegIf = IFX_NULL;
                   pMeiDevCntrl->meiIf[portIdx].eMeiHwState   = e_MEI_MEI_HW_STATE_UNKNOWN;
@@ -384,14 +397,16 @@ MEI_STATIC IFX_void_t MEI_MeiDevCntrlFree(
 MEIX_CNTRL_T *MEI_DevXCntrlStructAlloc(IFX_uint8_t entityNum)
 {
    MEIX_CNTRL_T  *pXCntrl = NULL;
-#if (MEI_SUPPORT_DEVICE_VR10 == 1)
-   if (MEI_VR10_PcieEntitiesCheck(entityNum) != IFX_SUCCESS)
+
+   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
    {
-      PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
-             ("MEIX_DRV[--]: ERROR Cntrl Struct Allocate - invalid device num" MEI_DRV_CRLF));
-      return IFX_NULL;
+      if (MEI_VR10_PcieEntitiesCheck(entityNum) != IFX_SUCCESS)
+      {
+         PRN_ERR_USR_NL(MEI_DRV, MEI_DRV_PRN_LEVEL_ERR, ("MEIX_DRV[--]: ERROR "
+                   "Cntrl Struct Allocate - invalid device num" MEI_DRV_CRLF));
+         return IFX_NULL;
+      }
    }
-#endif /* (MEI_SUPPORT_DEVICE_VR10 == 1) */
 
    if (entityNum >= MEI_MAX_DFEX_ENTITIES)
    {
@@ -559,16 +574,17 @@ MEI_DEV_T *MEI_DevLineStructAlloc( IFX_uint8_t nLineNum )
       /* save the device number for downloading firmware*/
       pMeiDev->fwDl.line_num = nLineNum;
 
-#if (MEI_SUPPORT_DEVICE_VR10 == 1)
-      if (MEI_VR10_PcieEntityInit(&pMeiDev->meiDrvCntrl) != IFX_SUCCESS)
+      if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
       {
-          PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
-             ("MEI_DRV[%02d]: ERROR Line Struct Allocate - pcie driver failed"
-            MEI_DRV_CRLF, nLineNum));
+         if (MEI_VR10_PcieEntityInit(&pMeiDev->meiDrvCntrl) != IFX_SUCCESS)
+         {
+             PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+                ("MEI_DRV[%02d]: ERROR Line Struct Allocate - pcie driver failed"
+               MEI_DRV_CRLF, nLineNum));
 
-         return IFX_NULL;
+            goto ERR_MEI_DEV_LINE_STRUCT_ALLOC;
+         }
       }
-#endif /* (MEI_SUPPORT_DEVICE_VR10 == 1) */
 
 #if (MEI_SUPPORT_PCI_SLAVE_FW_DOWNLOAD == 1)
       /* Assume dev#0 to be a PCI master*/
@@ -1312,10 +1328,11 @@ IFX_void_t MEI_IoctlRequestConfig(
    pArgDevCfg_out->currOpenInst = (unsigned int)pMeiDynCntrl->openInstance;
    pArgDevCfg_out->phyBaseAddr  = (unsigned int)MEI_DRV_MEI_PHY_ADDR_GET(pMeiDev);
    pArgDevCfg_out->virtBaseAddr = (unsigned int)MEI_DRV_MEI_VIRT_ADDR_GET(pMeiDev);
-#if (MEI_SUPPORT_DEVICE_VR10 == 1)
-   pArgDevCfg_out->phyPDBRAMaddr  = (unsigned int)MEI_DRV_PDBRAM_PHY_ADDR_GET(pMeiDev);
-   pArgDevCfg_out->virtPDBRAMaddr = (unsigned int)MEI_DRV_PDBRAM_VIRT_ADDR_GET(pMeiDev);
-#endif /* (MEI_SUPPORT_DEVICE_VR10 == 1) */
+   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
+   {
+      pArgDevCfg_out->phyPDBRAMaddr  = (unsigned int)MEI_DRV_PDBRAM_PHY_ADDR_GET(pMeiDev);
+      pArgDevCfg_out->virtPDBRAMaddr = (unsigned int)MEI_DRV_PDBRAM_VIRT_ADDR_GET(pMeiDev);
+   }
    pArgDevCfg_out->usedIRQ      = (unsigned int)pMeiDynCntrl->pDfeX->IRQ_Num;
    pArgDevCfg_out->drvArc2MeMbSize = (unsigned int)sizeof(MEI_MEI_MAILBOX_T);
    pArgDevCfg_out->drvMe2ArcMbSize = (unsigned int)sizeof(MEI_MEI_MAILBOX_T);
@@ -2586,13 +2603,10 @@ IFX_void_t MEI_EnableDeviceInt(MEI_DEV_T *pMeiDev)
 IFX_void_t MEI_MsgIntSet(MEI_DEV_T *pMeiDev)
 {
 
-#if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1)
    pMeiDev->meiDrvCntrl.intMsgMask = MEI_GET_REL_CH_FROM_DEVNUM(pMeiDev->meiDrvCntrl.dslLineNum) == 0 ?
       ME_ARC2ME_MASK_ARC_MSGAV0_ENA :
       ME_ARC2ME_MASK_ARC_MSGAV1_ENA;
-#else
-   pMeiDev->meiDrvCntrl.intMsgMask = ME_ARC2ME_MASK_ARC_MSGAV_ENA;
-#endif /* #if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1)*/
+
    return;
 }
 

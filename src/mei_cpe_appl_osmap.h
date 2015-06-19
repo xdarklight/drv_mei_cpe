@@ -2,7 +2,7 @@
 #define _MEI_CPE_APPL_OSMAP_H
 /******************************************************************************
 
-                              Copyright (c) 2013
+                              Copyright (c) 2014
                             Lantiq Deutschland GmbH
 
   For licensing information, see the file 'LICENSE' in the root folder of

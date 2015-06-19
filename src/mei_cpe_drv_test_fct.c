@@ -1,6 +1,6 @@
 /******************************************************************************
 
-                              Copyright (c) 2013
+                              Copyright (c) 2014
                             Lantiq Deutschland GmbH
 
   For licensing information, see the file 'LICENSE' in the root folder of
@@ -344,12 +344,10 @@ int MEI_req_cfg(MEIOS_File_t *streamOut, int fd)
            pReqCfg->devNum, pReqCfg->currOpenInst,
            pReqCfg->phyBaseAddr, pReqCfg->virtBaseAddr, pReqCfg->usedIRQ);
 
-#if (MEI_SUPPORT_DEVICE_VR10 == 1)
    MEIOS_FPrintf(streamOut, TEST_MEI_DBG_PREFIX
-           "REQ_CONFIG[%02d-%02d]: phy PDBRAM addr 0x%08X (virt 0x%08X)" MEIOS_CRLF,
+           "REQ_CONFIG[%02d-%02d]: phy PDBRAM addr 0x%08X (virt 0x%08X) - VR10 only" MEIOS_CRLF,
            pReqCfg->devNum, pReqCfg->currOpenInst,
            pReqCfg->phyPDBRAMaddr, pReqCfg->virtPDBRAMaddr);
-#endif /* (MEI_SUPPORT_DEVICE_VR10 == 1) */
 
    MEIOS_FPrintf(streamOut, TEST_MEI_DBG_PREFIX
            "REQ_CONFIG[%02d-%02d]: curr DrvState = %d, curr ModemFSM = %d" MEIOS_CRLF,
@@ -445,7 +443,6 @@ int MEI_req_stat(MEIOS_File_t *streamOut, int fd)
 */
 int MEI_init_dev(MEIOS_File_t *streamOut, int fd, IOCTL_MEI_devInit_t *pDevInit)
 {
-#if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_AR9 == 1)
    int ret;
 
    MEIOS_Printf( TEST_MEI_DBG_PREFIX
@@ -459,11 +456,15 @@ int MEI_init_dev(MEIOS_File_t *streamOut, int fd, IOCTL_MEI_devInit_t *pDevInit)
          errno, ret, pDevInit->ictl.retCode);
       return -1;
    }
-#elif (MEI_SUPPORT_DEVICE_VR10 == 1)
-      MEIOS_FPrintf(streamOut, TEST_MEI_DBG_PREFIX
-         "ERROR: only internal device init available for VR10" MEIOS_CRLF);
-      return -1;
-#endif
+   else
+   {
+      if (pDevInit->ictl.retCode == e_MEI_ERR_ALREADY_DONE)
+      {
+         MEIOS_FPrintf(streamOut, TEST_MEI_DBG_PREFIX
+            "WARNING - device init: already done (device tree data used), retCode = %d"
+            MEIOS_CRLF, pDevInit->ictl.retCode);
+      }
+   }
 
    return 0;
 }
@@ -1503,33 +1504,29 @@ int MEI_fw_set_mode(MEIOS_File_t *streamOut, int fd, char *pConfig)
          return -1;
    }
 
-   switch (fwMode.firmwareFeatures.eFirmwareXdslModes)
+   if (fwMode.firmwareFeatures.eFirmwareXdslModes == e_MEI_FW_XDSLMODE_CLEANED)
    {
-      case e_MEI_FW_XDSLMODE_CLEANED:
-         MEIOS_Printf(TEST_MEI_DBG_PREFIX"FW XDSL mode: set CLEANED mode" MEIOS_CRLF);
-         break;
+      MEIOS_Printf(TEST_MEI_DBG_PREFIX"FW XDSL mode: set CLEANED mode" MEIOS_CRLF);
+   }
 
-      case e_MEI_FW_XDSLMODE_ADSL_A:
-         MEIOS_Printf(TEST_MEI_DBG_PREFIX"FW XDSL mode: set ADSL_A mode" MEIOS_CRLF);
-         break;
+   if (fwMode.firmwareFeatures.eFirmwareXdslModes & e_MEI_FW_XDSLMODE_ADSL_A)
+   {
+      MEIOS_Printf(TEST_MEI_DBG_PREFIX"FW XDSL mode: set ADSL_A mode" MEIOS_CRLF);
+   }
 
-      case e_MEI_FW_XDSLMODE_ADSL_B:
-         MEIOS_Printf(TEST_MEI_DBG_PREFIX"FW XDSL mode: set ADSL_B mode" MEIOS_CRLF);
-         break;
+   if (fwMode.firmwareFeatures.eFirmwareXdslModes & e_MEI_FW_XDSLMODE_ADSL_B)
+   {
+      MEIOS_Printf(TEST_MEI_DBG_PREFIX"FW XDSL mode: set ADSL_B mode" MEIOS_CRLF);
+   }
 
-      case e_MEI_FW_XDSLMODE_VDSL2:
-         MEIOS_Printf(TEST_MEI_DBG_PREFIX"FW XDSL mode: set VDSL2 mode" MEIOS_CRLF);
-         break;
+   if (fwMode.firmwareFeatures.eFirmwareXdslModes & e_MEI_FW_XDSLMODE_VDSL2)
+   {
+      MEIOS_Printf(TEST_MEI_DBG_PREFIX"FW XDSL mode: set VDSL2 mode" MEIOS_CRLF);
+   }
 
-      case e_MEI_FW_XDSLMODE_VDSL2_VECTOR:
-         MEIOS_Printf(TEST_MEI_DBG_PREFIX"FW XDSL mode: set VDSL2_VECTOR mode" MEIOS_CRLF);
-         break;
-
-      default:
-         MEIOS_FPrintf(streamOut, TEST_MEI_DBG_PREFIX
-               "ERROR - inconsistent parameters, invalid fw xdsl mode %u!" MEIOS_CRLF,
-                     (unsigned int)fwMode.firmwareFeatures.eFirmwareXdslModes);
-         return -1;
+   if (fwMode.firmwareFeatures.eFirmwareXdslModes & e_MEI_FW_XDSLMODE_VDSL2_VECTOR)
+   {
+      MEIOS_Printf(TEST_MEI_DBG_PREFIX"FW XDSL mode: set VDSL2_VECTOR mode" MEIOS_CRLF);
    }
 
    MEIOS_FPrintf(streamOut, TEST_MEI_DBG_PREFIX

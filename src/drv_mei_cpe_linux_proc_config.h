@@ -2,7 +2,7 @@
 #define _DRV_MEI_CPE_LINUX_PROC_CONFIG_H
 /******************************************************************************
 
-                              Copyright (c) 2013
+                              Copyright (c) 2014
                             Lantiq Deutschland GmbH
 
   For licensing information, see the file 'LICENSE' in the root folder of
@@ -253,7 +253,7 @@ typedef int(*MEI_PROCFS_WRITE_CONFIG_FCT)(char *);
    Function type of the procfs read config function.
    - param: points to the current page location.
 */
-typedef int(*MEI_PROCFS_READ_CONFIG_FCT)(char *);
+typedef void(*MEI_PROCFS_READ_CONFIG_FCT)(struct seq_file *s);
 
 
 /**

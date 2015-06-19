@@ -1,6 +1,6 @@
 /******************************************************************************
 
-                              Copyright (c) 2013
+                              Copyright (c) 2014
                             Lantiq Deutschland GmbH
 
   For licensing information, see the file 'LICENSE' in the root folder of
@@ -27,12 +27,7 @@ extern "C"
    ========================================================================= */
 
 #include "ifx_types.h"
-
-#if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1)
 #include "drv_mei_cpe_mei_vrx.h"
-#else
-#include "drv_mei_cpe_mei_ar9.h"
-#endif
 
 /* ==========================================================================
    Macro defs
@@ -169,10 +164,8 @@ extern "C"
 #define MEI_FW_PORT_MODE_LOCK   (0x1)
 #define MEI_FW_PORT_MODE_UNLOCK (0x0)
 
-#if (MEI_SUPPORT_DEVICE_VR10 == 1)
 #define MEI_HYBRID_TYPE_A       (0x6)
 #define MEI_HYBRID_TYPE_BJ      (0x3)
-#endif
 
 #define MEI_FW_BOOTLOADER_ERR_INVAL_IMAGE        (0xE1)
 #define MEI_FW_BOOTLOADER_ERR_INVAL_MEMEXT_SEL   (0xE2)
@@ -477,9 +470,9 @@ typedef enum
 typedef enum
 {
    /** original revision 0 */
-   eMEI_FW_REVISION_OLD,
+   eMEI_FW_INTERFACE_REV_0,
    /** new revision 1 (for layout type 2) */
-   eMEI_FW_REVISION_NEW
+   eMEI_FW_INTERFACE_REV_1
 } MEI_FW_REVISION;
 
 typedef enum
@@ -550,6 +543,21 @@ typedef struct MEI_fw_download_cntrl_s
    MEI_FW_PORT_MODE_CONTROL_T defaultPortModeCtrl;
    /** FW image chunk control data*/
    MEI_FW_IMAGE_CHUNK_CTRL_T  imageChunkCtrl[MEI_FW_IMAGE_MAX_CHUNK_COUNT_TYPE_2];
+
+   /** Current firmware revision */
+   MEI_FW_REVISION            eFwRevision;
+
+   /** Current firmware memory layout type */
+   MEI_FW_MEM_LAYOUT_TYPE     eFwMemLayoutType;
+
+   /** Partitions information (available for fw layout type 2) */
+   MEI_FW_PARTITIONS          meiPartitions;
+
+   /** Max amount of chunks (depends of fw layout type) */
+   IFX_uint32_t               meiMaxChunkCount;
+   /** Offset of special chunks (linked to the BAR14, BAR15, BAR16) */
+   /** BAR[14] -> chunk[14+meiSpecialChunkOffset] */
+   IFX_uint32_t               meiSpecialChunkOffset;
 } MEI_FW_DOWNLOAD_CNTRL_T;
 
 /**

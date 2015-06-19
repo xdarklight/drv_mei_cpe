@@ -2,7 +2,7 @@
 #define _DRV_MEI_CPE_CONFIG_H
 /******************************************************************************
 
-                              Copyright (c) 2013
+                              Copyright (c) 2014
                             Lantiq Deutschland GmbH
 
   For licensing information, see the file 'LICENSE' in the root folder of
@@ -55,18 +55,18 @@
 
 #if (MEI_SUPPORT_DEVICE_VR9 == 1)
 #  if (MEI_SUPPORT_DEVICE_VR10 == 1) || (MEI_SUPPORT_DEVICE_AR9 == 1)
-     #error "Only one device could be selected!"
+     #error "Only one device can be selected!"
 #  endif
 #elif (MEI_SUPPORT_DEVICE_VR10 == 1)
 #  if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_AR9 == 1)
-     #error "Only one device could be selected!"
+     #error "Only one device can be selected!"
 #  endif
 #elif (MEI_SUPPORT_DEVICE_AR9 == 1)
 #  if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1)
-     #error "Only one device could be selected!"
+     #error "Only one device can be selected!"
 #  endif
 #else
-     #error "At least one device should be selected!"
+     #error "At least one device must be selected!"
 #endif
 
 #ifdef DEBUG_PRINT
@@ -357,7 +357,9 @@
 #define DRV_MEI_VER_STR        PACKAGE_VERSION
 
 /** driver version, what string */
-#define DRV_MEI_WHAT_STR "@(#)MEI CPE Driver, Version " DRV_MEI_VER_STR
+#define DRV_MEI_WHAT_STR \
+   "@(#)Lantiq (VRX) DSL CPE MEI driver, version " \
+   DRV_MEI_VER_STR
 
 
 /* ==========================================================================

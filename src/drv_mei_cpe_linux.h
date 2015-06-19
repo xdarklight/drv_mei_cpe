@@ -2,7 +2,7 @@
 #define _DRV_MEI_CPE_LINUX_H
 /******************************************************************************
 
-                              Copyright (c) 2013
+                              Copyright (c) 2014
                             Lantiq Deutschland GmbH
 
   For licensing information, see the file 'LICENSE' in the root folder of
@@ -32,18 +32,30 @@
 
 #include <linux/sched.h>
 #include <linux/interrupt.h>
+#include <linux/version.h>
 
-#include <asm/ifx/irq.h>
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0))
+   #include <asm/ifx/irq.h>
+#else
+   #include <irq.h>
+   #include <net/net_namespace.h>
+   #include <linux/platform_device.h>
+   #include <linux/of_irq.h>
+   #include <linux/of_address.h>
+#endif
 
 #if (MEI_DRV_IFXOS_ENABLE == 0)
 
-#include <linux/version.h>
 #include <linux/wait.h>
 #include <linux/fs.h>
 #include <linux/poll.h>
 #include <linux/types.h>
 
-#include <asm/ifx/ifx_types.h>
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0))
+   #include <asm/ifx/ifx_types.h>
+#else
+   #include <ifx_types.h>
+#endif
 
 #endif /* #if (MEI_DRV_IFXOS_ENABLE == 0)*/
 
@@ -83,12 +95,11 @@ typedef irqreturn_t (*usedIsrHandler_t)(int, void *);
 #define MEI_DRVOS_SIGNAL_PENDING             signal_pending(current)
 #endif
 
-/* PCI device shared IRQ*/
-#define MEI_DRVOS_SLAVE_IRQ_NUM   INT_NUM_IM4_IRL30
-
-#define MEI_DRVOS_IRQ_FLAGS_GET(irq_num)   irq_num == MEI_DRVOS_SLAVE_IRQ_NUM ?  \
-                                              IRQF_SHARED | IRQF_TRIGGER_FALLING : \
-                                              IRQ_LEVEL
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0))
+#   ifndef PDE_DATA
+#     define PDE_DATA(inode) PDE(inode)->data
+#  endif
+#endif
 
 /**
    Function typedef for the Linux request_irq()

@@ -2,7 +2,7 @@
 #define _DRV_MEI_CPE_MEI_ACCESS_VRX_H
 /******************************************************************************
 
-                              Copyright (c) 2013
+                              Copyright (c) 2014
                             Lantiq Deutschland GmbH
 
   For licensing information, see the file 'LICENSE' in the root folder of
@@ -28,11 +28,7 @@ extern "C"
 #include "drv_mei_cpe_config.h"
 
 /* MEI register definitions */
-#if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1)
-   #include "drv_mei_cpe_mei_vrx.h"
-#elif (MEI_SUPPORT_DEVICE_AR9 == 1)
-   #include "drv_mei_cpe_mei_ar9.h"
-#endif
+#include "drv_mei_cpe_mei_vrx.h"
 
 /* ============================================================================
    MEI Register Access Macros (Common)
@@ -221,8 +217,6 @@ extern "C"
 
 #define ME_ARC2ME_STAT_ARC_MSGAV_GET(pMeiDev) \
             (pMeiDev->meiDrvCntrl.intMsgMask)
-
-#   if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1)
 /*
    Notify the ARC about mailbox message read done.
       NOTE: write '1' to clear the corresponding flag
@@ -247,35 +241,6 @@ extern "C"
             (MEI_REG_ACCESS_ME_ME2ARC_STAT_GET(pMeiDrvCntrl) & (pMeiDrvCntrl->intMsgMask))
 
 #define MEI_IS_RESET_MODE_SUPPORTED(x) ((x) == e_MEI_RESET ? IFX_TRUE : IFX_FALSE)
-
-#   elif (MEI_SUPPORT_DEVICE_AR9 == 1)
-
-/*
-   Notify the ARC about mailbox message read done.
-      NOTE: write '1' to clear the corresponding flag
-*/
-#define MEI_MAILBOX_MSG_READ_DONE(pMeiDrvCntrl) \
-            MEI_REG_ACCESS_ME_ARC2ME_STAT_SET(pMeiDrvCntrl, (ME_ARC2ME_STAT_ARC_MSGAV) )
-/*
-   Release the ROM code interrupt.
-      NOTE: write '1' to clear the corresponding flag
-*/
-#define MEI_RELEASE_ROM_INT(pMeiDrvCntrl) \
-            MEI_REG_ACCESS_ME_ARC2ME_STAT_SET(pMeiDrvCntrl, (ME_ARC2ME_STAT_ARC_GP_INT1) )
-/*
-   Notify the ARC for a new Mailbox message.
-*/
-#define MEI_MAILBOX_NFC_NEW_MSG(pMeiDrvCntrl) \
-            MEI_REG_ACCESS_ME_ME2ARC_INT_SET(pMeiDrvCntrl, ME_ME2ARC_INT_ME_MSGAV )
-/*
-   Check the Mailbox ready for next msg. ME2ARC status register is not defined.
-   Use it as dummy.
-*/
-#define MEI_MAILBOX_BUSY_FOR_WR(pMeiDrvCntrl) (0x0)
-
-#define MEI_IS_RESET_MODE_SUPPORTED(x) (IFX_TRUE)
-
-#   endif
 
 #ifdef __cplusplus
 /* extern "C" */

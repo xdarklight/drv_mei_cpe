@@ -2,7 +2,7 @@
 #define _DRV_MEI_CPE_API_H
 /******************************************************************************
 
-                              Copyright (c) 2013
+                              Copyright (c) 2014
                             Lantiq Deutschland GmbH
 
   For licensing information, see the file 'LICENSE' in the root folder of
@@ -61,13 +61,10 @@
 /** protection flag for the timeout values set from outside */
 #define MEI_CFG_DEF_WAIT_PROTECTION_FLAG            0x80000000
 /** default startup cfg: max wait time for the MODEM READY online msg */
-#if (MEI_SUPPORT_DEVICE_VR10 == 1)
-#define MEI_CFG_DEF_WAIT_FOR_MODEM_READY_SEC        30000
+#define MEI_CFG_DEF_WAIT_FOR_MODEM_READY_SEC        10000
 #define MEI_CFG_DEF_WAIT_FOR_PDBRAM_ACCESS_TOTAL    100
 #define MEI_CFG_DEF_WAIT_FOR_PDBRAM_ACCESS_ATTEMPT  20
-#else
-#define MEI_CFG_DEF_WAIT_FOR_MODEM_READY_SEC        10000
-#endif
+
 /** default startup cfg: max wait time for the MODEM READY online msg (bootmode 7) */
 #define MEI_CFG_DEF_WAIT_FOR_MODEM_READY_BM7_SEC    4000
 /** default startup cfg: max wait time for normal msg responce */
@@ -275,9 +272,18 @@
 /** get IF num on the entity from the given channel */
 #define MEI_GET_IF_FROM_DEVNUM(device_num) (device_num % MEI_MAX_MEI_IF_PER_DEVICE)
 
+/** platform device attr get from device tree */
+#define MEI_DEVICE_CFG_VALUE_GET(attr) MEI_DevCfgData.attr
+
+/** platform device attr get from device tree */
+#define MEI_DEVICE_CFG_VALUE_SET(attr, value) MEI_DevCfgData.attr = (value);
+
+/** check current platform case */
+#define MEI_DEVICE_CFG_IS_PLATFORM(value) \
+                (IFX_boolean_t)(MEI_DEVICE_CFG_VALUE_GET(platform) & value)
+
 /** get the entity number from a control device */
 #define MEIX_GET_ENTITY_FROM_DEVNNUM(entity_num) (entity_num & MEI_ENTITY_CNTRL_DEV_MASK)
-
 
 /** set the CPE device number (dsl line num) to the MEI device struct */
 #define MEI_DRV_LINENUM_SET(pMeiDev, setDevNum) \
@@ -307,7 +313,6 @@
 #define MEI_DRV_MEI_VIRT_ADDR_SET(pMeiDev, pNewMeiVirtAddr) \
                         (pMeiDev)->meiDrvCntrl.pMeiIfCntrl->pVirtMeiRegIf = pNewMeiVirtAddr;
 
-#if (MEI_SUPPORT_DEVICE_VR10 == 1)
 /** get the MEI physical address at PCIe bus */
 #define MEI_DRV_PCIE_PHY_MEMBASE_GET(pMeiDrvCntrl) \
                                     (pMeiDrvCntrl)->MEI_pcie_phy_membase
@@ -335,7 +340,6 @@
 /** set the PDBRAM virtual address to the MEI device struct */
 #define MEI_DRV_PDBRAM_VIRT_ADDR_SET(pMeiDev, newPDBRAM_VirtAddr) \
                         (pMeiDev)->meiDrvCntrl.pMeiIfCntrl->virtPDBRAMaddr = (IFX_ulong_t)newPDBRAM_VirtAddr;
-#endif /* (MEI_SUPPORT_DEVICE_VR10 == 1) */
 
 /** get the MEI MEI interface state this interface */
 #define MEI_DRV_MEI_IF_STATE_GET(pMeiDev) \
@@ -654,6 +658,19 @@ typedef enum
 
 }  MEI_MB_BUF_STATE_E;
 
+/**
+   Defines possible device tree platforms
+*/
+typedef enum
+{
+   /** platform unknow or undefined */
+   e_MEI_DEV_PLATFORM_CONFIG_UNKNOWN   = 0,
+   /** VR9 (xrx200) */
+   e_MEI_DEV_PLATFORM_CONFIG_VR9       = 1,
+   /** VR10 (xrx300, smartphy) */
+   e_MEI_DEV_PLATFORM_CONFIG_VR10      = 2
+
+} MEI_DEV_PLATFORM_CONFIG_E;
 
 /* ==========================================================================
    Global defs - data and struct types
@@ -856,21 +873,6 @@ typedef struct MEI_dev_s
    MEI_TIME_STAT_T          timeStat;
 #endif
 
-   /** Current firmware revision */
-   MEI_FW_REVISION          eFwRevision;
-
-   /** Current firmware memory layout type */
-   MEI_FW_MEM_LAYOUT_TYPE   eFwMemLayoutType;
-
-   /** Partitions information (available for fw layout type 2) */
-   MEI_FW_PARTITIONS        meiPartitions;
-
-   /** Max amount of chunks (depends of fw layout type) */
-   IFX_uint32_t             meiMaxChunkCount;
-   /** Offset of special chunks (linked to the BAR14, BAR15, BAR16) */
-   /** BAR[14] -> chunk[14+meiSpecialChunkOffset] */
-   IFX_uint32_t             meiSpecialChunkOffset;
-
 #if (MEI_SUPPORT_DSM == 1)
    /** dsm vectoring data */
    MEI_DSM_VECTOR_DYN_ERB   meiERBbuf;
@@ -962,6 +964,16 @@ typedef struct MEI_dev_s
 #endif
 } MEI_DEV_T;
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0))
+typedef struct MEI_devcfg_data_s
+{
+   IFX_uint32_t               nIrq;
+   IFX_uint32_t               nBaseAddr;
+   struct clk                 *clk;
+   MEI_DEV_PLATFORM_CONFIG_E  platform;
+} MEI_DEVCFG_DATA_T;
+#endif
+
 
 /**
    Global xDSL chip related data
@@ -1004,7 +1016,6 @@ struct MEIx_cntrl_s
    /** List of xDSL chips - for shared interrupts */
    MEIX_CNTRL_T        *pNextMeiXCntrl;
 };
-
 
 /**
    Dynamic MEI related data to handle multiple open().
@@ -1051,6 +1062,10 @@ extern IFX_int32_t MEI_IrqProtectCount;
 /** what string */
 extern const char MEI_WHATVERSION[] ;
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0))
+/** device tree data */
+extern MEI_DEVCFG_DATA_T MEI_DevCfgData;
+#endif
 
 /* VRX-Driver: Common debug module - declare print level variable */
 MEI_DRV_PRN_USR_MODULE_DECL(MEI_DRV);
@@ -1075,16 +1090,17 @@ extern IFX_uint32_t MEI_fwModeSelect;
    Global Functions Definitions
    ========================================================================== */
 
-#if (MEI_SUPPORT_DEVICE_VR10 == 1)
 extern IFX_int32_t MEI_VR10_PcieEntitiesCheck(
                            IFX_uint8_t nEntityNum);
 
 extern IFX_int32_t MEI_VR10_PcieEntityInit(
                            MEI_MEI_DRV_CNTRL_T *pMeiDrvCntrl);
 
+extern IFX_int32_t MEI_VR10_PcieEntityFree(
+                           IFX_uint8_t entityNum);
+
 extern IFX_int32_t MEI_VR10_InternalInitDevice(
                            MEI_DYN_CNTRL_T *pMeiDynCntrl);
-#endif /* (MEI_SUPPORT_DEVICE_VR10 == 1) */
 
 extern IFX_int32_t MEI_CheckIoctlCmdInitState(
                                  MEI_DYN_CNTRL_T *pMeiDynCntrl,
@@ -1126,6 +1142,10 @@ extern IFX_int32_t MEI_InstanceLineAlloc(
 
 extern IFX_int32_t MEI_DevLineClose(
                                  MEI_DYN_CNTRL_T *pMeiDynCntrl);
+
+extern IFX_int32_t MEI_PowerUp(void);
+
+extern IFX_int32_t MEI_PowerDown(void);
 
 extern IFX_int32_t MEI_IoctlInitDevice(
                                  MEI_DYN_CNTRL_T     *pMeiDynCntrl,

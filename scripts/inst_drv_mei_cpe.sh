@@ -9,8 +9,8 @@
 
 bindir=/opt/lantiq/bin
 
-# check for linux 2.6.x
-uname -r | grep -q 2.6.
+# check for linux 2.6.x or 3.8.x or 3.10.x
+uname -r | grep -q -e 2.6. -e 3.8. -e 3.10.x
 if [ $? -eq 0 ]; then
     MODEXT=.ko
 fi

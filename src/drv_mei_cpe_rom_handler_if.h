@@ -2,7 +2,7 @@
 #define _drv_MEI_CPE_rom_handler_if_h
 /******************************************************************************
 
-                              Copyright (c) 2013
+                              Copyright (c) 2014
                             Lantiq Deutschland GmbH
 
   For licensing information, see the file 'LICENSE' in the root folder of

@@ -1,6 +1,6 @@
 /******************************************************************************
 
-                              Copyright (c) 2013
+                              Copyright (c) 2014
                             Lantiq Deutschland GmbH
 
   For licensing information, see the file 'LICENSE' in the root folder of
@@ -429,7 +429,6 @@ MEI_STATIC IFX_int32_t MEI_IoCtl(
          break;
 #endif      /* #if (MEI_SUPPORT_VDSL2_ADSL_SWAP == 1) */
 
-#if (MEI_SUPPORT_DEVICE_VR9 == 1)
       case FIO_MEI_FW_MODE_CTRL_SET:
          ret = MEI_IoctlFwModeCtrlSet(
                pMeiDynCntrl, &pUserArgs->fw_mode_ctrl);
@@ -439,7 +438,6 @@ MEI_STATIC IFX_int32_t MEI_IoCtl(
          ret = MEI_IoctlFwModeStatGet(
                pMeiDynCntrl, &pUserArgs->fw_mode_stat);
          break;
-#endif /* #if (MEI_SUPPORT_DEVICE_VR9 == 1)*/
 
 #if (MEI_SUPPORT_STATISTICS == 1)
       case FIO_MEI_REQ_STAT:
@@ -488,7 +486,6 @@ MEI_STATIC IFX_int32_t MEI_IoCtl(
          }
          break;
 
-#if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_AR9 == 1)
       case FIO_MEI_OPT_FW_DL:
          {
             PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
@@ -498,7 +495,6 @@ MEI_STATIC IFX_int32_t MEI_IoCtl(
             ret = MEI_IoctlOptFirmwareDownload(pMeiDynCntrl, &pUserArgs->fw_dl_opt, IFX_FALSE);
          }
          break;
-#endif /* (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_AR9 == 1)*/
 
 #if (MEI_SUPPORT_DFE_DMA_ACCESS == 1)
       case FIO_MEI_DMA_WRITE:
@@ -1422,9 +1418,8 @@ int MEI_DevCreate(void)
    IFX_uint8_t       deviceNumLast;
    IFX_int32_t       ret = IFX_SUCCESS;
 
-   printf("%s" MEI_DRV_CRLF, &MEI_WHATVERSION[4]);
-   printf("(c) Copyright 2012, Lantiq Deutschland GmbH" MEI_DRV_CRLF MEI_DRV_CRLF);
-   printf("### VRX - VRX - VRX - VRX ###" MEI_DRV_CRLF);
+   printf("%s", &MEI_WHATVERSION[4]);
+   printf(", (c) 2013 Lantiq Deutschland GmbH" MEI_DRV_CRLF MEI_DRV_CRLF);
 
    MEI_DRV_PRN_USR_LEVEL_SET(MEI_DRV, MEI_DRV_PRN_LEVEL_HIGH);
    MEI_DRV_PRN_INT_LEVEL_SET(MEI_DRV, MEI_DRV_PRN_LEVEL_HIGH);

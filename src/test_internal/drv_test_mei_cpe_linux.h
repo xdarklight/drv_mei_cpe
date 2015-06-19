@@ -2,7 +2,7 @@
 #define _DRV_TEST_MEI_CPE_LINUX_H
 /******************************************************************************
 
-                              Copyright (c) 2013
+                              Copyright (c) 2014
                             Lantiq Deutschland GmbH
 
   For licensing information, see the file 'LICENSE' in the root folder of
@@ -52,7 +52,9 @@
                                     _MKSTR(MEI_TEST_DRV_VER_TYPE)
 
 /** driver version, what string */
-#define MEI_TEST_DRV_WHAT_STR "@(#)VRX Driver Test, Version " MEI_TEST_DRV_VER_STR
+#define MEI_TEST_DRV_WHAT_STR \
+   "@(#)VRX driver test application, version " \
+   MEI_TEST_DRV_VER_STR
 
 /** used driver name for registration */
 #define MEI_TEST_DRV_NAME     "mei_test"

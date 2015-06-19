@@ -1,6 +1,6 @@
 /******************************************************************************
 
-                              Copyright (c) 2013
+                              Copyright (c) 2014
                             Lantiq Deutschland GmbH
 
   For licensing information, see the file 'LICENSE' in the root folder of
@@ -19,8 +19,6 @@
 /* get at first the driver configuration */
 #include "drv_mei_cpe_config.h"
 
-#if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1) || (MEI_SUPPORT_DEVICE_AR9 == 1)
-
 #include "ifx_types.h"
 #include "drv_mei_cpe_os.h"
 #include "drv_mei_cpe_dbg.h"
@@ -29,11 +27,13 @@
 #include "drv_mei_cpe_mei_interface.h"
 #include "drv_mei_cpe_api.h"
 
-#if (MEI_SUPPORT_DEVICE_VR10 == 1)
 #if defined(LINUX)
-#include "ifx_pcie.h"
+#  if (LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0))
+#    include "ifx_pcie.h"
+#  else
+#    include "lantiq_pcie.h"
+#  endif
 #endif /* #if defined(LINUX)*/
-#endif
 
 IFX_int32_t MEI_GPIntProcess(MEI_MeiRegVal_t processInt, MEI_DEV_T *pMeiDev)
 {
@@ -69,7 +69,6 @@ IFX_int32_t MEI_GetChipInfo(MEI_DEV_T *pMeiDev)
    return IFX_SUCCESS;
 }
 
-#if (MEI_SUPPORT_DEVICE_VR10 == 1)
 /**
    Check for correct entity value
 
@@ -141,6 +140,29 @@ IFX_int32_t MEI_VR10_PcieEntityInit(MEI_MEI_DRV_CNTRL_T *pMeiDrvCntrl)
 }
 
 /**
+   Release usage PCIe module by MEI driver
+
+\param
+   entityNum:    device number - identify the given device.
+
+\return
+   IFX_SUCCESS    Success
+   IFX_ERROR      in case of error
+*/
+IFX_int32_t MEI_VR10_PcieEntityFree(IFX_uint8_t entityNum)
+{
+   if (ifx_pcie_ep_dev_info_release(entityNum))
+   {
+      PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+         ("PCIe: failed to release EP device %i" MEI_DRV_CRLF, entityNum));
+
+      return IFX_ERROR;
+   }
+
+   return IFX_SUCCESS;
+}
+
+/**
    Internal init device with info provided by pcie driver
 
 \param
@@ -157,12 +179,12 @@ IFX_int32_t MEI_VR10_InternalInitDevice(MEI_DYN_CNTRL_T *pMeiDynCntrl)
    MEI_DEV_T           *pMeiDev = pMeiDynCntrl->pMeiDev;
 
    /* Init membase addresses and driver for the first usage */
-   if (MEI_DRV_STATE_GET(pMeiDynCntrl->pMeiDev) == e_MEI_DRV_STATE_NOT_INIT)
+   if (MEI_DRV_STATE_GET(pMeiDev) == e_MEI_DRV_STATE_NOT_INIT)
    {
-      InitDev.usedIRQ = MEI_DRV_PCIE_IRQ_GET(&pMeiDynCntrl->pMeiDev->meiDrvCntrl);
-      InitDev.meiBaseAddr = MEI_DRV_PCIE_PHY_MEMBASE_GET(&pMeiDynCntrl->pMeiDev->meiDrvCntrl)
+      InitDev.usedIRQ = MEI_DRV_PCIE_IRQ_GET(&pMeiDev->meiDrvCntrl);
+      InitDev.meiBaseAddr = MEI_DRV_PCIE_PHY_MEMBASE_GET(&pMeiDev->meiDrvCntrl)
                               + MEI_DSL_MEI_OFFSET;
-      InitDev.PDBRAMaddr = MEI_DRV_PCIE_PHY_MEMBASE_GET(&pMeiDynCntrl->pMeiDev->meiDrvCntrl)
+      InitDev.PDBRAMaddr = MEI_DRV_PCIE_PHY_MEMBASE_GET(&pMeiDev->meiDrvCntrl)
                               + MEI_PDBRAM_OFFSET;
 
       if ((retVal = MEI_InternalInitDevice(pMeiDynCntrl, &InitDev)) != IFX_SUCCESS)
@@ -177,6 +199,4 @@ IFX_int32_t MEI_VR10_InternalInitDevice(MEI_DYN_CNTRL_T *pMeiDynCntrl)
 
    return IFX_SUCCESS;
 }
-#endif /* (MEI_SUPPORT_DEVICE_VR10 == 1) */
-#endif /* (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1) || (MEI_SUPPORT_DEVICE_AR9 == 1)*/
 

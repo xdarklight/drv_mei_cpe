@@ -1,6 +1,6 @@
 /******************************************************************************
 
-                              Copyright (c) 2013
+                              Copyright (c) 2014
                             Lantiq Deutschland GmbH
 
   For licensing information, see the file 'LICENSE' in the root folder of
@@ -59,6 +59,7 @@
 
 #if CONFIG_PROC_FS
 #include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 #endif
 
 
@@ -104,86 +105,74 @@ static int MEI_GetDigitArray( char *pArgList,
 
 #if (MEI_DEBUG_PRINT == 1)
 static int MEI_ProcWriteConfigGlobalDbgConfig(char *pArg);
-static int MEI_ProcReadConfigGlobalDbgConfig(char *pPage);
+static void MEI_ProcReadConfigGlobalDbgConfig(struct seq_file *s);
 #endif      /* #if (MEI_DEBUG_PRINT == 1) */
 
-static int MEI_ProcReadConfig( char *page, char **start,
-                                 off_t off, int count,
-                                 int *eof, void *data);
-
-static int MEI_ProcWriteConfig( struct file *file,
-                                  const char *buffer,
-                                  unsigned long count,
-                                  void *data);
-
 static int MEI_ProcWriteConfigLog(char *pArg);
-static int MEI_ProcReadConfigLog(char *pPage);
+static void MEI_ProcReadConfigLog(struct seq_file *s);
 
 static int MEI_ProcWriteConfigTrace(char *pArg);
-static int MEI_ProcReadConfigTrace(char *pPage);
+static void MEI_ProcReadConfigTrace(struct seq_file *s);
 
 static int MEI_ProcWriteConfigLogMei(char *pArg);
-static int MEI_ProcReadConfigLogMei(char *pPage);
+static void MEI_ProcReadConfigLogMei(struct seq_file *s);
 
 static int MEI_ProcWriteConfigTraceMei(char *pArg);
-static int MEI_ProcReadConfigTraceMei(char *pPage);
+static void MEI_ProcReadConfigTraceMei(struct seq_file *s);
 
 static int MEI_ProcWriteConfigMailboxME2ARC(char *pArg);
-static int MEI_ProcReadConfigMailboxME2ARC(char *pPage);
+static void MEI_ProcReadConfigMailboxME2ARC(struct seq_file *s);
 
 static int MEI_ProcWriteConfigMailboxARC2ME(char *pArg);
-static int MEI_ProcReadConfigMailboxARC2ME(char *pPage);
+static void MEI_ProcReadConfigMailboxARC2ME(struct seq_file *s);
 
 #if (MEI_SUPPORT_ROM_CODE == 1)
 
 static int MEI_ProcWriteConfigTraceRom(char *pArg);
-static int MEI_ProcReadConfigTraceRom(char *pPage);
+static void MEI_ProcReadConfigTraceRom(struct seq_file *s);
 
 #endif
 
-static int MEI_ProcReadConfigBlockTimeout(char *pPage);
+static void MEI_ProcReadConfigBlockTimeout(struct seq_file *s);
 static int MEI_ProcWriteConfigBlockTimeout(char *pArg);
 
-static int MEI_ProcReadConfigMaxWaitModemOnline(char *pPage);
+static void MEI_ProcReadConfigMaxWaitModemOnline(struct seq_file *s);
 static int MEI_ProcWriteConfigMaxWaitModemOnline(char *pArg);
 
-static int MEI_ProcReadConfigMaxWaitDfeResp(char *pPage);
+static void MEI_ProcReadConfigMaxWaitDfeResp(struct seq_file *s);
 static int MEI_ProcWriteConfigMaxWaitDfeResp(char *pArg);
 
 #if (MEI_SUPPORT_VDSL2_ADSL_SWAP == 1)
 static int MEI_ProcWriteConfigFwSelect(char *pArg);
-static int MEI_ProcReadConfigFwSelect(char *pPage);
+static void MEI_ProcReadConfigFwSelect(struct seq_file *s);
 #endif
 
 #if ( (MEI_MSG_DUMP_ENABLE == 1) && (MEI_DEBUG_PRINT == 1) )
 static int MEI_ProcWriteConfigMsgDumpEnable(char *pArg);
-static int MEI_ProcReadConfigMsgDumpEnable(char *pPage);
+static void MEI_ProcReadConfigMsgDumpEnable(struct seq_file *s);
 
 static int MEI_ProcWriteConfigMsgDumpId(char *pArg);
-static int MEI_ProcReadConfigMsgDumpId(char *pPage);
+static void MEI_ProcReadConfigMsgDumpId(struct seq_file *s);
 #endif
 
 #if (MEI_EXT_MEI_ACCESS_ADD_CSE_MIPS == 1) || (MEI_EXT_MEI_ACCESS_ADD_CSE == 1)
 static int MEI_ProcWriteConfigMeiAccCse(char *pArg);
-static int MEI_ProcReadConfigMeiAccCse(char *pPage);
+static void MEI_ProcReadConfigMeiAccCse(struct seq_file *s);
 #endif
 
 #if (MEI_SUPPORT_DRV_MODEM_TESTS == 1)
 static int MEI_ProcWriteConfigDTestCntrl(char *pArg);
-static int MEI_ProcReadConfigDTestCntrl(char *pPage);
+static void MEI_ProcReadConfigDTestCntrl(struct seq_file *s);
 #endif
 
 static int MEI_ProcWriteConfigFsmSetPreAct(char *pArg);
-static int MEI_ProcReadConfigFsmSetPreAct(char *pPage);
+static void MEI_ProcReadConfigFsmSetPreAct(struct seq_file *s);
 
 
 
 /* ==========================================================================
    Local variables
    ========================================================================== */
-
-/* config proc dir entry */
-static struct proc_dir_entry *MEI_ProcConfigFile;
 
 #undef NO_SEPARATOR
 #define NO_SEPARATOR
@@ -355,9 +344,10 @@ static int MEI_ProcWriteConfigGlobalDbgConfig(char *pArg)
 /**
    Handle procfs config - read global debug level for int and usr direction.
 */
-static int MEI_ProcReadConfigGlobalDbgConfig(char *pPage)
+static void MEI_ProcReadConfigGlobalDbgConfig(struct seq_file *s)
 {
-   return (sprintf( pPage, "%2d: %s \tT = %d L = %d \tCnt = 0x%X, Mask[0..3] = 0x%X 0x%X 0x%X 0x%X" MEI_DRV_CRLF,
+
+   seq_printf(s, "%2d: %s \tT = %d L = %d \tCnt = 0x%X, Mask[0..3] = 0x%X 0x%X 0x%X 0x%X" MEI_DRV_CRLF,
                     e_PROCFS_CONFIG_G_DBG_CONFIG,
                     arrVrxDfeProcFsConfigTable[e_PROCFS_CONFIG_G_DBG_CONFIG].pName,
                     MEI_DRVOS_GDBG_USR_LEVEL_GET(),
@@ -366,7 +356,7 @@ static int MEI_ProcReadConfigGlobalDbgConfig(char *pPage)
                     MEI_DRV_PRN_DEBUG_CONTROL_MASK_GET(0),
                     MEI_DRV_PRN_DEBUG_CONTROL_MASK_GET(1),
                     MEI_DRV_PRN_DEBUG_CONTROL_MASK_GET(2),
-                    MEI_DRV_PRN_DEBUG_CONTROL_MASK_GET(3) ));
+                    MEI_DRV_PRN_DEBUG_CONTROL_MASK_GET(3));
 }
 #endif      /* #if (MEI_DEBUG_PRINT == 1) */
 
@@ -396,14 +386,13 @@ static int MEI_ProcWriteConfigLog(char *pArg)
 /**
    Handle procfs config - set LOG configuration.
 */
-static int MEI_ProcReadConfigLog(char *pPage)
+static void MEI_ProcReadConfigLog(struct seq_file *s)
 {
-   return (sprintf( pPage, "%2d: %s \t= %2d" MEI_DRV_CRLF,
+   seq_printf(s, "%2d: %s \t= %2d" MEI_DRV_CRLF,
                     e_PROCFS_CONFIG_LOG,
                     arrVrxDfeProcFsConfigTable[e_PROCFS_CONFIG_LOG].pName,
-                    MEI_DRV_PRN_INT_LEVEL_GET(MEI_DRV)) );
+                    MEI_DRV_PRN_INT_LEVEL_GET(MEI_DRV));
 }
-
 
 /**
    Handle procfs config - set TRACE configuration.
@@ -432,14 +421,13 @@ static int MEI_ProcWriteConfigTrace(char *pArg)
 /**
    Handle procfs config - set TRACE configuration.
 */
-static int MEI_ProcReadConfigTrace(char *pPage)
+static void MEI_ProcReadConfigTrace(struct seq_file *s)
 {
-   return (sprintf( pPage, "%2d: %s \t= %2d" MEI_DRV_CRLF,
+   seq_printf(s, "%2d: %s \t= %2d" MEI_DRV_CRLF,
                     e_PROCFS_CONFIG_TRACE,
                     arrVrxDfeProcFsConfigTable[e_PROCFS_CONFIG_TRACE].pName,
-                    MEI_DRV_PRN_USR_LEVEL_GET(MEI_DRV)));
+                    MEI_DRV_PRN_USR_LEVEL_GET(MEI_DRV));
 }
-
 
 /**
    Handle procfs config - set TRACE configuration.
@@ -468,12 +456,12 @@ static int MEI_ProcWriteConfigLogMei(char *pArg)
 /**
    Handle procfs config - set TRACE configuration.
 */
-static int MEI_ProcReadConfigLogMei(char *pPage)
+static void MEI_ProcReadConfigLogMei(struct seq_file *s)
 {
-   return (sprintf( pPage, "%2d: %s \t= %2d" MEI_DRV_CRLF,
+   seq_printf(s, "%2d: %s \t= %2d" MEI_DRV_CRLF,
                     e_PROCFS_CONFIG_LOG_MEI,
                     arrVrxDfeProcFsConfigTable[e_PROCFS_CONFIG_LOG_MEI].pName,
-                    MEI_DRV_PRN_INT_LEVEL_GET(MEI_MEI_ACCESS)));
+                    MEI_DRV_PRN_INT_LEVEL_GET(MEI_MEI_ACCESS));
 }
 
 
@@ -504,12 +492,12 @@ static int MEI_ProcWriteConfigTraceMei(char *pArg)
 /**
    Handle procfs config - set TRACE configuration.
 */
-static int MEI_ProcReadConfigTraceMei(char *pPage)
+static void MEI_ProcReadConfigTraceMei(struct seq_file *s)
 {
-   return (sprintf( pPage, "%2d: %s \t= %2d" MEI_DRV_CRLF,
+   seq_printf(s, "%2d: %s \t= %2d" MEI_DRV_CRLF,
                     e_PROCFS_CONFIG_TRACE_MEI,
                     arrVrxDfeProcFsConfigTable[e_PROCFS_CONFIG_TRACE_MEI].pName,
-                    MEI_DRV_PRN_USR_LEVEL_GET(MEI_MEI_ACCESS)));
+                    MEI_DRV_PRN_USR_LEVEL_GET(MEI_MEI_ACCESS));
 }
 
 
@@ -531,12 +519,12 @@ static int MEI_ProcWriteConfigMailboxME2ARC(char *pArg)
 /**
    Handle procfs config - read  mailbox addr ME2ARC.
 */
-static int MEI_ProcReadConfigMailboxME2ARC(char *pPage)
+static void MEI_ProcReadConfigMailboxME2ARC(struct seq_file *s)
 {
-   return (sprintf( pPage, "%2d: %s \t= 0x%08X" MEI_DRV_CRLF,
+   seq_printf(s, "%2d: %s \t= 0x%08X" MEI_DRV_CRLF,
                     e_PROCFS_CONFIG_MB_ME2ARC,
                     arrVrxDfeProcFsConfigTable[e_PROCFS_CONFIG_MB_ME2ARC].pName,
-                    MEI_MailboxBase_ME2ARC));
+                    MEI_MailboxBase_ME2ARC);
 }
 
 
@@ -558,12 +546,12 @@ static int MEI_ProcWriteConfigMailboxARC2ME(char *pArg)
 /**
    Handle procfs config - read  mailbox addr ARC2ME.
 */
-static int MEI_ProcReadConfigMailboxARC2ME(char *pPage)
+static void MEI_ProcReadConfigMailboxARC2ME(struct seq_file *s)
 {
-   return (sprintf( pPage, "%2d: %s \t= 0x%08X" MEI_DRV_CRLF,
+   seq_printf(s, "%2d: %s \t= 0x%08X" MEI_DRV_CRLF,
                     e_PROCFS_CONFIG_MB_ARC2ME,
                     arrVrxDfeProcFsConfigTable[e_PROCFS_CONFIG_MB_ARC2ME].pName,
-                    MEI_MailboxBase_ARC2ME));
+                    MEI_MailboxBase_ARC2ME);
 }
 
 
@@ -596,12 +584,12 @@ static int MEI_ProcWriteConfigTraceRom(char *pArg)
 /**
    Handle procfs config - set TRACE configuration.
 */
-static int MEI_ProcReadConfigTraceRom(char *pPage)
+static void MEI_ProcReadConfigTraceRom(struct seq_file *s)
 {
-   return (sprintf( pPage, "%2d: %s \t= %2d" MEI_DRV_CRLF,
+   seq_printf(s, "%2d: %s \t= %2d" MEI_DRV_CRLF,
                     e_PROCFS_CONFIG_TRACE_DL_ROM,
                     arrVrxDfeProcFsConfigTable[e_PROCFS_CONFIG_TRACE_DL_ROM].pName,
-                    MEI_DRV_PRN_USR_LEVEL_GET(MEI_ROM)));
+                    MEI_DRV_PRN_USR_LEVEL_GET(MEI_ROM));
 }
 
 #endif   /* #if (MEI_SUPPORT_ROM_CODE == 1) */
@@ -624,12 +612,12 @@ static int MEI_ProcWriteConfigBlockTimeout(char *pArg)
 /**
    Handle procfs config - read  block timeout for Download.
 */
-static int MEI_ProcReadConfigBlockTimeout(char *pPage)
+static void MEI_ProcReadConfigBlockTimeout(struct seq_file *s)
 {
-   return (sprintf( pPage, "%2d: %s \t= %d" MEI_DRV_CRLF,
+   seq_printf(s, "%2d: %s \t= %d" MEI_DRV_CRLF,
                     e_PROCFS_CONFIG_BLOCK_TOUT,
                     arrVrxDfeProcFsConfigTable[e_PROCFS_CONFIG_BLOCK_TOUT].pName,
-                    MEI_BlockTimeout));
+                    MEI_BlockTimeout);
 }
 
 
@@ -649,13 +637,13 @@ static int MEI_ProcWriteConfigMaxWaitModemOnline(char *pArg)
 /**
    Handle procfs config - read  Max Wait for VRX Response.
 */
-static int MEI_ProcReadConfigMaxWaitModemOnline(char *pPage)
+static void MEI_ProcReadConfigMaxWaitModemOnline(struct seq_file *s)
 {
-   return (sprintf( pPage, "%2d: %s \t= %s%d [ms]\n\r",
+   seq_printf(s, "%2d: %s \t= %s%d [ms]\n\r",
                     e_PROCFS_CONFIG_W_MODEM_ONLINE,
                     arrVrxDfeProcFsConfigTable[e_PROCFS_CONFIG_W_MODEM_ONLINE].pName,
                     ((MEI_MaxWaitForModemReady_ms & MEI_CFG_DEF_WAIT_PROTECTION_FLAG) ? "*" : ""),
-                    (MEI_MaxWaitForModemReady_ms & ~MEI_CFG_DEF_WAIT_PROTECTION_FLAG) ));
+                    (MEI_MaxWaitForModemReady_ms & ~MEI_CFG_DEF_WAIT_PROTECTION_FLAG) );
 }
 
 
@@ -677,12 +665,12 @@ static int MEI_ProcWriteConfigMaxWaitDfeResp(char *pArg)
 /**
    Handle procfs config - read  Max Wait for VRX Response.
 */
-static int MEI_ProcReadConfigMaxWaitDfeResp(char *pPage)
+static void MEI_ProcReadConfigMaxWaitDfeResp(struct seq_file *s)
 {
-   return (sprintf( pPage, "%2d: %s \t= %d [ms]" MEI_DRV_CRLF,
+   seq_printf(s, "%2d: %s \t= %d [ms]" MEI_DRV_CRLF,
                     e_PROCFS_CONFIG_W_DFE_RESP,
                     arrVrxDfeProcFsConfigTable[e_PROCFS_CONFIG_W_DFE_RESP].pName,
-                    MEI_MaxWaitDfeResponce_ms));
+                    MEI_MaxWaitDfeResponce_ms);
 }
 
 #if (MEI_SUPPORT_VDSL2_ADSL_SWAP == 1)
@@ -705,12 +693,12 @@ static int MEI_ProcWriteConfigFwSelect(char *pArg)
 /**
    Handle procfs config - read fw mode select (VDSL2 / ADSL).
 */
-static int MEI_ProcReadConfigFwSelect(char *pPage)
+static void MEI_ProcReadConfigFwSelect(struct seq_file *s)
 {
-   return (sprintf( pPage, "%2d: %s \t= 0x%02X " MEI_DRV_CRLF,
+   seq_printf(s, "%2d: %s \t= 0x%02X " MEI_DRV_CRLF,
                     e_PROCFS_CONFIG_FW_SELECT,
                     arrVrxDfeProcFsConfigTable[e_PROCFS_CONFIG_FW_SELECT].pName,
-                    MEI_fwModeSelect));
+                    MEI_fwModeSelect);
 }
 
 #endif      /* #if (MEI_SUPPORT_VDSL2_ADSL_SWAP == 1) */
@@ -733,12 +721,12 @@ static int MEI_ProcWriteConfigFsmSetPreAct(char *pArg)
 /**
    Handle procfs config - read FSM State Set Pre-Action.
 */
-static int MEI_ProcReadConfigFsmSetPreAct(char *pPage)
+static void MEI_ProcReadConfigFsmSetPreAct(struct seq_file *s)
 {
-   return (sprintf( pPage, "%2d: %s \t= 0x%02X " MEI_DRV_CRLF,
+   seq_printf(s, "%2d: %s \t= 0x%02X " MEI_DRV_CRLF,
                     e_PROCFS_CONFIG_FSM_SET_PRE_ACT,
                     arrVrxDfeProcFsConfigTable[e_PROCFS_CONFIG_FSM_SET_PRE_ACT].pName,
-                    MEI_FsmStateSetMsgPreAction));
+                    MEI_FsmStateSetMsgPreAction);
 }
 
 
@@ -770,7 +758,7 @@ static int MEI_ProcWriteConfigMsgDumpEnable(char *pArg)
 }
 
 
-static int MEI_ProcReadConfigMsgDumpEnable(char *pPage)
+static void MEI_ProcReadConfigMsgDumpEnable(struct seq_file *s)
 {
    unsigned long tmpVal;
 
@@ -778,10 +766,10 @@ static int MEI_ProcReadConfigMsgDumpEnable(char *pPage)
               (MEI_msgDumpOutCntrl << 8) |
               ( ((IFX_uint32_t)MEI_msgDumpLine) << 16) );
 
-   return (sprintf( pPage, "%2d: %s \t= 0x%02X " MEI_DRV_CRLF,
+   seq_printf(s, "%2d: %s \t= 0x%02X " MEI_DRV_CRLF,
                     e_PROCFS_CONFIG_MDMP_ENABLE,
                     arrVrxDfeProcFsConfigTable[e_PROCFS_CONFIG_MDMP_ENABLE].pName,
-                    (unsigned int)tmpVal));
+                    (unsigned int)tmpVal);
 }
 
 static int MEI_ProcWriteConfigMsgDumpId(char *pArg)
@@ -790,12 +778,12 @@ static int MEI_ProcWriteConfigMsgDumpId(char *pArg)
    return 0;
 }
 
-static int MEI_ProcReadConfigMsgDumpId(char *pPage)
+static void MEI_ProcReadConfigMsgDumpId(struct seq_file *s)
 {
-   return (sprintf( pPage, "%2d: %s \t= 0x%02X " MEI_DRV_CRLF,
+   seq_printf(s, "%2d: %s \t= 0x%02X " MEI_DRV_CRLF,
                     e_PROCFS_CONFIG_MDMP_ID,
                     arrVrxDfeProcFsConfigTable[e_PROCFS_CONFIG_MDMP_ID].pName,
-                    MEI_msgDumpId));
+                    MEI_msgDumpId);
 }
 
 #endif /* ( (MEI_MSG_DUMP_ENABLE == 1) && (MEI_DEBUG_PRINT == 1) ) */
@@ -825,12 +813,12 @@ static int MEI_ProcWriteConfigMeiAccCse(char *pArg)
 /**
    Handle procfs config - read MEI Access Dummy Loop Count.
 */
-static int MEI_ProcReadConfigMeiAccCse(char *pPage)
+static void MEI_ProcReadConfigMeiAccCse(struct seq_file *s)
 {
-   return (sprintf( pPage, "%2d: %s \tRd=%d \tWr=%d\n\r",
+   seq_printf(s, "%2d: %s \tRd=%d \tWr=%d\n\r",
                     e_PROCFS_CONFIG_MEI_ACCESS_ADD_CSE,
                     arrVrxDfeProcFsConfigTable[e_PROCFS_CONFIG_MEI_ACCESS_ADD_CSE].pName,
-                    MEI_DummyAccessLoopsRd, MEI_DummyAccessLoopsWr));
+                    MEI_DummyAccessLoopsRd, MEI_DummyAccessLoopsWr);
 }
 
 #endif      /* #if (MEI_EXT_MEI_ACCESS_ADD_CSE_MIPS == 1) || (MEI_EXT_MEI_ACCESS_ADD_CSE == 1) */
@@ -862,26 +850,24 @@ static int MEI_ProcWriteConfigDTestCntrl(char *pArg)
 /**
    Handle procfs config - read Modem Test control.
 */
-static int MEI_ProcReadConfigDTestCntrl(char *pPage)
+static void MEI_ProcReadConfigDTestCntrl(struct seq_file *s)
 {
-   return (sprintf( pPage, "%2d: %s \t= 0x%08X min = 0x%08X max = 0x%08X" MEI_DRV_CRLF,
+   seq_printf(s, "%2d: %s \t= 0x%08X min = 0x%08X max = 0x%08X" MEI_DRV_CRLF,
                     e_PROCFS_CONFIG_DTEST_CNTRL,
                     arrVrxDfeProcFsConfigTable[e_PROCFS_CONFIG_DTEST_CNTRL].pName,
                     MEI_procDebugTestCntrl,
                     MEI_procDebugTestBufDmaRangeMin,
-                    MEI_procDebugTestBufDmaRangeMax));
+                    MEI_procDebugTestBufDmaRangeMax);
 }
 #endif
 
 
 /**
 */
-static int MEI_ProcReadConfig( char *page, char **start,
-                                     off_t off, int count,
-                                     int *eof, void *data)
+static void MEI_ProcReadConfig(struct seq_file *s)
 {
-   int len = 0, i;
-   MEI_CONFIG_PROC_ENTRY_T *pConfigPage = (MEI_CONFIG_PROC_ENTRY_T *)data;
+   int i;
+   MEI_CONFIG_PROC_ENTRY_T *pConfigPage = (MEI_CONFIG_PROC_ENTRY_T *)s->private;
 
    #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0))
    MOD_INC_USE_COUNT;
@@ -897,7 +883,7 @@ static int MEI_ProcReadConfig( char *page, char **start,
               pConfigPage[i].pName ));
 */
 
-      len += pConfigPage[i].pRdFct(page + len);
+      pConfigPage[i].pRdFct(s);
 
 /*
       len += sprintf( page+len, "%2d: %s \t= %2d" MEI_DRV_CRLF,
@@ -910,20 +896,18 @@ static int MEI_ProcReadConfig( char *page, char **start,
    #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0))
    MOD_DEC_USE_COUNT;
    #endif
-   return len;
 }
 
 /**
 */
-static int MEI_ProcWriteConfig( struct file *file,
-                                      const char *buffer,
-                                      unsigned long count,
-                                      void *data)
+static int MEI_ProcWriteConfig(struct file *file,
+                  const char *buffer, size_t count, loff_t *ppos)
 {
    int len, i;
    char MEI_procWriteBuf[64];
    char *pArgPointer = IFX_NULL;
-   MEI_CONFIG_PROC_ENTRY_T *pConfigPage = (MEI_CONFIG_PROC_ENTRY_T *)data;
+	struct seq_file *s = file->private_data;
+   MEI_CONFIG_PROC_ENTRY_T *pConfigPage = (MEI_CONFIG_PROC_ENTRY_T *)s->private;
 
    #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0))
    MOD_INC_USE_COUNT;
@@ -943,7 +927,10 @@ static int MEI_ProcWriteConfig( struct file *file,
    }
 
    /* terminate - last byte is 0x0A (CR) */
-   MEI_procWriteBuf[len-1] = '\0';
+   if (len)
+   {
+      MEI_procWriteBuf[len-1] = '\0';
+   }
 
    PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_LOW,
          ("MEI_DRV: write config entry: %s (%d)" MEI_DRV_CRLF,
@@ -986,7 +973,25 @@ static int MEI_ProcWriteConfig( struct file *file,
    return len;
 }
 
+static int mei_seq_single_show(struct seq_file *s, void *v)
+{
+   MEI_ProcReadConfig(s);
+	return 0;
+}
 
+static int mei_proc_single_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, mei_seq_single_show, PDE_DATA(inode));
+}
+
+static struct file_operations proc_ops = {
+   .owner = THIS_MODULE,
+   .open = mei_proc_single_open,
+   .release = single_release,
+   .read = seq_read,
+   .llseek = seq_lseek,
+   .write = MEI_ProcWriteConfig
+};
 
 /**
    Create an read/write proc entry for configuration.
@@ -995,25 +1000,8 @@ int MEI_InstallProcEntryConfig(struct proc_dir_entry *driver_proc_node)
 {
    if (driver_proc_node != NULL)
    {
-      /* create new entry (read/write) */
-      MEI_ProcConfigFile = create_proc_entry("config", 0644, driver_proc_node);
-
-      if (MEI_ProcConfigFile == NULL)
-      {
-         /* error create proc entry "config" */
-         PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
-               ("MEI_DRV: cannot create proc config entry" MEI_DRV_CRLF));
-         return -e_MEI_ERR_DEV_INIT;
-      }
-
-      /* Set the configuration data */
-      MEI_ProcConfigFile->data       = &arrVrxDfeProcFsConfigTable;
-      MEI_ProcConfigFile->read_proc  = MEI_ProcReadConfig;
-      MEI_ProcConfigFile->write_proc = MEI_ProcWriteConfig;
-
-      #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,30))
-      MEI_ProcConfigFile->owner      = THIS_MODULE;
-      #endif
+	   proc_create_data("config", (S_IFREG | S_IRUGO),
+                        driver_proc_node, &proc_ops, &arrVrxDfeProcFsConfigTable);
    }
 
    PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_HIGH,

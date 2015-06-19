@@ -2,7 +2,7 @@
 #define _MEI_CPE_mailbox_h
 /******************************************************************************
 
-                              Copyright (c) 2013
+                              Copyright (c) 2014
                             Lantiq Deutschland GmbH
 
   For licensing information, see the file 'LICENSE' in the root folder of
@@ -63,8 +63,6 @@ extern "C"
    ARC memory map + mailbox settings
    ========================================================== */
 
-#  if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1)
-
 /**
    Location of the mailbox description table.
 */
@@ -81,27 +79,6 @@ extern "C"
 /** Mailbox address within the ARC Bulk memory: ME to ARC */
 #define MEI_BOOT_MAILBOX_ME2ARC_ADDR    0x40014
 #define MEI_BOOT_MAILBOX_ME2ARC_LEN     0x14
-
-#  elif (MEI_SUPPORT_DEVICE_AR9 == 1)
-
-/**
-   Location of the mailbox description table.
-*/
-#define MEI_MAILBOX_DESCR_TABLE_ADDR    0x20000
-/*
-   Boot Mailbox address within the ARC controller memory.
-*/
-
-/* TODO: Check the values below*/
-
-/** Mailbox address within the ARC Bulk memory: ARC to ME */
-#define MEI_BOOT_MAILBOX_ARC2ME_ADDR    (0xAFA0)
-#define MEI_BOOT_MAILBOX_ARC2ME_LEN     sizeof(MEI_MEI_MAILBOX_T)
-/** Mailbox address within the ARC Bulk memory: ME to ARC */
-#define MEI_BOOT_MAILBOX_ME2ARC_ADDR    (0xAFD0)
-#define MEI_BOOT_MAILBOX_ME2ARC_LEN     sizeof(MEI_MEI_MAILBOX_T)
-
-#  endif
 
 extern IFX_uint32_t MEI_MailboxBase_ME2ARC;
 #define MEI_MAILBOX_BASE_ME2ARC   MEI_MailboxBase_ME2ARC

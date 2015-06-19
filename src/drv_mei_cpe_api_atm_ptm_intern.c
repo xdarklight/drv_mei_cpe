@@ -1,6 +1,6 @@
 /******************************************************************************
 
-                              Copyright (c) 2013
+                              Copyright (c) 2014
                             Lantiq Deutschland GmbH
 
   For licensing information, see the file 'LICENSE' in the root folder of
@@ -25,7 +25,11 @@
 #include "drv_mei_cpe_os.h"
 
 #ifdef LINUX
-   #include <asm/ifx/ifx_atm.h>
+   #if (LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0))
+      #include <asm/ifx/ifx_atm.h>
+   #else
+      #include <lantiq_atm.h>
+   #endif
 #else
    #error "ATM/PTM internal interface is only supported for Linux!"
 #endif
@@ -39,49 +43,9 @@
 static unsigned int g_tx_link_rate[MEI_MAX_DFE_CHAN_DEVICES][2] = {{0}};
 void *g_xdata_addr[MEI_MAX_DFE_CHAN_DEVICES] = {NULL};
 
-
-#if (MEI_MAX_DFE_CHAN_DEVICES > 1)
-#undef MEI_MAX_DFE_CHAN_DEVICES
-#define MEI_MAX_DFE_CHAN_DEVICES 1
-#endif /*TEMPORARY SOLUTION, TO BE REMOVED!!!*/
-
 /* ============================================================================
    Exported functions
    ========================================================================= */
-
-#if (MEI_MAX_DFE_CHAN_DEVICES > 1)
-int (*ifx_mei_atm_showtime_line_enter)(unsigned char line_num, struct port_cell_info *, void *) = NULL;
-int (*ifx_mei_atm_showtime_line_exit)(unsigned char line_num) = NULL;
-
-#define MEI_ATM_SHOWTIME_ENTER_FN   ifx_mei_atm_showtime_line_enter
-#define MEI_ATM_SHOWTIME_EXIT_FN    ifx_mei_atm_showtime_line_exit
-
-#define MEI_ATM_SHOWTIME_ENTER(line, cell, xdata) \
-           ifx_mei_atm_showtime_line_enter(line, cell, xdata)
-
-#define MEI_ATM_SHOWTIME_EXIT(line) \
-           ifx_mei_atm_showtime_line_exit(line)
-
-#else
-
-#define MEI_ATM_SHOWTIME_ENTER_FN   ifx_mei_atm_showtime_enter
-#define MEI_ATM_SHOWTIME_EXIT_FN    ifx_mei_atm_showtime_exit
-
-int (*ifx_mei_atm_showtime_enter)(struct port_cell_info *, void *) = NULL;
-int (*ifx_mei_atm_showtime_exit)(void) = NULL;
-#define MEI_ATM_SHOWTIME_ENTER(line, cell, xdata) \
-           line == 0 ? \
-           ifx_mei_atm_showtime_enter(cell, xdata) : \
-           ((void)0)
-
-#define MEI_ATM_SHOWTIME_EXIT(line) \
-           line == 0 ? \
-           ifx_mei_atm_showtime_exit() : \
-           ((void)0)
-
-#endif /* #if (MEI_MAX_DFE_CHAN_DEVICES > 1)*/
-
-
 
 IFX_int32_t MEI_InternalXtmSwhowtimeEntrySignal(
                               MEI_DYN_CNTRL_T         *pMeiDynCntrl,
@@ -90,6 +54,7 @@ IFX_int32_t MEI_InternalXtmSwhowtimeEntrySignal(
    IFX_int32_t retVal = IFX_SUCCESS;
    struct port_cell_info port_cell = {0};
    IFX_uint8_t dslLineNum;
+   ltq_mei_atm_showtime_enter_t ltq_mei_atm_showtime_enter = NULL;
 
    if (!pMeiDynCntrl || !pArgXtm)
       return -e_MEI_ERR_GET_ARG;
@@ -112,13 +77,17 @@ IFX_int32_t MEI_InternalXtmSwhowtimeEntrySignal(
       retVal = -e_MEI_ERR_INVAL_CONFIG;
    }
 
-   if (MEI_ATM_SHOWTIME_ENTER_FN)
+   /* get NULL or function pointer */
+   ltq_mei_atm_showtime_enter =
+        (ltq_mei_atm_showtime_enter_t)ppa_callback_get(LTQ_MEI_SHOWTIME_ENTER);
+
+   if (ltq_mei_atm_showtime_enter)
    {
       port_cell.port_num = 2;
       port_cell.tx_link_rate[0] = g_tx_link_rate[dslLineNum][0];
       port_cell.tx_link_rate[1] = g_tx_link_rate[dslLineNum][1];
 
-      MEI_ATM_SHOWTIME_ENTER(dslLineNum, &port_cell, g_xdata_addr[dslLineNum]);
+      ltq_mei_atm_showtime_enter(dslLineNum, &port_cell, g_xdata_addr[dslLineNum]);
    }
    else
    {
@@ -134,6 +103,7 @@ IFX_int32_t MEI_InternalXtmSwhowtimeExitSignal(
 {
    IFX_int32_t retVal = IFX_SUCCESS;
    IFX_uint8_t dslLineNum;
+   ltq_mei_atm_showtime_exit_t ltq_mei_atm_showtime_exit = NULL;
 
    if (!pMeiDynCntrl || !pArgXtm)
       return -e_MEI_ERR_GET_ARG;
@@ -141,9 +111,13 @@ IFX_int32_t MEI_InternalXtmSwhowtimeExitSignal(
    /* Get line number*/
    dslLineNum = pMeiDynCntrl->pMeiDev->meiDrvCntrl.dslLineNum;
 
-   if (MEI_ATM_SHOWTIME_EXIT_FN)
+   /* get NULL or function pointer */
+   ltq_mei_atm_showtime_exit =
+        (ltq_mei_atm_showtime_exit_t)ppa_callback_get(LTQ_MEI_SHOWTIME_EXIT);
+
+   if (ltq_mei_atm_showtime_exit)
    {
-      MEI_ATM_SHOWTIME_EXIT(dslLineNum);
+      ltq_mei_atm_showtime_exit(dslLineNum);
    }
    else
    {
@@ -153,46 +127,61 @@ IFX_int32_t MEI_InternalXtmSwhowtimeExitSignal(
    return retVal;
 }
 
-int ifx_mei_atm_showtime_check(
-                              #if (MEI_MAX_DFE_CHAN_DEVICES > 1)
-                              unsigned char line_num,
-                              #endif /* #if (MEI_MAX_DFE_CHAN_DEVICES > 1)*/
+/**
+   Function that is used by the PP subsystem to get some showtime relevant data
+   from the DSL subsystem (MEI Driver).
+
+   \param line_idx
+      Defines the line index for which showtime data is requested.
+   \param is_showtime[out]
+      Retuns current (showtime) state of the given line
+         - 0: Line is currently *not* in showtime
+         - 1: Line is currently in showtime
+   \param port_cell[out]
+      Returns the cell rate for the given line
+   \param xdata_addr[out]
+      Returns a pointer to the consistent DSL FW data memory
+
+   \return
+      0 if successful and -1 in case of an error/warning
+*/
+int ltq_mei_atm_showtime_check(
+                              const unsigned char line_idx,
                               int *is_showtime,
                               struct port_cell_info *port_cell,
                               void **xdata_addr)
 {
    unsigned int i;
-#if (MEI_MAX_DFE_CHAN_DEVICES == 1)
-   unsigned char line_num = 0;
-#endif /* #if (MEI_MAX_DFE_CHAN_DEVICES > 1)*/
 
-   if (line_num >= MEI_MAX_DFE_CHAN_DEVICES)
+   if (line_idx >= MEI_MAX_DFE_CHAN_DEVICES)
    {
       return -1;
    }
 
    if (is_showtime)
    {
-     *is_showtime = g_tx_link_rate[line_num][0] == 0 && g_tx_link_rate[line_num][1] == 0 ? 0 : 1;
+     *is_showtime = (g_tx_link_rate[line_idx][0] == 0) &&
+                    (g_tx_link_rate[line_idx][1] == 0) ? 0 : 1;
    }
 
    if (port_cell)
    {
       for ( i = 0; i < port_cell->port_num && i < 2; i++ )
       {
-         port_cell->tx_link_rate[i] = g_tx_link_rate[line_num][i];
+         port_cell->tx_link_rate[i] = g_tx_link_rate[line_idx][i];
       }
    }
 
    if (xdata_addr)
    {
-      if (g_tx_link_rate[line_num][0] == 0 && g_tx_link_rate[line_num][1] == 0)
+      if ((g_tx_link_rate[line_idx][0] == 0) &&
+          (g_tx_link_rate[line_idx][1] == 0))
       {
          *xdata_addr = NULL;
       }
       else
       {
-         *xdata_addr = g_xdata_addr[line_num];
+         *xdata_addr = g_xdata_addr[line_idx];
       }
    }
 
@@ -206,10 +195,6 @@ int ifx_mei_atm_led_blink(void)
 
 EXPORT_SYMBOL (MEI_InternalXtmSwhowtimeEntrySignal);
 EXPORT_SYMBOL (MEI_InternalXtmSwhowtimeExitSignal);
-
-EXPORT_SYMBOL(MEI_ATM_SHOWTIME_ENTER_FN);
-EXPORT_SYMBOL(MEI_ATM_SHOWTIME_EXIT_FN);
-EXPORT_SYMBOL(ifx_mei_atm_showtime_check);
 EXPORT_SYMBOL(ifx_mei_atm_led_blink);
 
 #endif      /* #if (MEI_EXPORT_INTERNAL_API == 1) && (MEI_DRV_ATM_PTM_INTERFACE_ENABLE == 1) */

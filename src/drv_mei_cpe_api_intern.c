@@ -1,6 +1,6 @@
 /******************************************************************************
 
-                              Copyright (c) 2013
+                              Copyright (c) 2014
                             Lantiq Deutschland GmbH
 
   For licensing information, see the file 'LICENSE' in the root folder of
@@ -706,7 +706,6 @@ IFX_int32_t MEI_InternalFirmwareDownload(
    return retVal;
 }
 
-#if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1) || (MEI_SUPPORT_DEVICE_AR9 == 1)
 IFX_int32_t MEI_InternalOptFirmwareDownload(
                               MEI_DYN_CNTRL_T           *pMeiDynCntrl,
                               IOCTL_MEI_fwOptDownLoad_t *pArgFwDl)
@@ -727,9 +726,7 @@ IFX_int32_t MEI_InternalOptFirmwareDownload(
 
    return retVal;
 }
-#endif /* (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1) || (MEI_SUPPORT_DEVICE_AR9 == 1)*/
 
-#if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1)
 IFX_int32_t MEI_InternalFwModeCtrlSet(
                               MEI_DYN_CNTRL_T           *pMeiDynCntrl,
                               IOCTL_MEI_FwModeCtrlSet_t *pArgFwModeCtrl)
@@ -771,7 +768,6 @@ IFX_int32_t MEI_InternalFwModeStatGet(
 
    return retVal;
 }
-#endif /* (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1)*/
 
 #if (MEI_DRV_ATM_OAM_ENABLE == 1)
 

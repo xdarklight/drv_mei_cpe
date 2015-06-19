@@ -1,6 +1,6 @@
 /******************************************************************************
 
-                              Copyright (c) 2013
+                              Copyright (c) 2014
                             Lantiq Deutschland GmbH
 
   For licensing information, see the file 'LICENSE' in the root folder of
@@ -19,8 +19,6 @@
 /* get at first the driver configuration */
 #include "drv_mei_cpe_config.h"
 
-#if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1)
-
 #include "ifx_types.h"
 #include "drv_mei_cpe_os.h"
 #include "drv_mei_cpe_dbg.h"
@@ -36,10 +34,41 @@
 
 #include "cmv_message_format.h"
 
-
 /* ============================================================================
    Local macro definition
    ========================================================================= */
+
+static inline volatile IFX_uint32_t MEI_RCU_get(MEI_MEI_DRV_CNTRL_T *pMeiDrvCntrl)
+{
+   IFX_uint32_t ret = 0;
+   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR9))
+   {
+      ret = (KSEG1 | 0x1F203000);
+   }
+   else if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
+   {
+      ret = (KSEG1 | MEI_DRV_PCIE_PHY_MEMBASE_GET(pMeiDrvCntrl) | MEI_RCU_OFFSET);
+   }
+   return ret;
+}
+
+static inline volatile IFX_uint32_t MEI_RCU_Slave_get(MEI_MEI_DRV_CNTRL_T *pMeiDrvCntrl)
+{
+   IFX_uint32_t ret = 0;
+   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR9))
+   {
+      ret = (KSEG1 | 0x19203000);
+   }
+   return ret;
+}
+
+/* Reset Request Register */
+#define MEI_RCU               MEI_RCU_get(pMeiDrvCntrl)
+#define MEI_RCU_SLAVE         MEI_RCU_Slave_get(pMeiDrvCntrl)
+#define MEI_RCU_RST_REQ       ((volatile IFX_uint32_t*)(MEI_RCU + 0x0010))
+#define MEI_RCU_SLAVE_RST_REQ ((volatile IFX_uint32_t*)(MEI_RCU_SLAVE + 0x0010))
+#define MEI_RCU_RST_REQ_DFE   (1 << 7)
+#define MEI_RCU_RST_REQ_AFE   (1 << 11)
 
 #if (TRACE_MEI_MEI_REG_ACCESS == 1)
 
@@ -547,21 +576,25 @@ IFX_int32_t MEI_ResetDfeBlocks(
       /* Wait after halting ARC*/
       MEI_DRVOS_Wait_ms(20);
 
-#if (MEI_SUPPORT_DEVICE_VR9 == 1)
-      /*Temporary workaround, to be removed after availability of the RCU API (per device)*/
-      if (MEI_GET_ENTITY_FROM_DEVNUM(pMeiDrvCntrl->dslLineNum))
+      if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR9))
       {
-         *MEI_RCU_SLAVE_RST_REQ |= (MEI_RCU_RST_REQ_DFE | MEI_RCU_RST_REQ_AFE);
+         if (MEI_GET_ENTITY_FROM_DEVNUM(pMeiDrvCntrl->dslLineNum))
+         {
+            *MEI_RCU_SLAVE_RST_REQ |= (MEI_RCU_RST_REQ_DFE | MEI_RCU_RST_REQ_AFE);
+         }
+         else
+         {
+            /* Set RCU register. Reset DFE and AFE parts*/
+            /* Reset cleared after approx. 20 cycles (36 MHz clock) */
+            *MEI_RCU_RST_REQ |= (MEI_RCU_RST_REQ_DFE | MEI_RCU_RST_REQ_AFE);
+         }
       }
       else
       {
-#endif
          /* Set RCU register. Reset DFE and AFE parts*/
          /* Reset cleared after approx. 20 cycles (36 MHz clock) */
          *MEI_RCU_RST_REQ |= (MEI_RCU_RST_REQ_DFE | MEI_RCU_RST_REQ_AFE);
-#if (MEI_SUPPORT_DEVICE_VR9 == 1)
       }
-#endif
 
       /* Wait after RCU reset register */
       MEI_DRVOS_Wait_ms(10);
@@ -1521,17 +1554,20 @@ IFX_int32_t MEI_InterfaceDetect(
       MEI_REG_ACCESS_ME_VERSION_SET(pMeiDrvCntrl, 0x00000000);
       hwVers = MEI_REG_ACCESS_ME_VERSION_GET(pMeiDrvCntrl);
 
-#if (MEI_SUPPORT_DEVICE_VR9 == 1)
-      if (hwVers == 0x00000230)
+      if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR9))
       {
-         return IFX_SUCCESS;
+         if (hwVers == 0x00000230)
+         {
+            return IFX_SUCCESS;
+         }
       }
-#elif (MEI_SUPPORT_DEVICE_VR10 == 1)
-      if (hwVers == 0x00000240)
+      else if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
       {
-         return IFX_SUCCESS;
+         if (hwVers == 0x00000240)
+         {
+            return IFX_SUCCESS;
+         }
       }
-#endif
    }
 
    return IFX_ERROR;
@@ -1539,17 +1575,10 @@ IFX_int32_t MEI_InterfaceDetect(
 
 IFX_int32_t MEI_BasicChipInit(IFX_void_t)
 {
-   /* Power up MEI */
-   DSL_DFE_PMU_SETUP(IFX_PMU_ENABLE);
-
-   if (ifx_pmu_pg_dsl_dfe_enable() != 0)
+   IFX_int32_t ret;
+   if ((ret = MEI_PowerUp()) != IFX_SUCCESS)
    {
-      PRN_ERR_USR_NL( MEI_MEI_ACCESS, MEI_DRV_PRN_LEVEL_ERR,
-            ("MEI: ERROR - DSL DFE PG enable failed!" MEI_DRV_CRLF));
-/* ignore for VR10 (for emulator) */
-#if (MEI_SUPPORT_DEVICE_VR10 != 1)
-      return IFX_ERROR;
-#endif
+      return ret;
    }
 
    return IFX_SUCCESS;
@@ -1557,15 +1586,11 @@ IFX_int32_t MEI_BasicChipInit(IFX_void_t)
 
 IFX_int32_t MEI_BasicChipExit(IFX_void_t)
 {
-   if (ifx_pmu_pg_dsl_dfe_disable() != 0)
+   IFX_int32_t ret;
+   if ((ret = MEI_PowerDown()) != IFX_SUCCESS)
    {
-      PRN_ERR_USR_NL( MEI_MEI_ACCESS, MEI_DRV_PRN_LEVEL_ERR,
-            ("MEI: ERROR - DSL DFE PG disable failed!" MEI_DRV_CRLF));
-      return IFX_ERROR;
+      return ret;
    }
-
-   /* Power down MEI */
-   DSL_DFE_PMU_SETUP(IFX_PMU_DISABLE);
 
    return IFX_SUCCESS;
 }
@@ -1719,6 +1744,4 @@ IFX_int32_t MEI_LowLevelInit(MEI_MEI_DRV_CNTRL_T *pMeiDrvCntrl)
 
    return IFX_SUCCESS;
 }
-
-#endif      /* #if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1)*/
 

@@ -2,7 +2,7 @@
 #define _DRV_MEI_CPE_MEI_VRX_H
 /******************************************************************************
 
-                              Copyright (c) 2013
+                              Copyright (c) 2014
                             Lantiq Deutschland GmbH
 
   For licensing information, see the file 'LICENSE' in the root folder of
@@ -39,16 +39,9 @@ extern "C"
 #endif
 #endif
 
-#ifdef LINUX
-   #include <asm/ifx/ifx_pmu.h>
-#else
-   #error "Please check PMU driver path!"
-#endif
-
 /* ============================================================================
    Module      :  PCIe mapping offset
    ========================================================================= */
-#if (MEI_SUPPORT_DEVICE_VR10 == 1)
 #define MEI_INTERNAL_ADDRESS_BASE   0x1E000000
 #define MEI_OUTBOUND_ADDRESS_BASE   0x20000000
 #define MEI_PDBRAM_OFFSET           0x80000
@@ -56,14 +49,12 @@ extern "C"
 #define MEI_DSL_MEI_OFFSET          0x116000
 #define MEI_GPIO_OFFSET             0x102B00
 #define MEI_PPE_OFFSET              0x200000
-#endif /* (MEI_SUPPORT_DEVICE_VR10 == 1) */
 
 /* ============================================================================
    VR10 peripherial modules
    Module      :  PPE
    Module      :  GPIO
    ========================================================================= */
-#if (MEI_SUPPORT_DEVICE_VR10 == 1)
 #define MEI_PCIE_PERIPHERIAL(mod_offset)  \
 (KSEG1 | MEI_DRV_PCIE_PHY_MEMBASE_GET(&pMeiDev->meiDrvCntrl) | (mod_offset))
 #define PPE_SB_OFFSET                    0x12000
@@ -77,28 +68,6 @@ extern "C"
 #define GPIO_P0_ALSEL1                   0x20
 #define MEI_GPIO_U32REG(addr)            \
 ((volatile IFX_uint32_t*)(MEI_PCIE_PERIPHERIAL(MEI_GPIO_OFFSET) + (addr)))
-#endif /* (MEI_SUPPORT_DEVICE_VR10 == 1) */
-
-/* ============================================================================
-   Module      :  RCU register address and bits
-   ========================================================================= */
-#if (MEI_SUPPORT_DEVICE_VR9 == 1)
-   #define MEI_RCU               (KSEG1 | 0x1F203000)
-   #define MEI_RCU_SLAVE         (KSEG1 | 0x19203000)
-   /*To be removed: PCI slave definition for the RCU module, should be replaced by the
-     corresponding RCI API (per device) in the future*/
-   #define MEI_RCU_SLAVE_RST_REQ       ((volatile IFX_uint32_t*)(MEI_RCU_SLAVE + 0x0010))
-#elif (MEI_SUPPORT_DEVICE_VR10 == 1)
-   #define MEI_RCU               (KSEG1 | MEI_DRV_PCIE_PHY_MEMBASE_GET(pMeiDrvCntrl) | MEI_RCU_OFFSET)
-#else
-   #error "The current implementation only supports VR9 or VR10!"
-#endif
-
-/* Reset Request Register */
-#define MEI_RCU_RST_REQ       ((volatile IFX_uint32_t*)(MEI_RCU + 0x0010))
-#define MEI_RCU_RST_REQ_DFE   (1 << 7)
-#define MEI_RCU_RST_REQ_AFE   (1 << 11)
-
 
 /* ============================================================================
    Module      :  ARC AUX space register addresss

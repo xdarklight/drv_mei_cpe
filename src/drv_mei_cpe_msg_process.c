@@ -1,6 +1,6 @@
 /******************************************************************************
 
-                              Copyright (c) 2013
+                              Copyright (c) 2014
                             Lantiq Deutschland GmbH
 
   For licensing information, see the file 'LICENSE' in the root folder of
@@ -18,8 +18,6 @@
 
 /* get at first the driver configuration */
 #include "drv_mei_cpe_config.h"
-
-#if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1)
 
 #include "ifx_types.h"
 
@@ -4201,6 +4199,4 @@ IFX_int32_t MEI_IoctlRawNfcRead( MEI_DYN_CNTRL_T *pMeiDynCntrl,
 }
 
 #endif      /* #if (MEI_SUPPORT_RAW_MSG == 1) */
-
-#endif /* #if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1)*/
 

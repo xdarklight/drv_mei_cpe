@@ -1,6 +1,6 @@
 /******************************************************************************
 
-                              Copyright (c) 2013
+                              Copyright (c) 2014
                             Lantiq Deutschland GmbH
 
   For licensing information, see the file 'LICENSE' in the root folder of
@@ -19,8 +19,6 @@
 
 /* get at first the driver configuration */
 #include "drv_mei_cpe_config.h"
-
-#if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1) || (MEI_SUPPORT_DEVICE_AR9 == 1)
 
 #include "ifx_types.h"
 #include "drv_mei_cpe_os.h"
@@ -52,7 +50,7 @@ extern void *g_xdata_addr[];
 #endif
 
 static IFX_int32_t MEI_VRX_ImageChunkFree(
-                                 MEI_DEV_T *pMeiDev,
+                                 MEI_FW_DOWNLOAD_CNTRL_T *pFwDlCtrl,
                                  IFX_uint32_t chunkIdx);
 
 /* ==========================================================================
@@ -73,12 +71,13 @@ static IFX_int32_t MEI_VRX_PortModeControlStructureCurrentGet(
 static IFX_void_t MEI_VRX_ChunksInfoShow(MEI_DEV_T *pMeiDev)
 {
    IFX_uint32_t i;
+   MEI_FW_DOWNLOAD_CNTRL_T *pFwDlCtrl = &(pMeiDev->fwDl);
    MEI_FW_IMAGE_CHUNK_CTRL_T *pChunk = pMeiDev->fwDl.imageChunkCtrl;
 
    PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL,
          (MEI_DRV_CRLF "================= FW IMAGE CHUNKS=================" MEI_DRV_CRLF));
 
-   for (i=0; i<pMeiDev->meiMaxChunkCount; i++)
+   for (i=0; i<pFwDlCtrl->meiMaxChunkCount; i++)
    {
       if (pChunk[i].eImageChunkType == eMEI_FW_IMAGE_CHUNK_UNDEFINED)
          continue;
@@ -322,43 +321,39 @@ static IFX_uint8_t* MEI_VR9_PciSlavePciAddrGet(
 }
 #endif /* #if (MEI_SUPPORT_PCI_SLAVE_FW_DOWNLOAD == 1)*/
 
-static IFX_int32_t MEI_VRX_TranslateMipsToArc(
-                                 MEI_FW_DOWNLOAD_CNTRL_T *pFwDlCtrl,
-                                 IFX_uint32_t chunkIdx,
-                                 IFX_uint8_t *pChunk)
+static IFX_uint8_t* MEI_VRX_TranslateMipsToArc(
+                                 IFX_uint8_t *pChunkMips)
 {
-   IFX_int32_t ret = 0;
-   MEI_FW_IMAGE_CHUNK_CTRL_T *pImageChunkCtrl = pFwDlCtrl->imageChunkCtrl;
+   IFX_uint8_t *pChunkArc = IFX_NULL;
 
-   pImageChunkCtrl[chunkIdx].pBARx = pChunk;
-#if (MEI_SUPPORT_DEVICE_VR10 == 1)
-   /* Translate chunk addresses located in SDRAM to be accessible by fw in ARC */
+   pChunkArc = pChunkMips;
 
-   /* Get chunk offset from absolute address by deleting 3 major bits */
-   pImageChunkCtrl[chunkIdx].pBARx =
-      (IFX_uint8_t *)((IFX_uint32_t)(pImageChunkCtrl[chunkIdx].pBARx) & 0x1FFFFFFF);
+   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
+   {
+      /* Translate chunk addresses located in SDRAM to be accessible by fw in ARC */
 
-   /* offset + MEI_OUTBOUND_ADDRESS_BASE */
-   pImageChunkCtrl[chunkIdx].pBARx =
-      (IFX_uint8_t *)((IFX_uint32_t)(pImageChunkCtrl[chunkIdx].pBARx) | MEI_OUTBOUND_ADDRESS_BASE);
-#endif
+      /* Get chunk offset from absolute address by deleting 3 major bits */
+      pChunkArc = (IFX_uint8_t *)((IFX_uint32_t)(pChunkArc) & 0x1FFFFFFF);
 
-   return ret;
+      /* offset + MEI_OUTBOUND_ADDRESS_BASE */
+      pChunkArc = (IFX_uint8_t *)((IFX_uint32_t)(pChunkArc) | MEI_OUTBOUND_ADDRESS_BASE);
+   }
+
+   return pChunkArc;
 }
 
 static IFX_int32_t MEI_VRX_ImageChunkAlloc(
-                                 MEI_DEV_T *pMeiDev,
+                                 MEI_FW_DOWNLOAD_CNTRL_T *pFwDlCtrl,
                                  IFX_uint32_t chunkIdx,
                                  IFX_uint32_t chunkSize_byte)
 {
-   MEI_FW_DOWNLOAD_CNTRL_T *pFwDlCtrl = &(pMeiDev->fwDl);
    IFX_int32_t ret = 0;
    IFX_uint8_t *pImageChunk_allocated = NULL;
    MEI_FW_IMAGE_CHUNK_CTRL_T *pImageChunkCtrl = pFwDlCtrl->imageChunkCtrl;
 
    if ( ((chunkSize_byte > MEI_FW_IMAGE_CHUNK_SIZE_BYTE) &&
-         (chunkIdx != pMeiDev->meiMaxChunkCount - 1)) ||
-         (chunkIdx > pMeiDev->meiMaxChunkCount - 1) )
+         (chunkIdx != pFwDlCtrl->meiMaxChunkCount - 1)) ||
+         (chunkIdx > pFwDlCtrl->meiMaxChunkCount - 1) )
    {
       PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
          ("MEI_DRV: chunk[%d] size %d incorrect!" MEI_DRV_CRLF,
@@ -367,11 +362,11 @@ static IFX_int32_t MEI_VRX_ImageChunkAlloc(
    }
 
    /* Check for the last chunk*/
-   if (chunkIdx == pMeiDev->meiMaxChunkCount - 1)
+   if (chunkIdx == pFwDlCtrl->meiMaxChunkCount - 1)
    {
       /* Release last chunk since it's size could vary. Will be allocated
          with a new size below. */
-      MEI_VRX_ImageChunkFree(pMeiDev, chunkIdx);
+      MEI_VRX_ImageChunkFree(pFwDlCtrl, chunkIdx);
    }
 
    /* Check if for a released chunk*/
@@ -445,7 +440,8 @@ static IFX_int32_t MEI_VRX_ImageChunkAlloc(
 #endif /* #if (MEI_SUPPORT_PCI_SLAVE_FW_DOWNLOAD == 1)*/
       {
          /* Prepare chunk MIPS address for ARC format */
-         MEI_VRX_TranslateMipsToArc(pFwDlCtrl, chunkIdx, pImageChunkCtrl[chunkIdx].pImageChunk_aligned);
+         pImageChunkCtrl[chunkIdx].pBARx =
+            MEI_VRX_TranslateMipsToArc(pImageChunkCtrl[chunkIdx].pImageChunk_aligned);
       }
 
       /* Assign chunk allocated address*/
@@ -455,7 +451,7 @@ static IFX_int32_t MEI_VRX_ImageChunkAlloc(
    }
 
    /* Assign chunk type*/
-   if (chunkIdx == MEI_FW_IMAGE_DATA_CHUNK_INDEX+pMeiDev->meiSpecialChunkOffset)
+   if (chunkIdx == MEI_FW_IMAGE_DATA_CHUNK_INDEX+pFwDlCtrl->meiSpecialChunkOffset)
    {
 #if (MEI_EXPORT_INTERNAL_API == 1) && (MEI_DRV_ATM_PTM_INTERFACE_ENABLE == 1)
       /* Place this assignment here only as a workaround to profide
@@ -475,13 +471,12 @@ static IFX_int32_t MEI_VRX_ImageChunkAlloc(
 }
 
 static IFX_int32_t MEI_VRX_ImageChunkFree(
-                                 MEI_DEV_T *pMeiDev,
+                                 MEI_FW_DOWNLOAD_CNTRL_T *pFwDlCtrl,
                                  IFX_uint32_t chunkIdx)
 {
-   MEI_FW_DOWNLOAD_CNTRL_T *pFwDlCtrl = &(pMeiDev->fwDl);
    MEI_FW_IMAGE_CHUNK_CTRL_T *pImageChunkCtrl = pFwDlCtrl->imageChunkCtrl;
 
-   if (chunkIdx > pMeiDev->meiMaxChunkCount - 1)
+   if (chunkIdx > pFwDlCtrl->meiMaxChunkCount - 1)
    {
       PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
          ("MEI_DRV: chunk index %d incorrect!" MEI_DRV_CRLF, chunkIdx));
@@ -512,7 +507,7 @@ static IFX_int32_t MEI_VRX_ImageChunkFree(
 #if (MEI_EXPORT_INTERNAL_API == 1) && (MEI_DRV_ATM_PTM_INTERFACE_ENABLE == 1)
    /* Place this assignment here only as a workaround to profide
       DATA address to the ATM/PTM drivers*/
-   if (chunkIdx == MEI_FW_IMAGE_DATA_CHUNK_INDEX + pMeiDev->meiSpecialChunkOffset)
+   if (chunkIdx == MEI_FW_IMAGE_DATA_CHUNK_INDEX + pFwDlCtrl->meiSpecialChunkOffset)
    {
       g_xdata_addr[pFwDlCtrl->line_num] = IFX_NULL;
    }
@@ -536,7 +531,7 @@ static IFX_int32_t MEI_VRX_ImageChunkFree(
    IFX_ERROR
 */
 static IFX_int32_t MEI_VRX_XpageWrite(
-                                 MEI_DEV_T *pMeiDev,
+                                 MEI_FW_DOWNLOAD_CNTRL_T *pFwDlCtrl,
                                  MEI_MEI_DRV_CNTRL_T *pMeiDrvCntrl,
                                  MEI_FW_IMAGE_CHUNK_CTRL_T *pChunkCtrl,
                                  MEI_FW_IMAGE_PAGE_T *pXpageInfo,
@@ -559,9 +554,9 @@ static IFX_int32_t MEI_VRX_XpageWrite(
                                pXpageInfo->codeOffset_Byte;
 
    /* Check if page offset is within the last large chunk*/
-   if (page_offset_bytes >= (pMeiDev->meiMaxChunkCount-2)*MEI_FW_IMAGE_CHUNK_SIZE_BYTE)
+   if (page_offset_bytes >= (pFwDlCtrl->meiMaxChunkCount-2)*MEI_FW_IMAGE_CHUNK_SIZE_BYTE)
    {
-      chunkIdx = pMeiDev->meiMaxChunkCount - 1;
+      chunkIdx = pFwDlCtrl->meiMaxChunkCount - 1;
    }
    else
    {
@@ -569,7 +564,7 @@ static IFX_int32_t MEI_VRX_XpageWrite(
       chunkIdx = page_offset_bytes / MEI_FW_IMAGE_CHUNK_SIZE_BYTE;
    }
 
-   if (chunkIdx > (pMeiDev->meiMaxChunkCount - 1))
+   if (chunkIdx > (pFwDlCtrl->meiMaxChunkCount - 1))
    {
       PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
          ("MEI_DRV: Out of boundaries chunk[%d] detected while preparing Xpage"
@@ -580,7 +575,7 @@ static IFX_int32_t MEI_VRX_XpageWrite(
    }
 
    /* Skip DATA chunk*/
-   chunkIdx = chunkIdx == (MEI_FW_IMAGE_DATA_CHUNK_INDEX + pMeiDev->meiSpecialChunkOffset)?
+   chunkIdx = chunkIdx == (MEI_FW_IMAGE_DATA_CHUNK_INDEX + pFwDlCtrl->meiSpecialChunkOffset)?
                                                                   chunkIdx + 1 : chunkIdx;
 
    /* Check for a valid chunk*/
@@ -605,9 +600,9 @@ static IFX_int32_t MEI_VRX_XpageWrite(
       {
          /* Move to the next chunk, skip DATA chunk if necessary*/
          chunkIdx += (chunkIdx ==
-                     (MEI_FW_IMAGE_DATA_CHUNK_INDEX + pMeiDev->meiSpecialChunkOffset)? 2 : 1);
+                     (MEI_FW_IMAGE_DATA_CHUNK_INDEX + pFwDlCtrl->meiSpecialChunkOffset)? 2 : 1);
 
-         if (chunkIdx > (pMeiDev->meiMaxChunkCount - 1))
+         if (chunkIdx > (pFwDlCtrl->meiMaxChunkCount - 1))
          {
             PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
                ("MEI_DRV: Undefined chunk[%d] detected while trying to fill Xpage!"
@@ -731,10 +726,8 @@ static IFX_int32_t MEI_VRX_PortModeControlStructureDefaultSet(
 {
    IFX_int32_t ret = 0;
    MEI_FW_PORT_MODE_CONTROL_DMA32_T fwPortModeCtrl = {0};
-#if (MEI_SUPPORT_DEVICE_VR10 == 1)
    IFX_uint32_t P0_IN;
    IFX_uint8_t hybrid_type;
-#endif
 
    /* Get current FW Port Mode Control Structure*/
    ret = MEI_VRX_PortModeControlStructureCurrentGet(pMeiDev, &fwPortModeCtrl);
@@ -757,29 +750,30 @@ static IFX_int32_t MEI_VRX_PortModeControlStructureDefaultSet(
    fwPortModeCtrl.imageOffsetSRAM   = pMeiDev->fwDl.defaultPortModeCtrl.imageOffsetSRAM;
    fwPortModeCtrl.maxBgDuration     = pMeiDev->fwDl.defaultPortModeCtrl.maxBgDuration;
 
-#if (MEI_SUPPORT_DEVICE_VR10 == 1)
-   P0_IN = *MEI_GPIO_U32REG(GPIO_P0_IN);
-   /* LIF Det 0 - bit 0 of P0_IN
-      LIF Det 1 - bit 3 of P0_IN
-      LIF Det 2 - bit 8 of P0_IN */
-   hybrid_type = (P0_IN & 0x1) | ((P0_IN >> 2) & 0x2) | ((P0_IN >> 6) & 0x4);
-
-   PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL,
-      ("MEI_DRV[%02d]: Hybrid Type (LIF module ID) 0x%x" MEI_DRV_CRLF,
-      MEI_DRV_LINENUM_GET(pMeiDev), hybrid_type));
-
-   if ((hybrid_type != MEI_HYBRID_TYPE_A) && (hybrid_type != MEI_HYBRID_TYPE_BJ))
+   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
    {
-      PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_WRN,
-         ("MEI_DRV[%02d]: Warning - unknown hybrid type 0x%x" MEI_DRV_CRLF,
-                  MEI_DRV_LINENUM_GET(pMeiDev), hybrid_type));
-   }
+      P0_IN = *MEI_GPIO_U32REG(GPIO_P0_IN);
+      /* LIF Det 0 - bit 0 of P0_IN
+         LIF Det 1 - bit 3 of P0_IN
+         LIF Det 2 - bit 8 of P0_IN */
+      hybrid_type = (P0_IN & 0x1) | ((P0_IN >> 2) & 0x2) | ((P0_IN >> 6) & 0x4);
 
-   /* clean LIF Det bits (afe bits 2,3,4)*/
-   fwPortModeCtrl.afePowerUp &= ~((1<<2) | (1<<3) | (1<<4));
-   /* bit 2-4: Hybrid Type (LIF module ID) */
-   fwPortModeCtrl.afePowerUp |= hybrid_type << 2;
-#endif
+      PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL,
+         ("MEI_DRV[%02d]: Hybrid Type (LIF module ID) 0x%x" MEI_DRV_CRLF,
+         MEI_DRV_LINENUM_GET(pMeiDev), hybrid_type));
+
+      if ((hybrid_type != MEI_HYBRID_TYPE_A) && (hybrid_type != MEI_HYBRID_TYPE_BJ))
+      {
+         PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_WRN,
+            ("MEI_DRV[%02d]: Warning - unknown hybrid type 0x%x" MEI_DRV_CRLF,
+                  MEI_DRV_LINENUM_GET(pMeiDev), hybrid_type));
+      }
+
+      /* clean LIF Det bits (afe bits 2,3,4)*/
+      fwPortModeCtrl.afePowerUp &= ~((1<<2) | (1<<3) | (1<<4));
+      /* bit 2-4: Hybrid Type (LIF module ID) */
+      fwPortModeCtrl.afePowerUp |= hybrid_type << 2;
+   }
 
 #if MEI_DBG_CECK_BOOTLOADER_START == 1
    /* Included for debug purpose (bringup) to set dummy value for signature 1 */
@@ -812,7 +806,6 @@ static IFX_int32_t MEI_VRX_PortModeControlStructureDefaultSet(
 
 \param
    pFwDlCtrl      points to the FW dowmload control structure.
-   pMeiDev        points to the device data
 \param
    pFwPartition   points to the FW binary partition
 \param
@@ -830,14 +823,13 @@ static IFX_int32_t MEI_VRX_PortModeControlStructureDefaultSet(
    IFX_ERROR
 */
 static IFX_int32_t MEI_VRX_PartitionChunksFill(
-                                 MEI_DEV_T *pMeiDev,
+                                 MEI_FW_DOWNLOAD_CNTRL_T *pFwDlCtrl,
                                  unsigned char *pFwPartition,
                                  IFX_int32_t partitionSize,
                                  MEI_FW_PARTITION_TYPE partitionType,
                                  IFX_uint32_t *chunkIdx,
                                  IFX_boolean_t bInternCall)
 {
-   MEI_FW_DOWNLOAD_CNTRL_T *pFwDlCtrl = &(pMeiDev->fwDl);
    IFX_int32_t ret = IFX_SUCCESS;
    IFX_uint32_t chunkSize_byte, copySize_byte, idx_32bit;
    IFX_uint32_t *pNonCachedChunk;
@@ -851,16 +843,16 @@ static IFX_int32_t MEI_VRX_PartitionChunksFill(
       (*chunkIdx)--;
    }
 
-   for (; *chunkIdx<pMeiDev->meiMaxChunkCount && partitionSize > 0; (*chunkIdx)++)
+   for (; *chunkIdx<pFwDlCtrl->meiMaxChunkCount && partitionSize > 0; (*chunkIdx)++)
    {
       /* Alloc new or use current chunk */
       if (!continue_chunk)
       {
-         if (*chunkIdx == MEI_FW_IMAGE_DATA_CHUNK_INDEX+pMeiDev->meiSpecialChunkOffset)
+         if (*chunkIdx == MEI_FW_IMAGE_DATA_CHUNK_INDEX+pFwDlCtrl->meiSpecialChunkOffset)
             continue;
 
          /* Set chunk size [bytes]*/
-         chunkSize_byte = (*chunkIdx == pMeiDev->meiMaxChunkCount - 1) ?
+         chunkSize_byte = (*chunkIdx == pFwDlCtrl->meiMaxChunkCount - 1) ?
                              partitionSize : MEI_FW_IMAGE_CHUNK_SIZE_BYTE;
 
          /* Check for the maximum allowed chunk size*/
@@ -875,7 +867,7 @@ static IFX_int32_t MEI_VRX_PartitionChunksFill(
          }
 
          /* Allocate chunk*/
-         ret = MEI_VRX_ImageChunkAlloc(pMeiDev, *chunkIdx, chunkSize_byte);
+         ret = MEI_VRX_ImageChunkAlloc(pFwDlCtrl, *chunkIdx, chunkSize_byte);
          if (ret != 0)
          {
             PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
@@ -888,11 +880,11 @@ static IFX_int32_t MEI_VRX_PartitionChunksFill(
          if (partitionType == eMEI_FW_PARTITION_BOOTLOADER)
          {
             /* Bootloader must be located at one chunk */
-            if (pMeiDev->meiPartitions.bootloader_size > MEI_FW_IMAGE_CHUNK_SIZE_BYTE)
+            if (pFwDlCtrl->meiPartitions.bootloader_size > MEI_FW_IMAGE_CHUNK_SIZE_BYTE)
             {
                PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
                   ("MEI_DRV: bootloader size %d is too large!"
-                  MEI_DRV_CRLF, pMeiDev->meiPartitions.bootloader_size));
+                  MEI_DRV_CRLF, pFwDlCtrl->meiPartitions.bootloader_size));
             }
 
             copySize_byte = partitionSize;
@@ -907,7 +899,7 @@ static IFX_int32_t MEI_VRX_PartitionChunksFill(
       else
       {
          chunkSize_byte = MEI_FW_IMAGE_CHUNK_SIZE_BYTE -
-                                        pMeiDev->meiPartitions.bootloader_size;
+                                        pFwDlCtrl->meiPartitions.bootloader_size;
 
          copySize_byte = (IFX_uint32_t)partitionSize > chunkSize_byte ?
                            chunkSize_byte : (IFX_uint32_t)partitionSize;
@@ -919,7 +911,7 @@ static IFX_int32_t MEI_VRX_PartitionChunksFill(
       if (continue_chunk)
       {
          /* First part of the chunk was filled by bootloader */
-         pNonCachedChunk += pMeiDev->meiPartitions.bootloader_size/sizeof(IFX_uint32_t);
+         pNonCachedChunk += pFwDlCtrl->meiPartitions.bootloader_size/sizeof(IFX_uint32_t);
          continue_chunk = IFX_FALSE;
       }
 
@@ -960,7 +952,6 @@ static IFX_int32_t MEI_VRX_PartitionChunksFill(
 
 \param
    pFwDlCtrl   points to the FW dowmload control structure.
-    pMeiDev    points to the device data
 \param
    pFwImage    points to the FW binary image
 \param
@@ -971,22 +962,21 @@ static IFX_int32_t MEI_VRX_PartitionChunksFill(
    IFX_SUCCESS
    IFX_ERROR
 */
-static IFX_int32_t MEI_VRX_ChunksFillX(
-                                 MEI_DEV_T *pMeiDev,
+static IFX_int32_t MEI_VRX_FMLT2_ChunksFill(
+                                 MEI_FW_DOWNLOAD_CNTRL_T *pFwDlCtrl,
                                  unsigned char *pFwImage,
                                  IFX_boolean_t bInternCall)
 {
-   MEI_FW_DOWNLOAD_CNTRL_T *pFwDlCtrl = &(pMeiDev->fwDl);
    IFX_int32_t ret = IFX_SUCCESS;
    IFX_uint32_t chunkIdx = 0;
 
    if (ret == IFX_SUCCESS)
    {
       /* Bootloader */
-      pMeiDev->meiPartitions.vDSL_cache_chunk_idx = chunkIdx;
+      pFwDlCtrl->meiPartitions.vDSL_cache_chunk_idx = chunkIdx;
       ret = MEI_VRX_PartitionChunksFill(
-               pMeiDev, pFwImage,
-               pMeiDev->meiPartitions.bootloader_size,
+               pFwDlCtrl, pFwImage,
+               pFwDlCtrl->meiPartitions.bootloader_size,
                eMEI_FW_PARTITION_BOOTLOADER,
                &chunkIdx, bInternCall);
    }
@@ -995,8 +985,8 @@ static IFX_int32_t MEI_VRX_ChunksFillX(
    {
       /* VDSL cache */
       ret = MEI_VRX_PartitionChunksFill(
-               pMeiDev, pFwImage + pMeiDev->meiPartitions.vDSL_cache_offset,
-               pMeiDev->meiPartitions.vDSL_cache_size,
+               pFwDlCtrl, pFwImage + pFwDlCtrl->meiPartitions.vDSL_cache_offset,
+               pFwDlCtrl->meiPartitions.vDSL_cache_size,
                eMEI_FW_PARTITION_XDSL_CACHE,
                &chunkIdx, bInternCall);
    }
@@ -1004,10 +994,10 @@ static IFX_int32_t MEI_VRX_ChunksFillX(
    if (ret == IFX_SUCCESS)
    {
       /* Bootloader */
-      pMeiDev->meiPartitions.aDSL_cache_chunk_idx = chunkIdx;
+      pFwDlCtrl->meiPartitions.aDSL_cache_chunk_idx = chunkIdx;
       ret = MEI_VRX_PartitionChunksFill(
-               pMeiDev, pFwImage,
-               pMeiDev->meiPartitions.bootloader_size,
+               pFwDlCtrl, pFwImage,
+               pFwDlCtrl->meiPartitions.bootloader_size,
                eMEI_FW_PARTITION_BOOTLOADER,
                &chunkIdx, bInternCall);
    }
@@ -1016,8 +1006,8 @@ static IFX_int32_t MEI_VRX_ChunksFillX(
    {
       /* ADSL cache */
       ret = MEI_VRX_PartitionChunksFill(
-               pMeiDev, pFwImage + pMeiDev->meiPartitions.aDSL_cache_offset,
-               pMeiDev->meiPartitions.aDSL_cache_size,
+               pFwDlCtrl, pFwImage + pFwDlCtrl->meiPartitions.aDSL_cache_offset,
+               pFwDlCtrl->meiPartitions.aDSL_cache_size,
                eMEI_FW_PARTITION_XDSL_CACHE,
                &chunkIdx, bInternCall);
    }
@@ -1025,10 +1015,10 @@ static IFX_int32_t MEI_VRX_ChunksFillX(
    if (ret == IFX_SUCCESS)
    {
       /* VDSL image */
-      pMeiDev->meiPartitions.vDSL_image_chunk_idx = chunkIdx;
+      pFwDlCtrl->meiPartitions.vDSL_image_chunk_idx = chunkIdx;
       ret = MEI_VRX_PartitionChunksFill(
-               pMeiDev, pFwImage + pMeiDev->meiPartitions.vDSL_image_offset,
-               pMeiDev->meiPartitions.vDSL_image_size,
+               pFwDlCtrl, pFwImage + pFwDlCtrl->meiPartitions.vDSL_image_offset,
+               pFwDlCtrl->meiPartitions.vDSL_image_size,
                eMEI_FW_PARTITION_XDSL_IMAGE,
                &chunkIdx, bInternCall);
    }
@@ -1036,10 +1026,10 @@ static IFX_int32_t MEI_VRX_ChunksFillX(
    if (ret == IFX_SUCCESS)
    {
       /* ADSL image */
-      pMeiDev->meiPartitions.aDSL_image_chunk_idx = chunkIdx;
+      pFwDlCtrl->meiPartitions.aDSL_image_chunk_idx = chunkIdx;
       ret = MEI_VRX_PartitionChunksFill(
-               pMeiDev, pFwImage + pMeiDev->meiPartitions.aDSL_image_offset,
-               pMeiDev->meiPartitions.aDSL_image_size,
+               pFwDlCtrl, pFwImage + pFwDlCtrl->meiPartitions.aDSL_image_offset,
+               pFwDlCtrl->meiPartitions.aDSL_image_size,
                eMEI_FW_PARTITION_XDSL_IMAGE,
                &chunkIdx, bInternCall);
    }
@@ -1047,19 +1037,19 @@ static IFX_int32_t MEI_VRX_ChunksFillX(
    if (ret == IFX_SUCCESS)
    {
       /* Release all unused chunks*/
-      for (chunkIdx=chunkIdx; chunkIdx<pMeiDev->meiMaxChunkCount; chunkIdx++)
+      for (chunkIdx=chunkIdx; chunkIdx<pFwDlCtrl->meiMaxChunkCount; chunkIdx++)
       {
-         if (chunkIdx == MEI_FW_IMAGE_DATA_CHUNK_INDEX + pMeiDev->meiSpecialChunkOffset)
+         if (chunkIdx == MEI_FW_IMAGE_DATA_CHUNK_INDEX + pFwDlCtrl->meiSpecialChunkOffset)
             continue;
 
-         MEI_VRX_ImageChunkFree(pMeiDev, chunkIdx);
+         MEI_VRX_ImageChunkFree(pFwDlCtrl, chunkIdx);
       }
 
       if (pFwDlCtrl->dataRegionSize_Byte)
       {
-         chunkIdx = MEI_FW_IMAGE_DATA_CHUNK_INDEX + pMeiDev->meiSpecialChunkOffset;
+         chunkIdx = MEI_FW_IMAGE_DATA_CHUNK_INDEX + pFwDlCtrl->meiSpecialChunkOffset;
          /* Allocate chunk for external writable DATA region */
-         ret = MEI_VRX_ImageChunkAlloc(pMeiDev, chunkIdx,
+         ret = MEI_VRX_ImageChunkAlloc(pFwDlCtrl, chunkIdx,
                                                pFwDlCtrl->dataRegionSize_Byte);
 
          if (ret != 0)
@@ -1073,18 +1063,18 @@ static IFX_int32_t MEI_VRX_ChunksFillX(
 
    if (ret == IFX_SUCCESS)
    {
-      if (pMeiDev->meiPartitions.debug_data_size)
+      if (pFwDlCtrl->meiPartitions.debug_data_size)
       {
-         chunkIdx = MEI_FW_IMAGE_DEBUG_CHUNK_INDEX + pMeiDev->meiSpecialChunkOffset;
+         chunkIdx = MEI_FW_IMAGE_DEBUG_CHUNK_INDEX + pFwDlCtrl->meiSpecialChunkOffset;
          /* Allocate chunk for external writable DATA region */
-         ret = MEI_VRX_ImageChunkAlloc(pMeiDev, chunkIdx,
-                                       pMeiDev->meiPartitions.debug_data_size);
+         ret = MEI_VRX_ImageChunkAlloc(pFwDlCtrl, chunkIdx,
+                                       pFwDlCtrl->meiPartitions.debug_data_size);
 
          if (ret != 0)
          {
             PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
                ("MEI_DRV: debug DATA region chunk[%02d] size %d allocation failed!"
-               MEI_DRV_CRLF, chunkIdx, pMeiDev->meiPartitions.debug_data_size));
+               MEI_DRV_CRLF, chunkIdx, pFwDlCtrl->meiPartitions.debug_data_size));
          }
       }
    }
@@ -1092,8 +1082,8 @@ static IFX_int32_t MEI_VRX_ChunksFillX(
    if (ret != IFX_SUCCESS)
    {
       /* Release all chunks*/
-      for (chunkIdx=0; chunkIdx<pMeiDev->meiMaxChunkCount; chunkIdx++)
-         MEI_VRX_ImageChunkFree(pMeiDev, chunkIdx);
+      for (chunkIdx=0; chunkIdx<pFwDlCtrl->meiMaxChunkCount; chunkIdx++)
+         MEI_VRX_ImageChunkFree(pFwDlCtrl, chunkIdx);
    }
 
    return ret;
@@ -1115,12 +1105,11 @@ static IFX_int32_t MEI_VRX_ChunksFillX(
    IFX_SUCCESS
    IFX_ERROR
 */
-static IFX_int32_t MEI_VRX_ChunksFill(
-                                 MEI_DEV_T *pMeiDev,
+static IFX_int32_t MEI_VRX_FMLT0_ChunksFill(
+                                 MEI_FW_DOWNLOAD_CNTRL_T *pFwDlCtrl,
                                  unsigned char *pFwImage,
                                  IFX_boolean_t bInternCall)
 {
-   MEI_FW_DOWNLOAD_CNTRL_T *pFwDlCtrl = &(pMeiDev->fwDl);
    IFX_int32_t ret = 0, chunkSize_byte;
    IFX_uint32_t chunkIdx, idx_32bit, copySize_byte;
    IFX_int32_t imageSize = (IFX_int32_t)pFwDlCtrl->size_byte;
@@ -1149,7 +1138,7 @@ static IFX_int32_t MEI_VRX_ChunksFill(
       }
 
       /* Allocate chunk*/
-      ret = MEI_VRX_ImageChunkAlloc(pMeiDev, chunkIdx, chunkSize_byte);
+      ret = MEI_VRX_ImageChunkAlloc(pFwDlCtrl, chunkIdx, chunkSize_byte);
       if (ret != 0)
       {
          PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
@@ -1203,14 +1192,14 @@ static IFX_int32_t MEI_VRX_ChunksFill(
          if (chunkIdx == MEI_FW_IMAGE_DATA_CHUNK_INDEX)
             continue;
 
-         MEI_VRX_ImageChunkFree(pMeiDev, chunkIdx);
+         MEI_VRX_ImageChunkFree(pFwDlCtrl, chunkIdx);
       }
 
       if (pFwDlCtrl->dataRegionSize_Byte)
       {
          /* Allocate chunk for external writable DATA region */
          ret = MEI_VRX_ImageChunkAlloc(
-                  pMeiDev, MEI_FW_IMAGE_DATA_CHUNK_INDEX,
+                  pFwDlCtrl, MEI_FW_IMAGE_DATA_CHUNK_INDEX,
                   pFwDlCtrl->dataRegionSize_Byte);
 
          if (ret != 0)
@@ -1226,13 +1215,12 @@ static IFX_int32_t MEI_VRX_ChunksFill(
    {
       /* Release all chunks*/
       for (chunkIdx=0; chunkIdx<MEI_FW_IMAGE_MAX_CHUNK_COUNT; chunkIdx++)
-         MEI_VRX_ImageChunkFree(pMeiDev, chunkIdx);
+         MEI_VRX_ImageChunkFree(pFwDlCtrl, chunkIdx);
    }
 
    return ret;
 }
 
-#if (MEI_SUPPORT_DEVICE_VR10 == 1)
 /**
    Check VR10 PDBRAM share access with PPE driver, manage
    to get access in case of PPE busy
@@ -1401,7 +1389,6 @@ static IFX_int32_t MEI_VR10_PDBRAM_Fill(
 
    return ret;
 }
-#endif /* if (MEI_SUPPORT_DEVICE_VR10 == 1) */
 
 /**
    Update VR9/VR10 BAR registers for new fw revision layout type 2.
@@ -1413,7 +1400,7 @@ static IFX_int32_t MEI_VR10_PDBRAM_Fill(
    IFX_SUCCESS
    IFX_ERROR
 */
-static IFX_int32_t MEI_VRX_BarRegistersUpdateX(
+static IFX_int32_t MEI_VRX_FMLT2_BarRegistersUpdate(
                                  MEI_DEV_T *pMeiDev)
 {
    IFX_int32_t ret = 0;
@@ -1421,19 +1408,17 @@ static IFX_int32_t MEI_VRX_BarRegistersUpdateX(
    MEI_MEI_DRV_CNTRL_T *pMeiDrvCntrl = &(pMeiDev->meiDrvCntrl);
    MEI_FW_DOWNLOAD_CNTRL_T *pFwDlCtrl = &(pMeiDev->fwDl);
    MEI_FW_IMAGE_CHUNK_CTRL_T *pChunk = pFwDlCtrl->imageChunkCtrl;
-#if (MEI_SUPPORT_DEVICE_VR10 == 1)
    IFX_uint8_t *ppPDBRAM = (IFX_uint8_t *)(MEI_INTERNAL_ADDRESS_BASE + MEI_PDBRAM_OFFSET);
-#endif /* (MEI_SUPPORT_DEVICE_VR10 == 1) */
    MEI_FW_PORT_MODE_CONTROL_DMA32_T fwPortModeCtrl = {0};
    IFX_uint32_t xDSL_image_chunk_idx, xDSL_image_chunks;
    IFX_uint32_t xDSL_cache_chunk_idx, xDSL_cache_chunks;
    IFX_uint32_t part_size;
 
-   if (pMeiDev->eFwMemLayoutType != eMEI_FW_MEM_LAYOUT_TYPE_2)
+   if (pFwDlCtrl->eFwMemLayoutType != eMEI_FW_MEM_LAYOUT_TYPE_2)
    {
       PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
-            ("MEI_DRV[%02d]: memory layout type %d is not supported yet!" MEI_DRV_CRLF,
-              MEI_DRV_LINENUM_GET(pMeiDev), pMeiDev->eFwMemLayoutType));
+            ("MEI_DRV[%02d]: memory layout type %d is not supported!" MEI_DRV_CRLF,
+              MEI_DRV_LINENUM_GET(pMeiDev), pFwDlCtrl->eFwMemLayoutType));
 
       return (-e_MEI_ERR_INVAL_CONFIG);
    }
@@ -1463,45 +1448,48 @@ static IFX_int32_t MEI_VRX_BarRegistersUpdateX(
    if (fwPortModeCtrl.xDslModeCurrent == MEI_FW_XDSL_MODE_VDSL)
    {
       /* Started chunk for VDSL full image */
-      xDSL_image_chunk_idx  = pMeiDev->meiPartitions.vDSL_image_chunk_idx;
+      xDSL_image_chunk_idx  = pFwDlCtrl->meiPartitions.vDSL_image_chunk_idx;
 
-      part_size = pMeiDev->meiPartitions.vDSL_image_size;
+      part_size = pFwDlCtrl->meiPartitions.vDSL_image_size;
       xDSL_image_chunks = part_size / MEI_FW_IMAGE_CHUNK_SIZE_BYTE
                                 + !!(part_size % MEI_FW_IMAGE_CHUNK_SIZE_BYTE);
 
       /* Started chunk for VDSL cache */
-      xDSL_cache_chunk_idx  = pMeiDev->meiPartitions.vDSL_cache_chunk_idx;
+      xDSL_cache_chunk_idx  = pFwDlCtrl->meiPartitions.vDSL_cache_chunk_idx;
 
-      part_size = pMeiDev->meiPartitions.bootloader_size +
-                                        pMeiDev->meiPartitions.vDSL_cache_size;
+      part_size = pFwDlCtrl->meiPartitions.bootloader_size +
+                                        pFwDlCtrl->meiPartitions.vDSL_cache_size;
       xDSL_cache_chunks = part_size / MEI_FW_IMAGE_CHUNK_SIZE_BYTE
                                 + !!(part_size % MEI_FW_IMAGE_CHUNK_SIZE_BYTE);
    }
    else
    {
       /* Started chunk for ADSL full image */
-      xDSL_image_chunk_idx  = pMeiDev->meiPartitions.aDSL_image_chunk_idx;
+      xDSL_image_chunk_idx  = pFwDlCtrl->meiPartitions.aDSL_image_chunk_idx;
 
-      part_size = pMeiDev->meiPartitions.aDSL_image_size;
+      part_size = pFwDlCtrl->meiPartitions.aDSL_image_size;
       xDSL_image_chunks = part_size / MEI_FW_IMAGE_CHUNK_SIZE_BYTE
                                 + !!(part_size % MEI_FW_IMAGE_CHUNK_SIZE_BYTE);
 
       /* Started chunk for ADSL cache */
-      xDSL_cache_chunk_idx  = pMeiDev->meiPartitions.aDSL_cache_chunk_idx;
+      xDSL_cache_chunk_idx  = pFwDlCtrl->meiPartitions.aDSL_cache_chunk_idx;
 
-      part_size = pMeiDev->meiPartitions.bootloader_size +
-                                        pMeiDev->meiPartitions.aDSL_cache_size;
+      part_size = pFwDlCtrl->meiPartitions.bootloader_size +
+                                        pFwDlCtrl->meiPartitions.aDSL_cache_size;
       xDSL_cache_chunks = part_size / MEI_FW_IMAGE_CHUNK_SIZE_BYTE
                                 + !!(part_size % MEI_FW_IMAGE_CHUNK_SIZE_BYTE);
    }
-#if (MEI_SUPPORT_DEVICE_VR10 == 1)
-   if (xDSL_cache_chunks > MEI_FW_IMAGE_MAX_CACHE_CHUNK_COUNT)
+
+   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
    {
-      PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
-         ("MEI_DRV: bootloader+cache size 0x%X are too big for PDBRAM!"
-          MEI_DRV_CRLF, part_size));
+      if (xDSL_cache_chunks > MEI_FW_IMAGE_MAX_CACHE_CHUNK_COUNT)
+      {
+         PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+            ("MEI_DRV: bootloader+cache size 0x%X are too big for PDBRAM!"
+            MEI_DRV_CRLF, part_size));
+      }
    }
-#endif
+
 
    PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL,
          (MEI_DRV_CRLF "================== BAR REGS INIT =================" MEI_DRV_CRLF));
@@ -1517,15 +1505,17 @@ static IFX_int32_t MEI_VRX_BarRegistersUpdateX(
    for (chunkIdx=xDSL_cache_chunk_idx, barIdx=0, chunks=0;
                             chunks < xDSL_cache_chunks; chunkIdx++, barIdx++, chunks++)
    {
-#if (MEI_SUPPORT_DEVICE_VR10 == 1)
-      /* BAR0, BAR1, BAR2 are points to PDBRAM */
-      MEI_REG_ACCESS_ME_XMEM_BAR_SET(pMeiDrvCntrl, barIdx, ppPDBRAM);
-      PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL,
-         ("BAR[%02d] = 0x%08X (-> PDBRAM+0x%05X)" MEI_DRV_CRLF, barIdx,
-          ppPDBRAM, barIdx*MEI_FW_IMAGE_CHUNK_SIZE_BYTE));
-      ppPDBRAM += MEI_FW_IMAGE_CHUNK_SIZE_BYTE;
-      continue;
-#endif
+      if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
+      {
+         /* BAR0, BAR1, BAR2 are points to PDBRAM */
+         MEI_REG_ACCESS_ME_XMEM_BAR_SET(pMeiDrvCntrl, barIdx, ppPDBRAM);
+         PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL,
+            ("BAR[%02d] = 0x%08X (-> PDBRAM+0x%05X)" MEI_DRV_CRLF, barIdx,
+            ppPDBRAM, barIdx*MEI_FW_IMAGE_CHUNK_SIZE_BYTE));
+         ppPDBRAM += MEI_FW_IMAGE_CHUNK_SIZE_BYTE;
+         continue;
+      }
+
       /* Skip unused chunks*/
       if (pChunk[chunkIdx].eImageChunkType == eMEI_FW_IMAGE_CHUNK_UNDEFINED)
          continue;
@@ -1555,7 +1545,7 @@ static IFX_int32_t MEI_VRX_BarRegistersUpdateX(
 #if (MEI_SUPPORT_DSM == 1)
    /* chunkIdx points to ERB block */
    barIdx = MEI_FW_IMAGE_ERB_CHUNK_INDEX;
-   chunkIdx = barIdx + pMeiDev->meiSpecialChunkOffset;
+   chunkIdx = barIdx + pFwDlCtrl->meiSpecialChunkOffset;
 
    if ((pChunk[chunkIdx].eImageChunkType != eMEI_FW_IMAGE_CHUNK_UNDEFINED) &&
       (pChunk[chunkIdx].eImageChunkType != eMEI_FW_IMAGE_CHUNK_ERB))
@@ -1564,20 +1554,20 @@ static IFX_int32_t MEI_VRX_BarRegistersUpdateX(
          ("MEI_DRV: could not init ERB BAR[%02d], busy by firmware!"
          MEI_DRV_CRLF, chunkIdx));
    }
-   /* ARC address format will be stored at pChunk[chunkIdx].pBARx */
-   MEI_VRX_TranslateMipsToArc(&pMeiDev->fwDl, chunkIdx, pMeiDev->meiERBbuf.pERB);
-   pChunk[chunkIdx].eImageChunkType = eMEI_FW_IMAGE_CHUNK_ERB;
 
    /* Update BAR register pointed to ERB block */
-   MEI_REG_ACCESS_ME_XMEM_BAR_SET(pMeiDrvCntrl, barIdx, pChunk[chunkIdx].pBARx);
+   MEI_REG_ACCESS_ME_XMEM_BAR_SET(pMeiDrvCntrl, barIdx,
+                          MEI_VRX_TranslateMipsToArc(pMeiDev->meiERBbuf.pERB));
    PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL,
       ("BAR[%02d] = 0x%08X (-> ERB block)"MEI_DRV_CRLF, barIdx,
       MEI_REG_ACCESS_ME_XMEM_BAR_GET(pMeiDrvCntrl, barIdx)));
+
+   pChunk[chunkIdx].eImageChunkType = eMEI_FW_IMAGE_CHUNK_ERB;
 #endif /* (MEI_SUPPORT_DSM == 1) */
 
    /* Check for the valid DATA chunk*/
    barIdx = MEI_FW_IMAGE_DATA_CHUNK_INDEX;
-   chunkIdx = barIdx + pMeiDev->meiSpecialChunkOffset;
+   chunkIdx = barIdx + pFwDlCtrl->meiSpecialChunkOffset;
    if (pChunk[chunkIdx].eImageChunkType != eMEI_FW_IMAGE_CHUNK_DATA)
    {
       PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_WRN,
@@ -1602,7 +1592,7 @@ static IFX_int32_t MEI_VRX_BarRegistersUpdateX(
 
    /* Check for the valid DEBUG chunk*/
    barIdx = MEI_FW_IMAGE_DEBUG_CHUNK_INDEX;
-   chunkIdx = barIdx + pMeiDev->meiSpecialChunkOffset;
+   chunkIdx = barIdx + pFwDlCtrl->meiSpecialChunkOffset;
    if (pChunk[chunkIdx].eImageChunkType != eMEI_FW_IMAGE_CHUNK_UNDEFINED)
    {
       MEI_REG_ACCESS_ME_XMEM_BAR_SET(pMeiDrvCntrl, barIdx, pChunk[chunkIdx].pBARx);
@@ -1627,7 +1617,7 @@ static IFX_int32_t MEI_VRX_BarRegistersUpdateX(
    IFX_SUCCESS
    IFX_ERROR
 */
-static IFX_int32_t MEI_VRX_BarRegistersUpdate(
+static IFX_int32_t MEI_VRX_FMLT0_BarRegistersUpdate(
                                  MEI_DEV_T *pMeiDev)
 {
    IFX_int32_t ret = 0;
@@ -1635,26 +1625,26 @@ static IFX_int32_t MEI_VRX_BarRegistersUpdate(
    MEI_MEI_DRV_CNTRL_T *pMeiDrvCntrl = &(pMeiDev->meiDrvCntrl);
    MEI_FW_DOWNLOAD_CNTRL_T *pFwDlCtrl = &(pMeiDev->fwDl);
    MEI_FW_IMAGE_CHUNK_CTRL_T *pChunk = pFwDlCtrl->imageChunkCtrl;
-#if (MEI_SUPPORT_DEVICE_VR10 == 1)
    IFX_uint8_t *ppPDBRAM = (IFX_uint8_t *)(MEI_INTERNAL_ADDRESS_BASE + MEI_PDBRAM_OFFSET);
-#endif /* (MEI_SUPPORT_DEVICE_VR10 == 1) */
 
    PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL,
          (MEI_DRV_CRLF "================== BAR REGS INIT =================" MEI_DRV_CRLF));
 
    for (chunkIdx=0; chunkIdx<MEI_FW_IMAGE_MAX_CHUNK_COUNT; chunkIdx++)
    {
-#if (MEI_SUPPORT_DEVICE_VR10 == 1)
-      /* BAR0, BAR1, BAR2 are points to PDBRAM */
-      if (chunkIdx < MEI_FW_IMAGE_MAX_CACHE_CHUNK_COUNT)
+      if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
       {
-         MEI_REG_ACCESS_ME_XMEM_BAR_SET(pMeiDrvCntrl, chunkIdx, ppPDBRAM);
-         PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL,
-            ("BAR[%02d] = 0x%08X" MEI_DRV_CRLF, chunkIdx, ppPDBRAM));
-         ppPDBRAM += MEI_FW_IMAGE_CHUNK_SIZE_BYTE;
-         continue;
+         /* BAR0, BAR1, BAR2 are points to PDBRAM */
+         if (chunkIdx < MEI_FW_IMAGE_MAX_CACHE_CHUNK_COUNT)
+         {
+            MEI_REG_ACCESS_ME_XMEM_BAR_SET(pMeiDrvCntrl, chunkIdx, ppPDBRAM);
+            PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL,
+               ("BAR[%02d] = 0x%08X" MEI_DRV_CRLF, chunkIdx, ppPDBRAM));
+            ppPDBRAM += MEI_FW_IMAGE_CHUNK_SIZE_BYTE;
+            continue;
+         }
       }
-#endif
+
       /* Skip unused chunks*/
       if (pChunk[chunkIdx].eImageChunkType == eMEI_FW_IMAGE_CHUNK_UNDEFINED)
          continue;
@@ -1677,10 +1667,10 @@ static IFX_int32_t MEI_VRX_BarRegistersUpdate(
          ("MEI_DRV: could not init ERB BAR[%02d], busy by firmware!"
          MEI_DRV_CRLF, chunkIdx));
    }
-   MEI_VRX_TranslateMipsToArc(&pMeiDev->fwDl, chunkIdx, pMeiDev->meiERBbuf.pERB);
 
    /* Update BAR register pointed to ERB block */
-   MEI_REG_ACCESS_ME_XMEM_BAR_SET(pMeiDrvCntrl, chunkIdx, pChunk[chunkIdx].pBARx);
+   MEI_REG_ACCESS_ME_XMEM_BAR_SET(pMeiDrvCntrl, chunkIdx,
+                          MEI_VRX_TranslateMipsToArc(pMeiDev->meiERBbuf.pERB));
    PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL, ("BAR[%02d] = 0x%08X" MEI_DRV_CRLF,
             chunkIdx, MEI_REG_ACCESS_ME_XMEM_BAR_GET(pMeiDrvCntrl, chunkIdx)));
 
@@ -1741,7 +1731,7 @@ static IFX_int32_t MEI_VRX_BootLoaderSizeGet(
    MEI_FW_IMAGE_CHUNK_CTRL_T *pChunk = pFwDlCtrl->imageChunkCtrl;
    MEI_FW_IMAGE_CNTRL_T *pFwImageHeader = NULL;
 
-   if (pMeiDev->eFwRevision == eMEI_FW_REVISION_OLD)
+   if (pFwDlCtrl->eFwRevision == eMEI_FW_INTERFACE_REV_0)
    {
       /* Set Image Header pointer. By default Image Header is located in the
          1st chunk*/
@@ -1770,24 +1760,26 @@ static IFX_int32_t MEI_VRX_BootLoaderSizeGet(
    }
    else
    {
-      *pVal = pMeiDev->meiPartitions.bootloader_size;
+      *pVal = pFwDlCtrl->meiPartitions.bootloader_size;
    }
 
    PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL,
       ("MEI_DRV: read bootloader size %d bytes"
       MEI_DRV_CRLF, *pVal));
 
-#if (MEI_SUPPORT_DEVICE_VR10 == 1)
-   if (*pVal == 0)
+   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
    {
-      /* set default value */
-      *pVal = MEI_FW_DEFAULT_BOOTLOADER_SIZE_BYTE;
+      if (*pVal == 0)
+      {
+         /* set default value */
+         *pVal = MEI_FW_DEFAULT_BOOTLOADER_SIZE_BYTE;
 
-      PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_WRN,
-         ("MEI_DRV: bootloader size is zero, use default size %d bytes"
-         MEI_DRV_CRLF, *pVal));
+         PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_WRN,
+            ("MEI_DRV: bootloader size is zero, use default size %d bytes"
+            MEI_DRV_CRLF, *pVal));
+      }
    }
-#endif /* (MEI_SUPPORT_DEVICE_VR10 == 1) */
+
    return ret;
 }
 
@@ -1853,7 +1845,7 @@ static IFX_int32_t MEI_VRX_BootPagesDownload(
 
          /* Fill Xpage with the PROGRAM Memory Data*/
          ret = MEI_VRX_XpageWrite(
-                  pMeiDev, pMeiDrvCntrl, pChunk,
+                  pFwDlCtrl, pMeiDrvCntrl, pChunk,
                   &(pFwImageHeader->imagePage.imagePageX[pageIdx]), IFX_FALSE);
 
          if (ret != 0)
@@ -1868,7 +1860,7 @@ static IFX_int32_t MEI_VRX_BootPagesDownload(
 
          /* Fill Xpage with the DATA memory Data*/
          ret = MEI_VRX_XpageWrite(
-                  pMeiDev, pMeiDrvCntrl, pChunk,
+                  pFwDlCtrl, pMeiDrvCntrl, pChunk,
                   &(pFwImageHeader->imagePage.imagePageX[pageIdx]), IFX_TRUE);
 
          if (ret != 0)
@@ -1940,10 +1932,11 @@ static IFX_int32_t MEI_VRX_FinishFwDownload(
       }
    }
 
-#if (MEI_SUPPORT_DEVICE_VR10 == 1)
-   /* Clear FORCE_LINK_DOWN flag for PPE */
-   *MEI_PPE_U32REG(PPE_FORCE_LINK_DOWN) &= ~0x1;
-#endif /* (MEI_SUPPORT_DEVICE_VR10 == 1) */
+   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
+   {
+      /* Clear FORCE_LINK_DOWN flag for PPE */
+      *MEI_PPE_U32REG(PPE_FORCE_LINK_DOWN) &= ~0x1;
+   }
 
 #if MEI_DBG_CECK_BOOTLOADER_START == 1
    if (MEI_VRX_PortModeControlStructureCurrentGet(
@@ -2070,6 +2063,7 @@ static IFX_int32_t MEI_VRX_StartFwDownload(
                                  IFX_boolean_t            bInternCall)
 {
    IFX_int32_t ret = 0;
+   MEI_FW_DOWNLOAD_CNTRL_T *pFwDlCtrl = &(pMeiDynCntrl->pMeiDev->fwDl);
    MEI_DEV_T *pMeiDev = pMeiDynCntrl->pMeiDev;
    IFX_uint32_t bootloader_size = 0;
 
@@ -2082,15 +2076,15 @@ static IFX_int32_t MEI_VRX_StartFwDownload(
       return ret;
    }
 
-   if (pMeiDev->eFwRevision == eMEI_FW_REVISION_OLD)
+   if (pFwDlCtrl->eFwRevision == eMEI_FW_INTERFACE_REV_0)
    {
       /* Setup and Fill Fw download chunks for old revision */
-      ret = MEI_VRX_ChunksFill(pMeiDev, pArgFwDl->pFwImage, bInternCall);
+      ret = MEI_VRX_FMLT0_ChunksFill(pFwDlCtrl, pArgFwDl->pFwImage, bInternCall);
    }
    else
    {
       /* Setup and Fill Fw download chunks for new revision (extended) */
-      ret = MEI_VRX_ChunksFillX(pMeiDev, pArgFwDl->pFwImage, bInternCall);
+      ret = MEI_VRX_FMLT2_ChunksFill(pFwDlCtrl, pArgFwDl->pFwImage, bInternCall);
    }
 
    if (ret != IFX_SUCCESS)
@@ -2106,46 +2100,49 @@ static IFX_int32_t MEI_VRX_StartFwDownload(
 
    /* Read bootloader size for VR9/VR10, but use only for VR10 */
    ret = MEI_VRX_BootLoaderSizeGet(pMeiDev, &bootloader_size);
-#if (MEI_SUPPORT_DEVICE_VR10 == 1)
-   if (ret != IFX_SUCCESS )
-   {
-      /* set default size */
-      bootloader_size = MEI_FW_DEFAULT_BOOTLOADER_SIZE_BYTE;
 
-      PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_WRN,
+   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
+   {
+      if (ret != IFX_SUCCESS )
+      {
+         /* set default size */
+         bootloader_size = MEI_FW_DEFAULT_BOOTLOADER_SIZE_BYTE;
+
+         PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_WRN,
             ("MEI_DRV: read bootloader size fails, use default size %d bytes"
             MEI_DRV_CRLF, bootloader_size));
+      }
    }
-#endif /* (MEI_SUPPORT_DEVICE_VR10 == 1) */
 
-#if (MEI_SUPPORT_DEVICE_VR10 == 1)
-   /* Get access to PDBRAM shared with PPE driver */
-   if ((ret = MEI_VR10_PDBRAM_AccessGet(pMeiDev)) != IFX_SUCCESS)
+   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
    {
-      PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
-         ("MEI_DRV: PDBRAM access failed!" MEI_DRV_CRLF));
+      /* Get access to PDBRAM shared with PPE driver */
+      if ((ret = MEI_VR10_PDBRAM_AccessGet(pMeiDev)) != IFX_SUCCESS)
+      {
+         PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+            ("MEI_DRV: PDBRAM access failed!" MEI_DRV_CRLF));
 
-      return ret;
+         return ret;
+      }
+
+      /* Fill PDBRAM */
+      if ((ret = MEI_VR10_PDBRAM_Fill(pMeiDev, bootloader_size)) != IFX_SUCCESS)
+      {
+         PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+            ("MEI_DRV: PDBRAM fill failed!" MEI_DRV_CRLF));
+
+         return ret;
+      }
    }
-
-   /* Fill PDBRAM */
-   if ((ret = MEI_VR10_PDBRAM_Fill(pMeiDev, bootloader_size)) != IFX_SUCCESS)
-   {
-      PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
-         ("MEI_DRV: PDBRAM fill failed!" MEI_DRV_CRLF));
-
-      return ret;
-   }
-#endif /* (MEI_SUPPORT_DEVICE_VR10 == 1) */
 
    /* Update BAR registers*/
-   if (pMeiDev->eFwRevision == eMEI_FW_REVISION_OLD)
+   if (pFwDlCtrl->eFwRevision == eMEI_FW_INTERFACE_REV_0)
    {
-      ret = MEI_VRX_BarRegistersUpdate(pMeiDev);
+      ret = MEI_VRX_FMLT0_BarRegistersUpdate(pMeiDev);
    }
    else
    {
-      ret = MEI_VRX_BarRegistersUpdateX(pMeiDev);
+      ret = MEI_VRX_FMLT2_BarRegistersUpdate(pMeiDev);
    }
 
    if (ret != IFX_SUCCESS)
@@ -2210,7 +2207,7 @@ static IFX_int32_t MEI_VRX_StartOptFwDownload(
    }
 
    /* Allocate chunk*/
-   ret = MEI_VRX_ImageChunkAlloc(pMeiDev, chunkIdx, pArgFwDl->size_byte);
+   ret = MEI_VRX_ImageChunkAlloc(pFwDlCtrl, chunkIdx, pArgFwDl->size_byte);
    if (ret != 0)
    {
       PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
@@ -2256,7 +2253,7 @@ static IFX_int32_t MEI_VRX_StartOptFwDownload(
       {
          /* Allocate chunk for external writable DATA region */
          ret = MEI_VRX_ImageChunkAlloc(
-                  pMeiDev, MEI_FW_IMAGE_DATA_CHUNK_INDEX,
+                  pFwDlCtrl, MEI_FW_IMAGE_DATA_CHUNK_INDEX,
                   pFwDlCtrl->dataRegionSize_Byte);
 
          if (ret != 0)
@@ -2272,7 +2269,7 @@ static IFX_int32_t MEI_VRX_StartOptFwDownload(
       MEI_VRX_ChunksInfoShow(pMeiDev);
 
       /* Update BAR registers*/
-      if ((ret = MEI_VRX_BarRegistersUpdate(pMeiDev)) != IFX_SUCCESS)
+      if ((ret = MEI_VRX_FMLT0_BarRegistersUpdate(pMeiDev)) != IFX_SUCCESS)
       {
          PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
             ("MEI_DRV: BAR registers update failed!" MEI_DRV_CRLF));
@@ -2303,7 +2300,7 @@ IFX_void_t MEI_DEV_FirmwareDownloadResourcesRelease(
    /* Free FW chunks*/
    for (chunkIdx=0; chunkIdx < MEI_FW_IMAGE_MAX_CHUNK_COUNT - 1; chunkIdx++)
    {
-      MEI_VRX_ImageChunkFree(pMeiDev, chunkIdx);
+      MEI_VRX_ImageChunkFree(&(pMeiDev->fwDl), chunkIdx);
    }
 
    MEI_DRVOS_SemaphoreUnlock(&pFwDlCntrlLock);
@@ -2326,6 +2323,7 @@ static IFX_int32_t MEI_DEV_FirmwareImageHeaderGet(
                                  IFX_boolean_t bInternCall)
 {
    IFX_int32_t ret = 0;
+   MEI_FW_DOWNLOAD_CNTRL_T *pFwDlCtrl = &(pMeiDev->fwDl);
    MEI_FW_IMAGE_CNTRL_T fwImageCtrl;
    MEI_FW_IMAGE_PAGE2_T fwImagePage2;
    MEI_FW_IMAGE_PAGE3_T fwImagePage3;
@@ -2421,38 +2419,38 @@ static IFX_int32_t MEI_DEV_FirmwareImageHeaderGet(
       }
    }
 
-   pMeiDev->eFwRevision = SWAP32_BYTE_ORDER(fwImagePage2.fwRevision);
-   if ((pMeiDev->eFwRevision != eMEI_FW_REVISION_OLD) &&
-       (pMeiDev->eFwRevision != eMEI_FW_REVISION_NEW))
+   pFwDlCtrl->eFwRevision = SWAP32_BYTE_ORDER(fwImagePage2.fwRevision);
+   if ((pFwDlCtrl->eFwRevision != eMEI_FW_INTERFACE_REV_0) &&
+       (pFwDlCtrl->eFwRevision != eMEI_FW_INTERFACE_REV_1))
    {
       PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
          ("MEI_DRV[0x%02X]: unsupported firmware revision %d!"
-         MEI_DRV_CRLF, MEI_DRV_LINENUM_GET(pMeiDev), pMeiDev->eFwRevision));
+         MEI_DRV_CRLF, MEI_DRV_LINENUM_GET(pMeiDev), pFwDlCtrl->eFwRevision));
 
       ret = -e_MEI_ERR_INVAL_CONFIG;
       return ret;
    }
 
-   pMeiDev->eFwMemLayoutType = SWAP32_BYTE_ORDER(fwImagePage2.fwMemLayout_Type);
+   pFwDlCtrl->eFwMemLayoutType = SWAP32_BYTE_ORDER(fwImagePage2.fwMemLayout_Type);
 
    PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL,
          (MEI_DRV_CRLF"Fw header info: fw revision %d, layout type %d" MEI_DRV_CRLF,
-          pMeiDev->eFwRevision, pMeiDev->eFwMemLayoutType));
+          pFwDlCtrl->eFwRevision, pFwDlCtrl->eFwMemLayoutType));
 
    /* For old revision (0) layout type at page 2 is not used (zero by default) */
-   if ((pMeiDev->eFwRevision == eMEI_FW_REVISION_OLD) &&
-                      (pMeiDev->eFwMemLayoutType != eMEI_FW_MEM_LAYOUT_TYPE_0))
+   if ((pFwDlCtrl->eFwRevision == eMEI_FW_INTERFACE_REV_0) &&
+                    (pFwDlCtrl->eFwMemLayoutType != eMEI_FW_MEM_LAYOUT_TYPE_0))
    {
       PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR, ("MEI_DRV[0x%02X]: "
          "image header revision %d is not compatible with layout type %d!"
-         MEI_DRV_CRLF, MEI_DRV_LINENUM_GET(pMeiDev), pMeiDev->eFwRevision,
-         pMeiDev->eFwMemLayoutType));
+         MEI_DRV_CRLF, MEI_DRV_LINENUM_GET(pMeiDev), pFwDlCtrl->eFwRevision,
+         pFwDlCtrl->eFwMemLayoutType));
 
       ret = -e_MEI_ERR_INVAL_CONFIG;
       return ret;
    }
 
-   if (pMeiDev->eFwRevision == eMEI_FW_REVISION_NEW)
+   if (pFwDlCtrl->eFwRevision == eMEI_FW_INTERFACE_REV_1)
    {
       /* Get Firmware Image PartitionsPage info*/
       if (bInternCall)
@@ -2477,84 +2475,86 @@ static IFX_int32_t MEI_DEV_FirmwareImageHeaderGet(
             return ret;
          }
       }
-      pMeiDev->meiPartitions.bootloader_size   = SWAP32_BYTE_ORDER(fwImagePage2.bootloader_size);
-      pMeiDev->meiPartitions.debug_data_size   = SWAP32_BYTE_ORDER(fwImagePage2.debug_data_size);
-      pMeiDev->meiPartitions.vDSL_image_offset = SWAP32_BYTE_ORDER(fwImagePartitionsPage.vDSL_image_offset);
-      pMeiDev->meiPartitions.vDSL_image_size   = SWAP32_BYTE_ORDER(fwImagePartitionsPage.vDSL_image_size);
-      pMeiDev->meiPartitions.aDSL_image_offset = SWAP32_BYTE_ORDER(fwImagePartitionsPage.aDSL_image_offset);
-      pMeiDev->meiPartitions.aDSL_image_size   = SWAP32_BYTE_ORDER(fwImagePartitionsPage.aDSL_image_size);
-      pMeiDev->meiPartitions.vDSL_cache_offset = SWAP32_BYTE_ORDER(fwImagePartitionsPage.vDSL_cache_offset);
-      pMeiDev->meiPartitions.vDSL_cache_size   = SWAP32_BYTE_ORDER(fwImagePartitionsPage.vDSL_cache_size);
-      pMeiDev->meiPartitions.aDSL_cache_offset = SWAP32_BYTE_ORDER(fwImagePartitionsPage.aDSL_cache_offset);
-      pMeiDev->meiPartitions.aDSL_cache_size   = SWAP32_BYTE_ORDER(fwImagePartitionsPage.aDSL_cache_size);
+      pFwDlCtrl->meiPartitions.bootloader_size   = SWAP32_BYTE_ORDER(fwImagePage2.bootloader_size);
+      pFwDlCtrl->meiPartitions.debug_data_size   = SWAP32_BYTE_ORDER(fwImagePage2.debug_data_size);
+      pFwDlCtrl->meiPartitions.vDSL_image_offset = SWAP32_BYTE_ORDER(fwImagePartitionsPage.vDSL_image_offset);
+      pFwDlCtrl->meiPartitions.vDSL_image_size   = SWAP32_BYTE_ORDER(fwImagePartitionsPage.vDSL_image_size);
+      pFwDlCtrl->meiPartitions.aDSL_image_offset = SWAP32_BYTE_ORDER(fwImagePartitionsPage.aDSL_image_offset);
+      pFwDlCtrl->meiPartitions.aDSL_image_size   = SWAP32_BYTE_ORDER(fwImagePartitionsPage.aDSL_image_size);
+      pFwDlCtrl->meiPartitions.vDSL_cache_offset = SWAP32_BYTE_ORDER(fwImagePartitionsPage.vDSL_cache_offset);
+      pFwDlCtrl->meiPartitions.vDSL_cache_size   = SWAP32_BYTE_ORDER(fwImagePartitionsPage.vDSL_cache_size);
+      pFwDlCtrl->meiPartitions.aDSL_cache_offset = SWAP32_BYTE_ORDER(fwImagePartitionsPage.aDSL_cache_offset);
+      pFwDlCtrl->meiPartitions.aDSL_cache_size   = SWAP32_BYTE_ORDER(fwImagePartitionsPage.aDSL_cache_size);
 
    PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL,
          (MEI_DRV_CRLF "================= FW PARTITIONS =================" MEI_DRV_CRLF));
 
    PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL,
-         ("bootloader size   [byte] %d(0x%X)" MEI_DRV_CRLF, pMeiDev->meiPartitions.bootloader_size,
-                                                           pMeiDev->meiPartitions.bootloader_size));
+         ("bootloader size   [byte] %d(0x%X)" MEI_DRV_CRLF, pFwDlCtrl->meiPartitions.bootloader_size,
+                                                            pFwDlCtrl->meiPartitions.bootloader_size));
    PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL,
-         ("debug data size   [byte] %d(0x%X)" MEI_DRV_CRLF, pMeiDev->meiPartitions.debug_data_size,
-                                                           pMeiDev->meiPartitions.debug_data_size));
+         ("debug data size   [byte] %d(0x%X)" MEI_DRV_CRLF, pFwDlCtrl->meiPartitions.debug_data_size,
+                                                            pFwDlCtrl->meiPartitions.debug_data_size));
    PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL,
-         ("vdsl image offset [byte] %d(0x%X)" MEI_DRV_CRLF, pMeiDev->meiPartitions.vDSL_image_offset,
-                                                           pMeiDev->meiPartitions.vDSL_image_offset));
+         ("vdsl image offset [byte] %d(0x%X)" MEI_DRV_CRLF, pFwDlCtrl->meiPartitions.vDSL_image_offset,
+                                                            pFwDlCtrl->meiPartitions.vDSL_image_offset));
    PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL,
-         ("vdsl image size   [byte] %d(0x%X)" MEI_DRV_CRLF, pMeiDev->meiPartitions.vDSL_image_size,
-                                                           pMeiDev->meiPartitions.vDSL_image_size));
+         ("vdsl image size   [byte] %d(0x%X)" MEI_DRV_CRLF, pFwDlCtrl->meiPartitions.vDSL_image_size,
+                                                            pFwDlCtrl->meiPartitions.vDSL_image_size));
    PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL,
-         ("adsl image offset [byte] %d(0x%X)" MEI_DRV_CRLF, pMeiDev->meiPartitions.aDSL_image_offset,
-                                                           pMeiDev->meiPartitions.aDSL_image_offset));
+         ("adsl image offset [byte] %d(0x%X)" MEI_DRV_CRLF, pFwDlCtrl->meiPartitions.aDSL_image_offset,
+                                                            pFwDlCtrl->meiPartitions.aDSL_image_offset));
    PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL,
-         ("adsl image size   [byte] %d(0x%X)" MEI_DRV_CRLF, pMeiDev->meiPartitions.aDSL_image_size,
-                                                           pMeiDev->meiPartitions.aDSL_image_size));
+         ("adsl image size   [byte] %d(0x%X)" MEI_DRV_CRLF, pFwDlCtrl->meiPartitions.aDSL_image_size,
+                                                            pFwDlCtrl->meiPartitions.aDSL_image_size));
    PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL,
-         ("vdsl cache offset [byte] %d(0x%X)" MEI_DRV_CRLF, pMeiDev->meiPartitions.vDSL_cache_offset,
-                                                           pMeiDev->meiPartitions.vDSL_cache_offset));
+         ("vdsl cache offset [byte] %d(0x%X)" MEI_DRV_CRLF, pFwDlCtrl->meiPartitions.vDSL_cache_offset,
+                                                            pFwDlCtrl->meiPartitions.vDSL_cache_offset));
    PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL,
-         ("vdsl cache size   [byte] %d(0x%X)" MEI_DRV_CRLF, pMeiDev->meiPartitions.vDSL_cache_size,
-                                                           pMeiDev->meiPartitions.vDSL_cache_size));
+         ("vdsl cache size   [byte] %d(0x%X)" MEI_DRV_CRLF, pFwDlCtrl->meiPartitions.vDSL_cache_size,
+                                                            pFwDlCtrl->meiPartitions.vDSL_cache_size));
    PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL,
-         ("adsl cache offset [byte] %d(0x%X)" MEI_DRV_CRLF, pMeiDev->meiPartitions.aDSL_cache_offset,
-                                                           pMeiDev->meiPartitions.aDSL_cache_offset));
+         ("adsl cache offset [byte] %d(0x%X)" MEI_DRV_CRLF, pFwDlCtrl->meiPartitions.aDSL_cache_offset,
+                                                            pFwDlCtrl->meiPartitions.aDSL_cache_offset));
    PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL,
-         ("adsl cache size   [byte] %d(0x%X)" MEI_DRV_CRLF, pMeiDev->meiPartitions.aDSL_cache_size,
-                                                           pMeiDev->meiPartitions.aDSL_cache_size));
+         ("adsl cache size   [byte] %d(0x%X)" MEI_DRV_CRLF, pFwDlCtrl->meiPartitions.aDSL_cache_size,
+                                                            pFwDlCtrl->meiPartitions.aDSL_cache_size));
 
    PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL,
          ("=================================================" MEI_DRV_CRLF));
 
-#if (MEI_SUPPORT_DEVICE_VR10 == 1)
-      if ((pMeiDev->meiPartitions.bootloader_size + pMeiDev->meiPartitions.vDSL_cache_size
-                                 > MEI_FW_IMAGE_MAX_PDBRAM_CACHE_SIZE_BYTE) ||
-          (pMeiDev->meiPartitions.bootloader_size + pMeiDev->meiPartitions.aDSL_cache_size
-                                 > MEI_FW_IMAGE_MAX_PDBRAM_CACHE_SIZE_BYTE))
+      if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
       {
-         PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
-            ("MEI_DRV[0x%02X]: bootloader and cache are too big for PDBRAM!"
-              MEI_DRV_CRLF, MEI_DRV_LINENUM_GET(pMeiDev)));
+         if ((pFwDlCtrl->meiPartitions.bootloader_size + pFwDlCtrl->meiPartitions.vDSL_cache_size
+                                 > MEI_FW_IMAGE_MAX_PDBRAM_CACHE_SIZE_BYTE) ||
+             (pFwDlCtrl->meiPartitions.bootloader_size + pFwDlCtrl->meiPartitions.aDSL_cache_size
+                                 > MEI_FW_IMAGE_MAX_PDBRAM_CACHE_SIZE_BYTE))
+         {
+            PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+               ("MEI_DRV[0x%02X]: bootloader and cache are too big for PDBRAM!"
+               MEI_DRV_CRLF, MEI_DRV_LINENUM_GET(pMeiDev)));
+         }
       }
-#endif
-      if (pMeiDev->meiPartitions.debug_data_size > MEI_FW_IMAGE_MAX_DEBUG_DATA)
+
+      if (pFwDlCtrl->meiPartitions.debug_data_size > MEI_FW_IMAGE_MAX_DEBUG_DATA)
       {
          PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_WRN,
             ("MEI_DRV[0x%02X]: reduce debug data size %d to max size %d"
-              MEI_DRV_CRLF, pMeiDev->meiPartitions.debug_data_size,
+              MEI_DRV_CRLF, pFwDlCtrl->meiPartitions.debug_data_size,
               MEI_FW_IMAGE_MAX_DEBUG_DATA));
       }
 
    }
 
-   switch (pMeiDev->eFwMemLayoutType)
+   switch (pFwDlCtrl->eFwMemLayoutType)
    {
       case eMEI_FW_MEM_LAYOUT_TYPE_0:
-#if (MEI_SUPPORT_DEVICE_VR10 == 1)
+
       case eMEI_FW_MEM_LAYOUT_TYPE_1:
-#endif
+
       case eMEI_FW_MEM_LAYOUT_TYPE_2:
 
-         if (pMeiDev->fwDl.size_byte > fwMaxImageSizeOfType[pMeiDev->eFwMemLayoutType])
+         if (pMeiDev->fwDl.size_byte > fwMaxImageSizeOfType[pFwDlCtrl->eFwMemLayoutType])
          {
             PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
                ("MEI_DRV: ERROR - Firmware Image size %d is too large!" MEI_DRV_CRLF,
@@ -2562,41 +2562,40 @@ static IFX_int32_t MEI_DEV_FirmwareImageHeaderGet(
 
             PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
                ("MEI_DRV: ERROR - Max supported Firmware Image size for mem layout type %d is %d!" MEI_DRV_CRLF,
-               pMeiDev->eFwMemLayoutType, fwMaxImageSizeOfType[pMeiDev->eFwMemLayoutType]));
+               pFwDlCtrl->eFwMemLayoutType, fwMaxImageSizeOfType[pFwDlCtrl->eFwMemLayoutType]));
 
             return IFX_ERROR;
          }
 
          /* set max amount of chunks to contain image */
-         pMeiDev->meiMaxChunkCount = fwMaxImageChunkOfType[pMeiDev->eFwMemLayoutType];
+         pFwDlCtrl->meiMaxChunkCount = fwMaxImageChunkOfType[pFwDlCtrl->eFwMemLayoutType];
 
          break;
 
       default:
          PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
             ("MEI_DRV[0x%02X]: download - FW memory layout type %d is not supported"
-            MEI_DRV_CRLF, MEI_DRV_LINENUM_GET(pMeiDev), pMeiDev->eFwMemLayoutType));
+            MEI_DRV_CRLF, MEI_DRV_LINENUM_GET(pMeiDev), pFwDlCtrl->eFwMemLayoutType));
 
          ret = -e_MEI_ERR_INVAL_ARG;
          return ret;
    }
 
-   switch(pMeiDev->eFwMemLayoutType)
+   switch(pFwDlCtrl->eFwMemLayoutType)
    {
       case eMEI_FW_MEM_LAYOUT_TYPE_0:
       default:
-         pMeiDev->meiSpecialChunkOffset =
+         pFwDlCtrl->meiSpecialChunkOffset =
             MEI_FW_IMAGE_MAX_CHUNK_COUNT_TYPE_0 - MEI_TOTAL_BAR_REGISTER_COUNT;
          break;
 
-#if (MEI_SUPPORT_DEVICE_VR10 == 1)
       case eMEI_FW_MEM_LAYOUT_TYPE_1:
-         pMeiDev->meiSpecialChunkOffset =
+         pFwDlCtrl->meiSpecialChunkOffset =
             MEI_FW_IMAGE_MAX_CHUNK_COUNT_TYPE_1 - MEI_TOTAL_BAR_REGISTER_COUNT;
          break;
-#endif
+
       case eMEI_FW_MEM_LAYOUT_TYPE_2:
-         pMeiDev->meiSpecialChunkOffset =
+         pFwDlCtrl->meiSpecialChunkOffset =
             MEI_FW_IMAGE_MAX_CHUNK_COUNT_TYPE_2 - MEI_TOTAL_BAR_REGISTER_COUNT;
          break;
    }
@@ -3295,6 +3294,4 @@ IFX_int32_t MEI_IoctlFwModeStatGet(
 
    return ret;
 }
-
-#endif   /* #if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1) || (MEI_SUPPORT_DEVICE_AR9 == 1)*/
 
