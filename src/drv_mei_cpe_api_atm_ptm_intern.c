@@ -26,7 +26,11 @@
 
 #ifdef LINUX
    #if (LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0))
-      #include <asm/ifx/ifx_atm.h>
+      #if (MEI_SUPPORT_DEVICE_VR10_320 != 1)
+         #include <asm/ifx/ifx_atm.h>
+      #else
+         #include <linux/atm.h>
+      #endif
    #else
       #include <lantiq_atm.h>
    #endif
@@ -87,10 +91,19 @@ IFX_int32_t MEI_InternalXtmSwhowtimeEntrySignal(
       port_cell.tx_link_rate[0] = g_tx_link_rate[dslLineNum][0];
       port_cell.tx_link_rate[1] = g_tx_link_rate[dslLineNum][1];
 
+      PRN_DBG_USR_NL( MEI_NOTIFICATIONS, MEI_DRV_PRN_LEVEL_NORMAL,
+            ("MEI_DRV[%02d]: ShowtimeEntrySignal, tx_link_rate(fast)=%d, "
+             "tx_link_rate(intl)=%d" MEI_DRV_CRLF, dslLineNum,
+             port_cell.tx_link_rate[0], port_cell.tx_link_rate[1]));
+
       ltq_mei_atm_showtime_enter(dslLineNum, &port_cell, g_xdata_addr[dslLineNum]);
    }
    else
    {
+      PRN_DBG_USR_NL( MEI_NOTIFICATIONS, MEI_DRV_PRN_LEVEL_ERR,
+            ("MEI_DRV[%02d]: ShowtimeEntrySignal failed, no PP callback defined!"
+             MEI_DRV_CRLF, dslLineNum));
+
       retVal = -e_MEI_ERR_OP_FAILED;
    }
 
@@ -117,10 +130,17 @@ IFX_int32_t MEI_InternalXtmSwhowtimeExitSignal(
 
    if (ltq_mei_atm_showtime_exit)
    {
+      PRN_DBG_USR_NL( MEI_NOTIFICATIONS, MEI_DRV_PRN_LEVEL_NORMAL,
+            ("MEI_DRV[%02d]: ShowtimeExitSignal" MEI_DRV_CRLF, dslLineNum));
+
       ltq_mei_atm_showtime_exit(dslLineNum);
    }
    else
    {
+      PRN_DBG_USR_NL( MEI_NOTIFICATIONS, MEI_DRV_PRN_LEVEL_ERR,
+            ("MEI_DRV[%02d]: ShowtimeEntrySignal failed, no PP callback defined!"
+             MEI_DRV_CRLF, dslLineNum));
+
       retVal = -e_MEI_ERR_OP_FAILED;
    }
 
@@ -158,10 +178,15 @@ int ltq_mei_atm_showtime_check(
       return -1;
    }
 
+   PRN_DBG_USR_NL( MEI_NOTIFICATIONS, MEI_DRV_PRN_LEVEL_NORMAL,
+         ("MEI_DRV[%02d]: ShowtimeCheck" MEI_DRV_CRLF, line_idx));
+
    if (is_showtime)
    {
      *is_showtime = (g_tx_link_rate[line_idx][0] == 0) &&
                     (g_tx_link_rate[line_idx][1] == 0) ? 0 : 1;
+     PRN_DBG_USR_NL( MEI_NOTIFICATIONS, MEI_DRV_PRN_LEVEL_NORMAL,
+           ("MEI_DRV[%02d]: is_showtime=%d" MEI_DRV_CRLF, line_idx, *is_showtime));
    }
 
    if (port_cell)
@@ -169,6 +194,10 @@ int ltq_mei_atm_showtime_check(
       for ( i = 0; i < port_cell->port_num && i < 2; i++ )
       {
          port_cell->tx_link_rate[i] = g_tx_link_rate[line_idx][i];
+
+         PRN_DBG_USR_NL( MEI_NOTIFICATIONS, MEI_DRV_PRN_LEVEL_NORMAL,
+               ("MEI_DRV[%02d]: tx_link_rate[%d]=%d" MEI_DRV_CRLF, line_idx, i,
+                port_cell->tx_link_rate[i]));
       }
    }
 
@@ -183,6 +212,9 @@ int ltq_mei_atm_showtime_check(
       {
          *xdata_addr = g_xdata_addr[line_idx];
       }
+
+      PRN_DBG_USR_NL( MEI_NOTIFICATIONS, MEI_DRV_PRN_LEVEL_NORMAL,
+            ("MEI_DRV[%02d]: *xdata_addr=0x%08X" MEI_DRV_CRLF, line_idx, *xdata_addr));
    }
 
    return 0;

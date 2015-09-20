@@ -63,15 +63,24 @@ IFX_int32_t MEI_VRX_DSM_ErbAlloc(MEI_DEV_T *pMeiDev, IFX_uint32_t erb_buf_size)
 {
    IFX_int32_t ret = 0;
 
-   pMeiDev->meiERBbuf.pERB = NULL;
+   pMeiDev->meiERBbuf.pERB_virt = NULL;
+   pMeiDev->meiERBbuf.pERB_phy = NULL;
    pMeiDev->meiERBbuf.nERBsize_byte = 0;
    pMeiDev->meiERBbuf.pCallBackFunc = NULL;
 
    /* allocate continuous memory (take care to use uncached area!!!) */
-   pMeiDev->meiERBbuf.pERB =
-      (IFX_uint8_t*)MEI_DRVOS_NON_CACHED_MEM_ADDR(MEI_DRVOS_Malloc(erb_buf_size));
+   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10_320))
+   {
+      pMeiDev->meiERBbuf.pERB_virt = (IFX_uint8_t *)MEI_DRVOS_PCI_Malloc(erb_buf_size,
+                                         (dma_addr_t *)&pMeiDev->meiERBbuf.pERB_phy);
+   }
+   else
+   {
+      pMeiDev->meiERBbuf.pERB_virt =
+         (IFX_uint8_t*)MEI_DRVOS_NON_CACHED_MEM_ADDR(MEI_DRVOS_Malloc(erb_buf_size));
+   }
 
-   if (!pMeiDev->meiERBbuf.pERB)
+   if (!pMeiDev->meiERBbuf.pERB_virt)
    {
       PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
             ("MEI_DRV[0x%02X]: no memory for Error Reported Block size %d" MEI_DRV_CRLF,
@@ -82,7 +91,7 @@ IFX_int32_t MEI_VRX_DSM_ErbAlloc(MEI_DEV_T *pMeiDev, IFX_uint32_t erb_buf_size)
 
    PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL,
             ("MEI_DRV: ERB block addr = 0x%08X, size = %d [byte]" MEI_DRV_CRLF,
-            pMeiDev->meiERBbuf.pERB, pMeiDev->meiERBbuf.nERBsize_byte));
+            pMeiDev->meiERBbuf.pERB_virt, pMeiDev->meiERBbuf.nERBsize_byte));
 
    /* init the open instance mutex (semaphore) */
    MEI_DRVOS_SemaphoreInit(&pCallBackFuncAccessLock);
@@ -101,12 +110,22 @@ IFX_int32_t MEI_VRX_DSM_ErbAlloc(MEI_DEV_T *pMeiDev, IFX_uint32_t erb_buf_size)
 */
 IFX_void_t MEI_VRX_DSM_ErbFree(MEI_DEV_T *pMeiDev)
 {
-   if (pMeiDev->meiERBbuf.pERB)
+   if (pMeiDev->meiERBbuf.pERB_virt)
    {
-      MEI_DRVOS_Free(pMeiDev->meiERBbuf.pERB);
+      if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10_320))
+      {
+         MEI_DRVOS_PCI_Free(pMeiDev->meiERBbuf.nERBsize_byte,
+                            pMeiDev->meiERBbuf.pERB_virt,
+                            pMeiDev->meiERBbuf.pERB_phy);
+      }
+      else
+      {
+         MEI_DRVOS_Free(pMeiDev->meiERBbuf.pERB_virt);
+      }
    }
 
-   pMeiDev->meiERBbuf.pERB = NULL;
+   pMeiDev->meiERBbuf.pERB_virt = NULL;
+   pMeiDev->meiERBbuf.pERB_phy = NULL;
    pMeiDev->meiERBbuf.nERBsize_byte = 0;
 
    /* mutex exist */
@@ -128,7 +147,7 @@ IFX_void_t MEI_VRX_DSM_DataInit(MEI_DEV_T *pMeiDev)
    memset((IFX_uint8_t *)&pMeiDev->meiDsmConfig, 0x00, sizeof(IOCTL_MEI_dsmConfig_t));
    pMeiDev->bDsmConfigInit = IFX_FALSE;
    memset((IFX_uint8_t *)&pMeiDev->meiMacConfig, 0x00, sizeof(IOCTL_MEI_MacConfig_t));
-   memset((IFX_uint8_t *)pMeiDev->meiERBbuf.pERB, 0x00, 4);
+   memset((IFX_uint8_t *)(pMeiDev->meiERBbuf.pERB_virt), 0x00, 4);
 #if (MEI_DBG_DSM_PROFILING == 1)
    memset((IFX_uint8_t *)pMeiDev->meiDbgProfilingData, 0x00, sizeof(pMeiDev->meiDbgProfilingData));
    pMeiDev->bErbReset = IFX_TRUE;
@@ -263,9 +282,9 @@ IFX_int32_t MEI_VRX_DSM_MacConfigSet(MEI_DYN_CNTRL_T *pMeiDynCntrl, IOCTL_MEI_Ma
    memset(&sAck, 0x00, sizeof(sAck));
    sCmd.Length = 3;
 
-   sCmd.SrcMacAddrB0_1 = ((IFX_uint16_t *)pMacConfig->nMacAddress)[0];
-   sCmd.SrcMacAddrB2_3 = ((IFX_uint16_t *)pMacConfig->nMacAddress)[1];
-   sCmd.SrcMacAddrB4_5 = ((IFX_uint16_t *)pMacConfig->nMacAddress)[2];
+   sCmd.SrcMacAddrB0_1 = pMacConfig->nMacAddress[1] | (IFX_uint16_t)(pMacConfig->nMacAddress[0]) << 8;
+   sCmd.SrcMacAddrB2_3 = pMacConfig->nMacAddress[3] | (IFX_uint16_t)(pMacConfig->nMacAddress[2]) << 8;
+   sCmd.SrcMacAddrB4_5 = pMacConfig->nMacAddress[5] | (IFX_uint16_t)(pMacConfig->nMacAddress[4]) << 8;
 
    ret = MEI_InternalSendMessage(pMeiDynCntrl, CMD_MAC_FRAMECONFIGURE,
                                  sizeof(sCmd), (unsigned char *)&sCmd,
@@ -458,7 +477,7 @@ IFX_int32_t MEI_VRX_DSM_FwConfigSet(MEI_DYN_CNTRL_T *pMeiDynCntrl)
 */
 IFX_void_t MEI_VRX_DSM_EvtErbHandler(MEI_DEV_T *pMeiDev, EVT_DSM_ErrorVectorReady_t *pDsmErbParams)
 {
-   IFX_uint32_t *pMeiErrVecSize = (IFX_uint32_t *)pMeiDev->meiERBbuf.pERB;
+   IFX_uint32_t *pMeiErrVecSize = (IFX_uint32_t *)pMeiDev->meiERBbuf.pERB_virt;
    IFX_int32_t pp_err_code;
 #if (MEI_DBG_DSM_PROFILING == 1)
    u64 count_start, count_end;
@@ -512,7 +531,7 @@ IFX_void_t MEI_VRX_DSM_EvtErbHandler(MEI_DEV_T *pMeiDev, EVT_DSM_ErrorVectorRead
    MEI_DRVOS_SemaphoreLock(&pCallBackFuncAccessLock);
 
    /* Call PP driver callback function */
-   if ((pp_err_code = pMeiDev->meiERBbuf.pCallBackFunc((IFX_uint32_t *)pMeiDev->meiERBbuf.pERB)) < 0)
+   if ((pp_err_code = pMeiDev->meiERBbuf.pCallBackFunc((IFX_uint32_t *)pMeiDev->meiERBbuf.pERB_virt)) < 0)
    {
 #if (MEI_DBG_DSM_PROFILING == 1)
       count_end = MEI_Count0_read(pMeiDev);

@@ -96,7 +96,7 @@ IFX_int32_t MEI_IrqProtectCount = MEI_IRQ_PROTECT_COUNT;
 */
 IFX_uint32_t MEI_FsmStateSetMsgPreAction = 0;
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)) || (MEI_SUPPORT_DEVICE_VR10_320 == 1)
 /** device tree data */
 MEI_DEVCFG_DATA_T MEI_DevCfgData;
 #endif
@@ -112,6 +112,10 @@ MEI_DRV_PRN_INT_MODULE_CREATE(MEI_DRV, MEI_DRV_PRN_LEVEL_LOW);
 /* MEI CPE-Driver: fw message dump debug module - create print level variable */
 MEI_DRV_PRN_USR_MODULE_CREATE(MEI_MSG_DUMP_API, MEI_DRV_PRN_LEVEL_LOW);
 MEI_DRV_PRN_INT_MODULE_CREATE(MEI_MSG_DUMP_API, MEI_DRV_PRN_LEVEL_LOW);
+
+/* MEI CPE-Driver: notifications debug module - create print level variable */
+MEI_DRV_PRN_USR_MODULE_CREATE(MEI_NOTIFICATIONS, MEI_DRV_PRN_LEVEL_LOW);
+MEI_DRV_PRN_INT_MODULE_CREATE(MEI_NOTIFICATIONS, MEI_DRV_PRN_LEVEL_LOW);
 
 /* Block timeout (for debugging)
    0: timeout not blocked
@@ -248,10 +252,10 @@ MEI_STATIC IFX_int32_t MEI_WaitForFirstResponce(MEI_DEV_T *pMeiDev)
       default:
          /* invalid boot state */
          PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
-                ("MEI_DRV[%02d]: ERROR Wait for device - invalid drv state" MEI_DRV_CRLF,
-                  MEI_DRV_LINENUM_GET(pMeiDev)));
+                ("MEI_DRV[%02d]: ERROR Wait for device - invalid drv state %d" MEI_DRV_CRLF,
+                  MEI_DRV_LINENUM_GET(pMeiDev), MEI_DRV_STATE_GET(pMeiDev)));
 
-         return IFX_ERROR;
+         return -e_MEI_ERR_INVAL_STATE;
    }
 
    return ret;
@@ -353,7 +357,8 @@ MEI_STATIC IFX_void_t MEI_MeiDevCntrlFree(
                         (IFX_uint32_t)sizeof(MEI_MEI_REG_IF_U),
                         (IFX_uint8_t **)&(pMeiDevCntrl->meiIf[portIdx].pVirtMeiRegIf));
                   }
-                  else if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
+                  else if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10) ||
+                           MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10_320))
                   {
                      MEI_VR10_PcieEntityFree(pMeiXCntrl->entityNum);
                   }
@@ -398,7 +403,8 @@ MEIX_CNTRL_T *MEI_DevXCntrlStructAlloc(IFX_uint8_t entityNum)
 {
    MEIX_CNTRL_T  *pXCntrl = NULL;
 
-   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
+   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10) ||
+       MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10_320))
    {
       if (MEI_VR10_PcieEntitiesCheck(entityNum) != IFX_SUCCESS)
       {
@@ -574,7 +580,8 @@ MEI_DEV_T *MEI_DevLineStructAlloc( IFX_uint8_t nLineNum )
       /* save the device number for downloading firmware*/
       pMeiDev->fwDl.line_num = nLineNum;
 
-      if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
+      if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10) ||
+          MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10_320))
       {
          if (MEI_VR10_PcieEntityInit(&pMeiDev->meiDrvCntrl) != IFX_SUCCESS)
          {
@@ -1133,8 +1140,8 @@ IFX_int32_t MEI_CheckIoctlCmdSendState(
          {
             /* device is still not ready --> block commands */
             PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
-                   ("MEI_DRV[%02d-%02d]: ERROR ioctl - inval state, not ready for send !!!" MEI_DRV_CRLF,
-                    MEI_DRV_LINENUM_GET(pMeiDev), pMeiDynCntrl->openInstance));
+                   ("MEI_DRV[%02d-%02d]: ERROR ioctl - inval state %d, not ready for send !!!" MEI_DRV_CRLF,
+                    MEI_DRV_LINENUM_GET(pMeiDev), pMeiDynCntrl->openInstance, MEI_DRV_STATE_GET(pMeiDev)));
 
             retVal = -e_MEI_ERR_INVAL_STATE;
          }
@@ -1274,7 +1281,7 @@ IFX_int32_t MEI_IoctlDebugLevelSet(
    if ( (pArgDbgLevel->valLevel   >= MEI_DRV_PRN_LEVEL_LOW) &&
         (pArgDbgLevel->valLevel   <= MEI_DRV_PRN_LEVEL_OFF) &&
         (pArgDbgLevel->eDbgModule >= e_MEI_DBGMOD_MEI_DRV)  &&
-        (pArgDbgLevel->eDbgModule <= e_MEI_DBGMOD_MEI_MSG_DUMP_API) )
+        (pArgDbgLevel->eDbgModule <  e_MEI_DBGMOD_LAST) )
    {
       switch(pArgDbgLevel->eDbgModule)
       {
@@ -1286,6 +1293,11 @@ IFX_int32_t MEI_IoctlDebugLevelSet(
          case e_MEI_DBGMOD_MEI_MSG_DUMP_API:
             MEI_DRV_PRN_USR_LEVEL_SET(MEI_MSG_DUMP_API, pArgDbgLevel->valLevel);
             MEI_DRV_PRN_INT_LEVEL_SET(MEI_MSG_DUMP_API, pArgDbgLevel->valLevel);
+            break;
+
+         case e_MEI_DBGMOD_MEI_NOTIFICATIONS:
+            MEI_DRV_PRN_USR_LEVEL_SET(MEI_NOTIFICATIONS, pArgDbgLevel->valLevel);
+            MEI_DRV_PRN_INT_LEVEL_SET(MEI_NOTIFICATIONS, pArgDbgLevel->valLevel);
             break;
 
          default:
@@ -1328,7 +1340,8 @@ IFX_void_t MEI_IoctlRequestConfig(
    pArgDevCfg_out->currOpenInst = (unsigned int)pMeiDynCntrl->openInstance;
    pArgDevCfg_out->phyBaseAddr  = (unsigned int)MEI_DRV_MEI_PHY_ADDR_GET(pMeiDev);
    pArgDevCfg_out->virtBaseAddr = (unsigned int)MEI_DRV_MEI_VIRT_ADDR_GET(pMeiDev);
-   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
+   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10) ||
+       MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10_320))
    {
       pArgDevCfg_out->phyPDBRAMaddr  = (unsigned int)MEI_DRV_PDBRAM_PHY_ADDR_GET(pMeiDev);
       pArgDevCfg_out->virtPDBRAMaddr = (unsigned int)MEI_DRV_PDBRAM_VIRT_ADDR_GET(pMeiDev);
@@ -1598,7 +1611,7 @@ IFX_uint32_t MEI_DefaultInitDevice(
 
 /**
    Start the corresponding device
-   - release reset, unmask interrupts and wait for the first responce.
+   - release reset, unmask interrupts and wait for the first response.
 
 \param
    *pMeiDev  private device data
@@ -1920,7 +1933,9 @@ IFX_int32_t MEI_PollIntPerVrxLine(
    {
       if (pMeiDev->eModePoll == e_MEI_DEV_ACCESS_MODE_ACTIV_POLL)
       {
-         MEI_DRV_GET_UNIQUE_DRIVER_ACCESS(pMeiDev);
+         /* Exclude SMP platforms race contiditions caused driver access lock */
+         /* \TODO: investigate handling */
+         /* MEI_DRV_GET_UNIQUE_DRIVER_ACCESS(pMeiDev); */
          MEI_DRV_GET_UNIQUE_DEVICE_ACCESS(pMeiDev);
       }
       else
@@ -1932,7 +1947,9 @@ IFX_int32_t MEI_PollIntPerVrxLine(
 
       if (pMeiDev->eModePoll == e_MEI_DEV_ACCESS_MODE_ACTIV_POLL)
       {
-         MEI_DRV_RELEASE_UNIQUE_DRIVER_ACCESS(pMeiDev);
+         /* Exclude SMP platforms race contiditions caused driver access lock */
+         /* \TODO: investigate handling */
+         /* MEI_DRV_RELEASE_UNIQUE_DRIVER_ACCESS(pMeiDev); */
          MEI_DRV_RELEASE_UNIQUE_DEVICE_ACCESS(pMeiDev);
       }
       else
@@ -1960,7 +1977,7 @@ IFX_int32_t MEI_ProcessIntPerVrxLine(
    IFX_int32_t  processCnt = 0, gpIntCnt = 0;
    MEI_MeiRegVal_t processInt, intMask, tmpInt;
 #if (MEI_DBG_DSM_PROFILING == 1)
-   IFX_uint32_t *pMeiErrVecSize = (IFX_uint32_t *)pMeiDev->meiERBbuf.pERB;
+   IFX_uint32_t *pMeiErrVecSize = (IFX_uint32_t *)pMeiDev->meiERBbuf.pERB_virt;
 #endif
 
    if (MEI_DRV_MEI_IF_STATE_GET(pMeiDev) == e_MEI_MEI_HW_STATE_UP)
@@ -2451,7 +2468,7 @@ IFX_int32_t MEI_IoctlDevCfgFwModeSwap(
 #if 1
    MEI_DRV_GET_UNIQUE_DRIVER_ACCESS(pMeiDev);
 
-   /* set driver state "wait for first responce" */
+   /* set driver state "wait for first response" */
    MEI_DRV_STATE_SET(pMeiDev, e_MEI_DRV_STATE_WAIT_FOR_FIRST_RESP);
 
    MEI_DRV_RELEASE_UNIQUE_DRIVER_ACCESS(pMeiDev);
@@ -2464,11 +2481,11 @@ IFX_int32_t MEI_IoctlDevCfgFwModeSwap(
       return -e_MEI_ERR_OP_FAILED;
    }
 
-   /* wait for first responce */
+   /* wait for first response */
    if ( MEI_WaitForFirstResponce(pMeiDev) != IFX_SUCCESS)
    {
       PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
-             ("MEI_DRV[%02d]: SWAP FW failure - no responce!!!" MEI_DRV_CRLF,
+             ("MEI_DRV[%02d]: SWAP FW failure - no response!!!" MEI_DRV_CRLF,
              MEI_DRV_LINENUM_GET(pMeiDev)));
    }
 

@@ -639,7 +639,7 @@ extern IFX_int32_t MEI_InternalCmdMsgWrite(
       Error:
          -e_MEI_ERR_RETURN_ARG:     cannot return arguments
          -e_MEI_ERR_DEV_NEG_RESP:   negative acknowledge
-         -e_MEI_ERR_DEV_INVAL_RESP: invalid responce.
+         -e_MEI_ERR_DEV_INVAL_RESP: invalid response.
 
    \remarks
       This function should be only used within driver layer, internal access

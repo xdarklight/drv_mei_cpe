@@ -47,8 +47,11 @@ typedef enum
 /** Error Reported Block - dynamic buffer */
 typedef struct
 {
-   /** Error Reported Block */
-   IFX_uint8_t *pERB;
+   /** Error Reported Block virtual address */
+   IFX_uint8_t *pERB_virt;
+
+   /** Error Reported Block physical address */
+   IFX_uint8_t *pERB_phy;
 
    /** Error Reported Block length in bytes   */
    IFX_uint32_t nERBsize_byte;

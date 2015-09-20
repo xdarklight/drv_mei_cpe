@@ -55,8 +55,13 @@ extern "C"
    Module      :  PPE
    Module      :  GPIO
    ========================================================================= */
+#if (MEI_SUPPORT_DEVICE_VR10_320 != 1)
 #define MEI_PCIE_PERIPHERIAL(mod_offset)  \
 (KSEG1 | MEI_DRV_PCIE_PHY_MEMBASE_GET(&pMeiDev->meiDrvCntrl) | (mod_offset))
+#else
+#define MEI_PCIE_PERIPHERIAL(mod_offset)  \
+(KSEG1 | MEI_DRV_PCIE_VIRT_MEMBASE_GET(&pMeiDev->meiDrvCntrl) | (mod_offset))
+#endif
 #define PPE_SB_OFFSET                    0x12000
 #define PPE_SB_RAM_BLOCK_4_OFFSET        0x6000
 #define PPE_FORCE_LINK_DOWN              0x7DC1

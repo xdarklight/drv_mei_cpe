@@ -62,7 +62,7 @@
 #  error "OS type not defined!!!"
 #endif
 
-#if defined(LINUX)
+#if defined(LINUX) && (MEI_SUPPORT_DEVICE_VR10_320 != 1)
 #define MEI_DRVOS_NON_CACHED_MEM_ADDR(x)   KSEG1ADDR(x)
 #else
 #define MEI_DRVOS_NON_CACHED_MEM_ADDR(x)   (x)

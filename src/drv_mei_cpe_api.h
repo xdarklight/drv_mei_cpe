@@ -67,7 +67,7 @@
 
 /** default startup cfg: max wait time for the MODEM READY online msg (bootmode 7) */
 #define MEI_CFG_DEF_WAIT_FOR_MODEM_READY_BM7_SEC    4000
-/** default startup cfg: max wait time for normal msg responce */
+/** default startup cfg: max wait time for normal msg response */
 #define MEI_CFG_DEF_WAIT_FOR_DEVICE_RESPONCE         2000
 
 /*
@@ -133,7 +133,6 @@
 #endif
 
 #if (MEI_DRV_OS_BYTE_ORDER == MEI_DRV_OS_BIG_ENDIAN)
-
 /** Swap the hi/lo 16 bit word (DMA access width) */
 #define SWAP32_DMA_WIDTH_ORDER(x)  ( (((x)&0xFFFF0000)>>16)  \
                                    | (((x)&0x0000FFFF)<<16) )
@@ -158,8 +157,11 @@
                                     (((xl) & 0x00ff0000) >>  8) | \
                                     (((xl) & 0xff000000) >> 24))
 
-#else
+/* swap a value to big endian */
+#define MEI_SWAP_TO_BIG_S
+#define MEI_SWAP_TO_BIG_L
 
+#else
 /** Swap the hi/lo 16 bit word (DMA access width) */
 #define SWAP32_DMA_WIDTH_ORDER
 /** Swap 32 bit */
@@ -171,8 +173,16 @@
 #define MEI_SWAP_TO_LITTLE_S
 #define MEI_SWAP_TO_LITTLE_L
 
-#endif      /* #if (MEI_DRV_OS_BYTE_ORDER == MEI_DRV_OS_BIG_ENDIAN) */
+/* swap a value to big endian */
+#define MEI_SWAP_TO_BIG_S(xs)  ((((xs) & 0x00FF) << 8) | \
+                                (((xs) & 0xFF00) >> 8))
 
+#define MEI_SWAP_TO_BIG_L(xl)  ((((xl) & 0x000000ff) << 24) | \
+                                (((xl) & 0x0000ff00) <<  8) | \
+                                (((xl) & 0x00ff0000) >>  8) | \
+                                (((xl) & 0xff000000) >> 24))
+
+#endif      /* #if (MEI_DRV_OS_BYTE_ORDER == MEI_DRV_OS_BIG_ENDIAN) */
 
 /* ==========================================================================
    Global macros - lock handling
@@ -349,7 +359,23 @@
 #define MEI_DRV_MEI_IF_STATE_SET(pMeiDev, new_meiif_state) \
                         (pMeiDev)->meiDrvCntrl.pMeiIfCntrl->eMeiHwState = new_meiif_state
 
+/** set BAR register type */
+#define MEI_BAR_TYPE_SET(pMeiDevm, barIdx, val) \
+                        (pMeiDev)->fwDl.eBarType[barIdx] = val;
 
+/** get BAR register type */
+#define MEI_BAR_TYPE_GET(pMeiDevm, barIdx) \
+                        (pMeiDev)->fwDl.eBarType[barIdx]
+
+#if (MEI_PREDEF_DBG_BAR == 1)
+/** set BAR register debug addr */
+#define MEI_BAR_DBG_ADDR_SET(pMeiDevm, barIdx, val) \
+                        (pMeiDev)->fwDl.dbgBarAddr[barIdx] = val;
+
+/** get BAR register debug addr */
+#define MEI_BAR_DBG_ADDR_GET(pMeiDevm, barIdx) \
+                        (pMeiDev)->fwDl.dbgBarAddr[barIdx]
+#endif /* (MEI_PREDEF_DBG_BAR == 1) */
 
 /** set the MEI driver state for this channel */
 #define MEI_TRACE_DRV_STATE_CHANGES   0
@@ -668,8 +694,9 @@ typedef enum
    /** VR9 (xrx200) */
    e_MEI_DEV_PLATFORM_CONFIG_VR9       = 1,
    /** VR10 (xrx300, smartphy) */
-   e_MEI_DEV_PLATFORM_CONFIG_VR10      = 2
-
+   e_MEI_DEV_PLATFORM_CONFIG_VR10      = 2,
+   /** VR10_320 (xrx320) */
+   e_MEI_DEV_PLATFORM_CONFIG_VR10_320  = 4
 } MEI_DEV_PLATFORM_CONFIG_E;
 
 /* ==========================================================================
@@ -964,7 +991,7 @@ typedef struct MEI_dev_s
 #endif
 } MEI_DEV_T;
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)) || (MEI_SUPPORT_DEVICE_VR10_320 == 1)
 typedef struct MEI_devcfg_data_s
 {
    IFX_uint32_t               nIrq;
@@ -1062,7 +1089,7 @@ extern IFX_int32_t MEI_IrqProtectCount;
 /** what string */
 extern const char MEI_WHATVERSION[] ;
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)) || (MEI_SUPPORT_DEVICE_VR10_320 == 1)
 /** device tree data */
 extern MEI_DEVCFG_DATA_T MEI_DevCfgData;
 #endif
@@ -1071,9 +1098,13 @@ extern MEI_DEVCFG_DATA_T MEI_DevCfgData;
 MEI_DRV_PRN_USR_MODULE_DECL(MEI_DRV);
 MEI_DRV_PRN_INT_MODULE_DECL(MEI_DRV);
 
-/* MEI CPE-Driver: fw message dump debug module - create print level variable */
+/* MEI CPE-Driver: fw message dump debug module - declare print level variable */
 MEI_DRV_PRN_USR_MODULE_DECL(MEI_MSG_DUMP_API);
 MEI_DRV_PRN_INT_MODULE_DECL(MEI_MSG_DUMP_API);
+
+/* MEI Driver: notifications debug module - declare print level variable */
+MEI_DRV_PRN_USR_MODULE_DECL(MEI_NOTIFICATIONS);
+MEI_DRV_PRN_INT_MODULE_DECL(MEI_NOTIFICATIONS);
 
 /** define the boot mode */
 extern IFX_int32_t  MEI_BlockTimeout;

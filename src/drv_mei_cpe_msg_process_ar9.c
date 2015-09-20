@@ -1269,7 +1269,7 @@ MEI_STATIC IFX_void_t MEI_FreeNextRdNfcMsg(
    Error:   negative value
       -e_MEI_ERR_RETURN_ARG:     cannot return arguments
       -e_MEI_ERR_DEV_NEG_RESP:   not successful functional operation code
-      -e_MEI_ERR_DEV_INVAL_RESP: invalid responce.
+      -e_MEI_ERR_DEV_INVAL_RESP: invalid response.
 
 */
 MEI_STATIC IFX_int32_t MEI_DriverMsgRead(
@@ -1356,7 +1356,7 @@ MEI_STATIC IFX_int32_t MEI_DriverMsgRead(
    Error:   negative value
       -e_MEI_ERR_RETURN_ARG:     cannot return arguments
       -e_MEI_ERR_DEV_NEG_RESP:   not successful functional operation code
-      -e_MEI_ERR_DEV_INVAL_RESP: invalid responce.
+      -e_MEI_ERR_DEV_INVAL_RESP: invalid response.
 
 */
 MEI_STATIC IFX_int32_t MEI_ModemNfcRead(
@@ -1568,8 +1568,8 @@ IFX_boolean_t MEI_MailboxLoop( MEI_DEV_T *pMeiDev,
    pMeiDev  points to the current VRX device.
 
 \return
-   IFX_SUCCESS:   responce received.
-   IFX_ERROR:     no responce received - timeout
+   IFX_SUCCESS:   response received.
+   IFX_ERROR:     no response received - timeout
 */
 IFX_int32_t MEI_WaitForMailbox(MEI_DEV_T *pMeiDev)
 {
@@ -1688,7 +1688,7 @@ IFX_int32_t MEI_WriteMailbox( MEI_DYN_CNTRL_T    *pMeiDynCntrl,
       }
    }
 
-   /* first - protect the access against other user and wait for responce form modem */
+   /* first - protect the access against other user and wait for response form modem */
    MEI_DRV_GET_UNIQUE_DRIVER_ACCESS(pMeiDev);
 
    /* check now if the mailbox is free */
@@ -2545,7 +2545,7 @@ IFX_int32_t MEI_IoctlCmdMsgWrite(
    Error:
       -e_MEI_ERR_RETURN_ARG:     cannot return arguments
       -e_MEI_ERR_DEV_NEG_RESP:   negative acknowledge
-      -e_MEI_ERR_DEV_INVAL_RESP: invalid responce.
+      -e_MEI_ERR_DEV_INVAL_RESP: invalid response.
 */
 IFX_int32_t MEI_IoctlAckMsgRead(
                               MEI_DYN_CNTRL_T     *pMeiDynCntrl,
@@ -2929,7 +2929,7 @@ IFX_int32_t MEI_IoctlMsgSend(
    Error:   negative value
       -e_MEI_ERR_RETURN_ARG:     cannot return arguments
       -e_MEI_ERR_DEV_NEG_RESP:   not successful functional operation code
-      -e_MEI_ERR_DEV_INVAL_RESP: invalid responce.
+      -e_MEI_ERR_DEV_INVAL_RESP: invalid response.
 
 */
 IFX_int32_t MEI_IoctlNfcMsgRead(
@@ -3121,7 +3121,7 @@ MEI_WRITE_MSG_ERROR:
    Error:
       -e_MEI_ERR_RETURN_ARG:     cannot return arguments
       -e_MEI_ERR_DEV_NEG_RESP:   negative acknowledge
-      -e_MEI_ERR_DEV_INVAL_RESP: invalid responce.
+      -e_MEI_ERR_DEV_INVAL_RESP: invalid response.
 
 */
 IFX_int32_t MEI_IoctlRawAckRead( MEI_DYN_CNTRL_T *pMeiDynCntrl,

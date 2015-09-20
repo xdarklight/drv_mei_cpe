@@ -2121,7 +2121,7 @@ int MEI_mac_set(MEIOS_File_t *streamOut, int fd, char *pMAC)
 int MEI_dbg_lvl_set(MEIOS_File_t *streamOut, int fd, char *pConfig)
 {
    IOCTL_MEI_dbgLevel_t dbg_lvl;
-   char* dbg_module[2] = {"MEI_DRV", "MEI_MSG_DUMP_API"};
+   char* dbg_module[3] = {"MEI_DRV", "MEI_MSG_DUMP_API", "MEI_NOTIFICATIONS"};
    char* dbg_level[4] = {"LOW", "NORMAL", "HIGH", "OFF"};
 
    memset(&dbg_lvl, 0x0, sizeof(IOCTL_MEI_dbgLevel_t));

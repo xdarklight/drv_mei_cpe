@@ -1,22 +1,61 @@
 NEXT VERSION
 
-V1.4.8.4 - 2014-03-11
-common:
-- VRX (DSLCPE_SW-788) Rework implementation for LIF detection of the GPIO handling
-  + excluded common GPIO framework added with DSLCPE_SW-705
+V1.4.9.7 - 2015-04-22
+Bug fix(es):
+- VRX (DSLCPE_SW-873) Correct missing cleanup of procfs entries
+  (meminfo/bar_usr_dbg) within MEI_module_exit
 
-V1.4.8.3 - 2014-02-27
+V1.4.9.6 - 2015-04-20
 common:
-- (DSLCPE_SW-785) Extend interface between DSL and PP subsystem to use line number.
-  + extended parameters list of showtime enter/exit/check functions.
+- VRX (DSLCPE_SW-799) Add debug functionality to set "unused" BAR registers to
+  special values
+  + added proc entry meminfo (get BAR config) and bar_usr_dbg (set BAR config)
+- VRX (DSLCPE_SW-867) D7800/VRX320: DCT Tool not working: as soon as the DCT is
+  connected, DSL showtime is lost.
+  + extensions to avoid firmware messages transmitting within firmware download
+  + excluded driver access lock for active polling to prevent SMP race conditions
 
-V1.4.8.2 - 2014-02-10
+V1.4.9.5 - 2014-08-11
+Bug fix(es):
+- Fixed memory free handling for PCIe case of VRX320
+
+V1.4.9.4 - 2014-07-31
+- VRX320 (DSLCPE_SW-811) Bug fixes related to endianess handling
+  + ERB length check does not need any endianess handling (written via PCIe and
+    host CPU dirtectly in host endianess)
+  + MAC address configuration adapted to fix wrong octet mapping
+
+V1.4.9.3 - 2014-07-30
+- VRX320 (DSLCPE_SW-811) Bug fixes related to endianess handling
+  + Fixed wrong MAC address firmware message payload format
+  + Extended ERB buffer handling (size check) with endianess check
+- VRX320 (DSLCPE_SW-813) Take care that non-cached memory is used for BAR
+  register allocation
+  + added MEI_DRVOS_PCI_Malloc/MEI_DRVOS_PCI_Free for VRX320
+- Use active polling mode for VRX320
+
+V1.4.9.2 - 2014-04-01
+- VRX320 (DSLCPE_SW-790) Changes for QCA platform
+  + included DSL/PP related interface functions
+
+V1.4.9.1 - 2014-03-21
 common:
-- VRX (DSLCPE_SW-770) Klocwork reworks/fixes for UGW-6.1
+- VRX320 (DSLCPE_SW-790) Changes for QCA platform
+  + added new device VR10_320 platform
+  + extended endianess handling for little endian
+  + extended address translation to intrernal ARC format
 
-V1.4.8.1 - 2014-01-23
+V1.4.9 - 2014-03-12
 common:
 - Removed line number from DSL/PP interface in case of bonding
+- VRX (DSLCPE_SW-770) Klocwork reworks/fixes for UGW-6.1
+- (DSLSPE_SW-771) Extend debugging functionality and take care that it is
+  working completely
+  + extended showtime enter/exit debug prints with new debug level
+- (DSLCPE_SW-785) Extend interface between DSL and PP subsystem to use line number.
+  + extended parameters list of showtime enter/exit/check functions.
+- VRX (DSLCPE_SW-788) Rework implementation for LIF detection of the GPIO handling
+  + excluded common GPIO framework added with DSLCPE_SW-705
 
 V1.4.8 - 2014-01-10
 common:

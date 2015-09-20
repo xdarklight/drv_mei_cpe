@@ -32,8 +32,14 @@
 
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2,6,17))
    #if (LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0))
-      #include <linux/utsrelease.h>
-      #include <asm/ifx/ifx_pmu.h>
+      #if (MEI_SUPPORT_DEVICE_VR10_320 != 1)
+         #include <linux/utsrelease.h>
+         #include <asm/ifx/ifx_pmu.h>
+      #else
+         #include <generated/utsrelease.h>
+         #include <linux/pmu.h>
+         #include <linux/clk.h>
+      #endif
    #else
       #include <generated/utsrelease.h>
       #include <linux/clk.h>
@@ -106,9 +112,13 @@
 /* Local function declarations (LINUX) */
 /* =================================== */
 
+#if (MEI_SUPPORT_DEVICE_VR10_320 != 1)
 static int __init MEI_module_init(void);
+#else
+static int MEI_module_init(void);
+#endif
 
-#if (MEI_DRV_LKM_ENABLE == 1)
+#if (MEI_DRV_LKM_ENABLE == 1) && (MEI_SUPPORT_DEVICE_VR10_320 != 1)
 static void __exit MEI_module_exit(void);
 #else
 static void MEI_module_exit(void);
@@ -320,7 +330,8 @@ static IFX_int32_t MEI_CpeDevOpen( IFX_int8_t nLineNum, struct file *filp)
    */
    filp->private_data = (void*)pDynCntrl;
 
-   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
+   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10) ||
+       MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10_320))
    {
       /* Init VR10 device (set mei base addr, pdbram base addr, irq) */
       /* Necessary addresses provided by pcie driver */
@@ -1546,6 +1557,188 @@ static void MEI_GetNfcProcPerDev(struct seq_file *s)
 }
 #endif
 
+/**
+   Read the memory status information from the driver.
+
+\param
+   buf   destination buffer
+
+\param
+   entity MEIx device
+
+\return
+  length
+*/
+static void MEI_MeminfoProcPerDevGet(struct seq_file *s)
+{
+   int devNum;
+   MEI_DEV_T *pMeiDev;
+   struct proc_entry *p = s->private;
+   int entity = p->entity;
+
+   MEI_FW_DOWNLOAD_CNTRL_T *pFwDlCtrl;
+   MEI_FW_IMAGE_CHUNK_CTRL_T *pChunk;
+   MEI_MEI_DRV_CNTRL_T *pMeiDrvCntrl;
+   IFX_uint32_t chunkIdx, barIdx, currBAR;
+   IFX_uint8_t *ppPDBRAM = (IFX_uint8_t *)(MEI_INTERNAL_ADDRESS_BASE + MEI_PDBRAM_OFFSET);
+
+   if ((entity < MEI_MAX_DFEX_ENTITIES) && (MEIX_Cntrl[entity] != NULL))
+   {
+      for (devNum=0; devNum<MEI_MAX_DFE_INSTANCE_PER_ENTITY; devNum++)
+      {
+         if (MEIX_Cntrl[entity]->MeiDevice[devNum] != NULL)
+         {
+            pMeiDev = MEIX_Cntrl[entity]->MeiDevice[devNum];
+            pMeiDrvCntrl = &(pMeiDev->meiDrvCntrl);
+            pFwDlCtrl = &(pMeiDev->fwDl);
+            pChunk = pMeiDev->fwDl.imageChunkCtrl;
+
+            for (chunkIdx = 0; chunkIdx < pFwDlCtrl->meiMaxChunkCount; chunkIdx++)
+            {
+               if (pChunk[chunkIdx].eImageChunkType == eMEI_FW_IMAGE_CHUNK_UNDEFINED)
+                  continue;
+
+               seq_printf(s, "chunk[%02d]: addr = 0x%08X (0x%08X), "
+                     "size = %5d [byte], type = %d" MEI_DRV_CRLF,
+                     chunkIdx, pChunk[chunkIdx].pImageChunk_aligned,
+                     pChunk[chunkIdx].pImageChunk_allocated,
+                     pChunk[chunkIdx].imageChunkSize_byte,
+                     pChunk[chunkIdx].eImageChunkType);
+            }
+
+            seq_printf(s, MEI_DRV_CRLF);
+
+            for (barIdx = 0; barIdx < MEI_TOTAL_BAR_REGISTER_COUNT; barIdx++)
+            {
+               currBAR = 0x1FFFFFFF & MEI_REG_ACCESS_ME_XMEM_BAR_GET(pMeiDrvCntrl, barIdx);
+
+               seq_printf(s, "BAR[%02d] = 0x%08X", barIdx, currBAR);
+
+               switch(MEI_BAR_TYPE_GET(pMeiDev, barIdx))
+               {
+                  case eMEI_BAR_TYPE_UNUSED:
+                     seq_printf(s, " (unused)");
+                     break;
+
+                  case eMEI_BAR_TYPE_USER:
+                     seq_printf(s, " (user debug)");
+                     break;
+
+                  case eMEI_BAR_TYPE_PDBRAM:
+                     if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10) && (barIdx < 3))
+                     {
+                        if (currBAR == (0x1FFFFFFF & ((IFX_int32_t)ppPDBRAM + barIdx*MEI_FW_IMAGE_CHUNK_SIZE_BYTE)))
+                        {
+                           /* BAR0, BAR1, BAR2 are points to PDBRAM */
+                           seq_printf(s, " (-> PDBRAM+0x%05X)", barIdx*MEI_FW_IMAGE_CHUNK_SIZE_BYTE);
+                        }
+                     }
+                     break;
+
+#if (MEI_SUPPORT_DSM == 1)
+                  case eMEI_BAR_TYPE_ERB:
+                     seq_printf(s, " (-> ERB block)");
+                     break;
+#endif /* (MEI_SUPPORT_DSM == 1) */
+
+                  case eMEI_BAR_TYPE_CHUNK:
+                  case eMEI_BAR_TYPE_SPECIAL:
+                        for(chunkIdx = 0; chunkIdx < pFwDlCtrl->meiMaxChunkCount; chunkIdx++)
+                        {
+                           if (currBAR == (0x1FFFFFFF & (IFX_int32_t)pChunk[chunkIdx].pBARx))
+                           {
+                              seq_printf(s, " (-> chunk[%02d])", chunkIdx);
+                              break;
+                           }
+                        }
+                        break;
+
+                  default:
+                     seq_printf(s, " (-> unknown BAR type)");
+               }
+               seq_printf(s, MEI_DRV_CRLF);
+            }
+         }
+      }
+   }
+}
+
+#if (MEI_PREDEF_DBG_BAR == 1)
+static int MEI_BarUsrDbgProcPerDevSet(struct file *file,
+                  const char *buf, size_t count, loff_t *ppos)
+{
+   int devNum;
+   MEI_DEV_T *pMeiDev;
+   struct seq_file *s = file->private_data;
+   struct proc_entry *p = s->private;
+   int entity = p->entity;
+   char proc_str[16] = { '\0' };
+   int barIdx = -1;
+   uint32_t bar_addr = 0;
+
+   if ((entity < MEI_MAX_DFEX_ENTITIES) && (MEIX_Cntrl[entity] != NULL))
+   {
+      for (devNum=0; devNum<MEI_MAX_DFE_INSTANCE_PER_ENTITY; devNum++)
+      {
+         if (MEIX_Cntrl[entity]->MeiDevice[devNum] != NULL)
+         {
+            pMeiDev = MEIX_Cntrl[entity]->MeiDevice[devNum];
+
+            if (count > sizeof(proc_str) - 1)
+            {
+               return -EINVAL;
+            }
+
+            if (copy_from_user(proc_str, buf, count))
+            {
+               return -EFAULT;
+            }
+
+            proc_str[count] = 0;
+
+            sscanf(proc_str, "%d %x", &barIdx, &bar_addr);
+
+            if ((barIdx >= MEI_TOTAL_BAR_REGISTER_COUNT) || (barIdx < 0))
+            {
+               PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_OFF,
+                     ("BAR register set: BAR[%02d] invalid index " MEI_DRV_CRLF, barIdx));
+               break;
+            }
+
+            if ((MEI_BAR_TYPE_GET(pMeiDev, barIdx) == eMEI_BAR_TYPE_USER) ||
+                (MEI_BAR_TYPE_GET(pMeiDev, barIdx) == eMEI_BAR_TYPE_UNUSED))
+            {
+               PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_OFF,
+                     ("BAR register set: BAR[%02d]=0x%08X" MEI_DRV_CRLF, barIdx, bar_addr));
+               PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_OFF,
+                     ("Please note that changes will be valid after link restart only!"
+                      MEI_DRV_CRLF));
+
+               MEI_REG_ACCESS_ME_XMEM_BAR_SET(&(pMeiDev->meiDrvCntrl), barIdx, bar_addr);
+               MEI_BAR_DBG_ADDR_SET(pMeiDev, barIdx, bar_addr);
+
+               if (bar_addr == 0)
+               {
+                  MEI_BAR_TYPE_SET(pMeiDev, barIdx, eMEI_BAR_TYPE_UNUSED);
+               }
+               else
+               {
+                  MEI_BAR_TYPE_SET(pMeiDev, barIdx, eMEI_BAR_TYPE_USER);
+               }
+            }
+            else
+            {
+               PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_OFF,
+                     ("BAR register set: BAR[%02d] already in use " MEI_DRV_CRLF, barIdx));
+            }
+         }
+      }
+   }
+
+   return count;
+}
+#endif /* (MEI_PREDEF_DBG_BAR == 1) */
+
 static int mei_seq_single_show(struct seq_file *s, void *v)
 {
    struct proc_entry *p = s->private;
@@ -1582,6 +1775,11 @@ static struct proc_entry proc_entry_version = {"version", MEI_GetVersionProc, NU
 static struct proc_entry proc_entry_status[MEI_MAX_DFEX_ENTITIES];
 #if (MEI_SUPPORT_DRV_NFC_DEBUG == 1)
 static struct proc_entry proc_entry_nfc[MEI_MAX_DFEX_ENTITIES];
+#endif
+
+static struct proc_entry proc_entry_meminfo[MEI_MAX_DFEX_ENTITIES];
+#if (MEI_PREDEF_DBG_BAR == 1)
+static struct proc_entry proc_entry_bar_usr_dbg[MEI_MAX_DFEX_ENTITIES];
 #endif
 
 /**
@@ -1663,6 +1861,48 @@ static int MEI_InstallProcEntry(unsigned char devNum)
    }
 #endif
 
+   driver_status_proc_node = proc_mkdir( "driver/" DRV_MEI_NAME "/meminfo", NULL);
+   if (driver_status_proc_node != NULL)
+   {
+      for (entity = 0; entity < MEI_MAX_DFEX_ENTITIES; entity++)
+      {
+         char buf[8];
+         sprintf(buf,"%02d",entity);
+         strcpy(proc_entry_meminfo[entity].name, buf);
+         proc_entry_meminfo[entity].entity = entity;
+         proc_entry_meminfo[entity].rd = MEI_MeminfoProcPerDevGet;
+         mei_proc_entry_create(driver_status_proc_node, &proc_entry_meminfo[entity]);
+      }
+   }
+   else
+   {
+      PRN_DBG_USR_NL( MEI_DRV,MEI_DRV_PRN_LEVEL_HIGH,
+            ("MEI_DRV: cannot create proc entry meminfo" MEI_DRV_CRLF));
+      return -e_MEI_ERR_DEV_INIT;
+   }
+
+#if (MEI_PREDEF_DBG_BAR == 1)
+   driver_status_proc_node = proc_mkdir( "driver/" DRV_MEI_NAME "/bar_usr_dbg", NULL);
+   if (driver_status_proc_node != NULL)
+   {
+      for (entity = 0; entity < MEI_MAX_DFEX_ENTITIES; entity++)
+      {
+         char buf[8];
+         sprintf(buf,"%02d",entity);
+         strcpy(proc_entry_bar_usr_dbg[entity].name, buf);
+         proc_entry_bar_usr_dbg[entity].entity = entity;
+         proc_entry_bar_usr_dbg[entity].wr = MEI_BarUsrDbgProcPerDevSet;
+         mei_proc_entry_create(driver_status_proc_node, &proc_entry_bar_usr_dbg[entity]);
+      }
+   }
+   else
+   {
+      PRN_DBG_USR_NL( MEI_DRV,MEI_DRV_PRN_LEVEL_HIGH,
+            ("MEI_DRV: cannot create proc entry meminfo" MEI_DRV_CRLF));
+      return -e_MEI_ERR_DEV_INIT;
+   }
+#endif /* (MEI_PREDEF_DBG_BAR == 1) */
+
    return 0;
 }
 #endif
@@ -1672,8 +1912,6 @@ static int __exit ltq_dsl_cpe_mei_remove(struct platform_device *pdev)
 {
    MEI_module_exit();
 
-   /* clear platform */
-   MEI_DEVICE_CFG_VALUE_SET(platform, e_MEI_DEV_PLATFORM_CONFIG_UNKNOWN);
    return 0;
 }
 
@@ -1740,18 +1978,24 @@ static int __init ltq_dsl_cpe_mei_probe(struct platform_device *pdev)
    \remark
    Called by the kernel.
 */
-extern IFX_uint32_t MEI_PrnUsrModule_MEI_MSG_DUMP_API;
+#if (MEI_SUPPORT_DEVICE_VR10_320 != 1)
 static int __init MEI_module_init (void)
+#else
+static int MEI_module_init (void)
+#endif
 {
    int result;
 
-   printk(KERN_INFO "%s, (c) 2013 Lantiq Deutschland GmbH", &MEI_WHATVERSION[4]);
+   printk(KERN_INFO "%s, (c) 2014 Lantiq Deutschland GmbH", &MEI_WHATVERSION[4]);
 
    MEI_DRV_PRN_USR_LEVEL_SET(MEI_DRV, debug_level);
    MEI_DRV_PRN_INT_LEVEL_SET(MEI_DRV, debug_level);
 
    MEI_DRV_PRN_USR_LEVEL_SET(MEI_MSG_DUMP_API, debug_level);
    MEI_DRV_PRN_INT_LEVEL_SET(MEI_MSG_DUMP_API, debug_level);
+
+   MEI_DRV_PRN_USR_LEVEL_SET(MEI_NOTIFICATIONS, debug_level);
+   MEI_DRV_PRN_INT_LEVEL_SET(MEI_NOTIFICATIONS, debug_level);
 
 #if (MEI_SUPPORT_ROM_CODE == 1)
    MEI_DRV_PRN_USR_LEVEL_SET(MEI_ROM, debug_level);
@@ -1763,7 +2007,11 @@ static int __init MEI_module_init (void)
 
    MEI_FsmStateSetMsgPreAction = (IFX_uint32_t)(fsm_set_pre_action & MEI_FSM_STATE_SET_PRE_ACT_ALL);
 
-   /* ============================================
+#if (MEI_SUPPORT_DEVICE_VR10_320 == 1)
+   MEI_DEVICE_CFG_VALUE_SET(platform, e_MEI_DEV_PLATFORM_CONFIG_VR10_320);
+#endif
+
+/* ============================================
       register device
       ============================================ */
    result = MEI_InitModuleRegCharDev(DRV_MEI_NAME);
@@ -1794,7 +2042,7 @@ static int __init MEI_module_init (void)
    \remark
    Called by the kernel.
 */
-#if (MEI_DRV_LKM_ENABLE == 1)
+#if (MEI_DRV_LKM_ENABLE == 1) && (MEI_SUPPORT_DEVICE_VR10_320 != 1)
 static void __exit MEI_module_exit (void)
 #else
 static void MEI_module_exit (void)
@@ -1943,6 +2191,32 @@ static void MEI_module_exit (void)
    remove_proc_entry(path ,0);
 #endif /* (MEI_SUPPORT_DRV_NFC_DEBUG == 1) */
 
+   for (entity = 0; entity < MEI_MAX_DFEX_ENTITIES; entity++)
+   {
+      sprintf(path, "%s%s%s/%02d", "driver/", DRV_MEI_NAME, "/meminfo", entity);
+      PRN_DBG_USR_NL( MEI_DRV,MEI_DRV_PRN_LEVEL_HIGH,
+            ("MEI_DRV: remove procfs entry: %s" MEI_DRV_CRLF, path));
+      remove_proc_entry(path ,0);
+   }
+   sprintf(path, "%s%s%s", "driver/", DRV_MEI_NAME, "/meminfo");
+   PRN_DBG_USR_NL( MEI_DRV,MEI_DRV_PRN_LEVEL_HIGH,
+         ("MEI_DRV: remove procfs entry: %s" MEI_DRV_CRLF, path));
+   remove_proc_entry(path ,0);
+
+#if (MEI_PREDEF_DBG_BAR == 1)
+   for (entity = 0; entity < MEI_MAX_DFEX_ENTITIES; entity++)
+   {
+      sprintf(path, "%s%s%s/%02d", "driver/", DRV_MEI_NAME, "/bar_usr_dbg", entity);
+      PRN_DBG_USR_NL( MEI_DRV,MEI_DRV_PRN_LEVEL_HIGH,
+            ("MEI_DRV: remove procfs entry: %s" MEI_DRV_CRLF, path));
+      remove_proc_entry(path ,0);
+   }
+   sprintf(path, "%s%s%s", "driver/", DRV_MEI_NAME, "/bar_usr_dbg");
+   PRN_DBG_USR_NL( MEI_DRV,MEI_DRV_PRN_LEVEL_HIGH,
+         ("MEI_DRV: remove procfs entry: %s" MEI_DRV_CRLF, path));
+   remove_proc_entry(path ,0);
+#endif /* (MEI_PREDEF_DBG_BAR == 1) */
+
    sprintf(path, "%s%s%s", "driver/", DRV_MEI_NAME, "/config");
    PRN_DBG_USR_NL( MEI_DRV,MEI_DRV_PRN_LEVEL_HIGH,
          ("MEI_DRV: remove procfs entry: %s" MEI_DRV_CRLF, path));
@@ -1967,6 +2241,10 @@ static void MEI_module_exit (void)
 
    /* touch one time this variable to avoid that the linker will remove it */
    debug_level = MEI_DRV_PRN_LEVEL_OFF;
+
+   /* clear platform */
+   MEI_DEVICE_CFG_VALUE_SET(platform, e_MEI_DEV_PLATFORM_CONFIG_UNKNOWN);
+
    return;
 }
 
@@ -2072,6 +2350,7 @@ static int MEI_InitModuleRegCharDev(const char *devName)
               devName, major_number));
       return result;
    }
+
    /* dynamic major                       */
    if ( major_number == 0 )
    {
@@ -2142,6 +2421,7 @@ static int MEI_SysClkDisable(struct clk *clk)
 
 IFX_int32_t MEI_PowerUp(void)
 {
+#if (MEI_SUPPORT_DEVICE_VR10_320 != 1)
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0))
    /* Power up MEI */
    DSL_DFE_PMU_SETUP(IFX_PMU_ENABLE);
@@ -2152,7 +2432,8 @@ IFX_int32_t MEI_PowerUp(void)
             ("MEI: ERROR - DSL DFE PG enable failed!" MEI_DRV_CRLF));
 
       /* ignore for VR10 (for emulator) */
-      if (!MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
+      if (!MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10) &&
+          !MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10_320))
       {
          return IFX_ERROR;
       }
@@ -2164,12 +2445,14 @@ IFX_int32_t MEI_PowerUp(void)
             ("MEI: ERROR - dfe sys clk enable failed!" MEI_DRV_CRLF));
    }
 #endif
+#endif
 
    return IFX_SUCCESS;
 }
 
 IFX_int32_t MEI_PowerDown(void)
 {
+#if (MEI_SUPPORT_DEVICE_VR10_320 != 1)
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0))
    if (ifx_pmu_pg_dsl_dfe_disable() != 0)
    {
@@ -2188,7 +2471,7 @@ IFX_int32_t MEI_PowerDown(void)
       return IFX_ERROR;
    }
 #endif
-
+#endif
    return IFX_SUCCESS;
 }
 
@@ -2230,7 +2513,8 @@ IFX_int32_t MEI_IoctlInitDevice(
       MEI_DRV_CRLF, MEI_DRV_LINENUM_GET(pMeiDev),
       (IFX_uint32_t)pInitDev->meiBaseAddr, (IFX_uint32_t)pInitDev->usedIRQ));
 
-   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
+   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10) ||
+       MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10_320))
    {
       PRN_DBG_USR( MEI_DRV, MEI_DRV_PRN_LEVEL_LOW, MEI_DRV_LINENUM_GET(pMeiDev),
          ("MEI_DRV[%02d]: ioctl - FIO_MEI_DEV_INIT PDBRAM addr = 0x%08X"
@@ -2287,7 +2571,8 @@ IFX_int32_t MEI_IoctlInitDevice(
 
       MEI_DRV_MEI_IF_STATE_SET(pMeiDev, MEI_DRV_MEI_IF_STATE_GET(pMeiDevMaster));
 
-      if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
+      if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10) ||
+          MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10_320))
       {
          MEI_DRV_PDBRAM_VIRT_ADDR_SET(pMeiDev, MEI_DRV_PDBRAM_VIRT_ADDR_GET(pMeiDevMaster));
 
@@ -2324,7 +2609,8 @@ IFX_int32_t MEI_IoctlInitDevice(
 
       MEI_DRV_MEI_PHY_ADDR_SET(pMeiDev, pInitDev->meiBaseAddr);
    }
-   else if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
+   else if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10) ||
+            MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10_320))
    {
       MEI_DRV_MEI_PHY_ADDR_SET(pMeiDev, pInitDev->meiBaseAddr);
       MEI_DRV_PDBRAM_PHY_ADDR_SET(pMeiDev, pInitDev->PDBRAMaddr);
@@ -2351,7 +2637,8 @@ IFX_int32_t MEI_IoctlInitDevice(
             MEI_DRV_LINENUM_GET(pMeiDev), MEI_DRV_MEI_PHY_ADDR_GET(pMeiDev),
             (IFX_uint32_t)(MEI_DRV_MEI_VIRT_ADDR_GET(pMeiDev))));
 
-   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
+   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10) ||
+       MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10_320))
    {
       PRN_DBG_USR( MEI_DRV, MEI_DRV_PRN_LEVEL_LOW, MEI_DRV_LINENUM_GET(pMeiDev),
           ("MEI_DRV[%02d]: PHY2VIRT MAP, PDBRAM phy addr = 0x%08X, PDBRAM virt addr = 0x%08X"
@@ -2359,7 +2646,8 @@ IFX_int32_t MEI_IoctlInitDevice(
             MEI_DRV_PDBRAM_VIRT_ADDR_GET(pMeiDev)));
    }
 
-   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
+   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10) ||
+       MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10_320))
    {
       /* Clear FORCE_LINK_DOWN flag for PPE */
       *MEI_PPE_U32REG(PPE_FORCE_LINK_DOWN) &= ~0x1;
@@ -2470,7 +2758,8 @@ IFX_int32_t MEI_IoctlInitDevice(
                {
                   usedFlags = IRQ_LEVEL;
                }
-               else if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
+               else if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10) ||
+                        MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10_320))
                {
                   usedFlags = IRQF_SHARED | IRQF_TRIGGER_FALLING;
                }
@@ -2517,7 +2806,8 @@ IFX_int32_t MEI_IoctlInitDevice(
                (IFX_uint32_t)(MEI_DRV_MEI_VIRT_ADDR_GET(pMeiDev)),
                (IFX_uint32_t)pInitDev->usedIRQ));
 
-      if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
+      if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10) ||
+          MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10_320))
       {
          PRN_DBG_USR( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL, MEI_DRV_LINENUM_GET(pMeiDev),
              ("MEI_DRV[%02d]: INIT DEVICE, PDBRAM phy addr = 0x%08X, PDBRAM virt addr = 0x%08X"
@@ -2992,7 +3282,8 @@ IFX_int32_t MEI_InternalDevOpen(
 
    /* Init VR10 device (set mei base addr, pdbram base addr, irq) */
    /* Necessary addresses provided by pcie driver */
-   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
+   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10) ||
+       MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10_320))
    {
       if ((retVal = MEI_VR10_InternalInitDevice(pMeiDynCntrl)) != IFX_SUCCESS)
       {
@@ -3364,7 +3655,7 @@ IFX_int32_t MEI_DRVOS_ThreadInit(
 /**
    LINUX Kernel - Shutdown and terminate a given thread.
    Therefore the thread delete functions triggers the user thread function
-   to shutdown. In case of not responce (timeout) the thread will be canceled.
+   to shutdown. In case of not response (timeout) the thread will be canceled.
 
 \par Implementation
    - force a shutdown via the shutdown flag and wait.
@@ -3582,7 +3873,7 @@ EXPORT_SYMBOL(MEI_FctFreeIrqSet);
 /*
    register module init and exit
 */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)) && (MEI_SUPPORT_DEVICE_VR10_320 != 1)
 module_platform_driver_probe(ltq_dsl_cpe_mei_driver, ltq_dsl_cpe_mei_probe);
 #else
 module_init (MEI_module_init);
