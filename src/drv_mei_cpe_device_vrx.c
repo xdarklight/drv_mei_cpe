@@ -29,7 +29,11 @@
 
 #if defined(LINUX)
 #  if (LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0))
-#    include "ifx_pcie.h"
+#    if (MEI_SUPPORT_DEVICE_VR10_320 != 1)
+#       include "ifx_pcie.h"
+#    else
+#       include "../drivers/net/ethernet/lantiq/lantiq_pcie.h"
+#    endif
 #  else
 #    include "lantiq_pcie.h"
 #  endif
@@ -84,7 +88,11 @@ IFX_int32_t MEI_VR10_PcieEntitiesCheck(IFX_uint8_t nEntityNum)
    IFX_uint32_t pcie_entitiesNum;
 
    /* get information from pcie driver */
+#if (MEI_SUPPORT_DEVICE_VR10_320 != 1)
    if (ifx_pcie_ep_dev_num_get(&pcie_entitiesNum))
+#else
+   if (ltq_pcie_ep_dev_num_get(&pcie_entitiesNum))
+#endif
    {
       PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
          ("PCIe: failed to get total device number" MEI_DRV_CRLF));
@@ -116,11 +124,19 @@ IFX_int32_t MEI_VR10_PcieEntitiesCheck(IFX_uint8_t nEntityNum)
 IFX_int32_t MEI_VR10_PcieEntityInit(MEI_MEI_DRV_CNTRL_T *pMeiDrvCntrl)
 {
    IFX_uint8_t entityNum;
+#if (MEI_SUPPORT_DEVICE_VR10_320 != 1)
    ifx_pcie_ep_dev_t MEI_pcie_ep_dev;
+#else
+   ltq_pcie_ep_dev_t MEI_pcie_ep_dev;
+#endif
 
    entityNum = MEI_GET_ENTITY_FROM_DEVNUM(pMeiDrvCntrl->dslLineNum);
 
+#if (MEI_SUPPORT_DEVICE_VR10_320 != 1)
    if (ifx_pcie_ep_dev_info_req(entityNum, IFX_PCIE_EP_INT_MEI, &MEI_pcie_ep_dev))
+#else
+   if (ltq_pcie_ep_dev_info_req(entityNum, IFX_PCIE_EP_INT_MEI, &MEI_pcie_ep_dev))
+#endif
    {
       PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
          ("PCIe: failed to get EP device %i information" MEI_DRV_CRLF, entityNum));
@@ -134,7 +150,15 @@ IFX_int32_t MEI_VR10_PcieEntityInit(MEI_MEI_DRV_CNTRL_T *pMeiDrvCntrl)
 
    pMeiDrvCntrl->MEI_pcie_phy_membase = (IFX_uint32_t)MEI_pcie_ep_dev.phy_membase;
    pMeiDrvCntrl->MEI_pcie_virt_membase = (IFX_uint32_t)MEI_pcie_ep_dev.membase;
-   pMeiDrvCntrl->MEI_pcie_irq = MEI_pcie_ep_dev.irq;
+   /* Use active polling mode for VRX320 */
+   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10_320))
+   {
+      pMeiDrvCntrl->MEI_pcie_irq = 99;
+   }
+   else
+   {
+      pMeiDrvCntrl->MEI_pcie_irq = MEI_pcie_ep_dev.irq;
+   }
 
    return IFX_SUCCESS;
 }
@@ -151,7 +175,11 @@ IFX_int32_t MEI_VR10_PcieEntityInit(MEI_MEI_DRV_CNTRL_T *pMeiDrvCntrl)
 */
 IFX_int32_t MEI_VR10_PcieEntityFree(IFX_uint8_t entityNum)
 {
+#if (MEI_SUPPORT_DEVICE_VR10_320 != 1)
    if (ifx_pcie_ep_dev_info_release(entityNum))
+#else
+   if (ltq_pcie_ep_dev_info_release(entityNum))
+#endif
    {
       PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
          ("PCIe: failed to release EP device %i" MEI_DRV_CRLF, entityNum));

@@ -286,6 +286,7 @@ typedef struct MEI_fw_image_port_mode_control_s
 */
 typedef struct MEI_fw_image_port_mode_control_dma32_s
 {
+#if (MEI_DRV_OS_BYTE_ORDER == MEI_DRV_OS_BIG_ENDIAN)
    /**
       Offset 3, TBD */
    IFX_uint8_t  xDslModeLock;
@@ -335,6 +336,57 @@ typedef struct MEI_fw_image_port_mode_control_dma32_s
    /**
       offset 20, TBD */
    IFX_uint8_t bgPort;
+#else
+   /**
+      Offset 0, a hardcoded value of 0x2468*/
+   IFX_uint16_t signature0;
+   /**
+      Offset 2, true/false that mode is locked by a port at the end of GHS*/
+   IFX_uint8_t  dualPortModeLock;
+   /**
+      Offset 3, TBD */
+   IFX_uint8_t  xDslModeLock;
+   /**
+      Offset 4, power-up default*/
+   IFX_uint8_t  dualPortModePreffered;
+   /**
+      Offset 5, power-up default*/
+   IFX_uint8_t  xDslModePreffered;
+   /**
+      Offset 6, being loaded, default - 0xFF*/
+   IFX_uint8_t  dualPortModeCurrent;
+   /**
+      Offset 7, being loaded, default - 0xFF*/
+   IFX_uint8_t  xDslModeCurrent;
+   /**
+      Offset 8, this will be used to communicate with driver if errors
+      detected early in the boot process*/
+   IFX_uint8_t  bootError;
+   /**
+      Offset 9, AFE_COLD_START = 0; AFE_WARM_START = 1*/
+   IFX_uint8_t  afePowerUp;
+   /**
+      Offset 10, a hardcode value of 0xB11D*/
+   IFX_uint16_t signature1;
+   /**
+      offset 12, set by the BootLoader based on info in .bin file */
+   IFX_uint32_t imageOffsetSRAM;
+   /**
+      offset 16, TBD*/
+   IFX_uint32_t bgPortSelRegValue;
+   /**
+      offset 20, TBD */
+   IFX_uint8_t bgPort;
+   /**
+      offset 21, TBD*/
+   IFX_uint8_t bgDuration;
+   /**
+      offset 22, TBD*/
+   IFX_uint8_t maxBgDuration;
+   /**
+      offset 23; TBD*/
+   IFX_uint8_t afeInitState;
+#endif
 }  MEI_FW_PORT_MODE_CONTROL_DMA32_T;
 
 typedef MEI_FW_PORT_MODE_CONTROL_T MEI_FW_IMAGE_PAGE0_T;
@@ -493,11 +545,31 @@ typedef struct
    MEI_FW_IMAGE_CHUNK_TYPE_E eImageChunkType;
    /* Pointer to the FW image allocated chunk*/
    IFX_uint8_t               *pImageChunk_allocated;
-   /* Pointer to the FW image address aligned chunk*/
+   /* Pointer to the FW image virtual address aligned chunk*/
    IFX_uint8_t               *pImageChunk_aligned;
+   /* Pointer to the FW image physical address aligned chunk*/
+   IFX_uint8_t               *pImageChunk_phy;
    /* BARx content*/
    IFX_uint8_t               *pBARx;
 } MEI_FW_IMAGE_CHUNK_CTRL_T;
+
+typedef enum
+{
+   /** could not be used for allocated chunk, PDBRAM or debug mode */
+   eMEI_BAR_TYPE_UNUSED,
+   /** used for allocated chunk */
+   eMEI_BAR_TYPE_CHUNK,
+   /** used for PDBRAM */
+   eMEI_BAR_TYPE_PDBRAM,
+#if (MEI_SUPPORT_DSM == 1)
+   /** used for ERB block, could not be used for debug mode */
+   eMEI_BAR_TYPE_ERB,
+#endif /* (MEI_SUPPORT_DSM == 1)*/
+   /** only for special cases (RTT, etc) could not be used for debug mode */
+   eMEI_BAR_TYPE_SPECIAL,
+   /** used for debug mode via proc */
+   eMEI_BAR_TYPE_USER,
+} MEI_BAR_TYPE;
 
 #if (MEI_SUPPORT_PCI_SLAVE_FW_DOWNLOAD == 1)
 typedef struct MEI_pci_slave_pool_element_s
@@ -552,6 +624,12 @@ typedef struct MEI_fw_download_cntrl_s
 
    /** Partitions information (available for fw layout type 2) */
    MEI_FW_PARTITIONS          meiPartitions;
+
+   /** BAR registers type table */
+   MEI_BAR_TYPE               eBarType[MEI_TOTAL_BAR_REGISTER_COUNT];
+#if (MEI_PREDEF_DBG_BAR == 1)
+   IFX_uint32_t               dbgBarAddr[MEI_TOTAL_BAR_REGISTER_COUNT];
+#endif /* (MEI_PREDEF_DBG_BAR == 1) */
 
    /** Max amount of chunks (depends of fw layout type) */
    IFX_uint32_t               meiMaxChunkCount;

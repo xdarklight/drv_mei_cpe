@@ -1675,7 +1675,7 @@ MEI_STATIC IFX_void_t MEI_FreeNextRdNfcMsg(
    Error:   negative value
       -e_MEI_ERR_RETURN_ARG:     cannot return arguments
       -e_MEI_ERR_DEV_NEG_RESP:   not successful functional operation code
-      -e_MEI_ERR_DEV_INVAL_RESP: invalid responce.
+      -e_MEI_ERR_DEV_INVAL_RESP: invalid response.
 
 */
 MEI_STATIC IFX_int32_t MEI_DriverMsgRead(
@@ -1764,7 +1764,7 @@ MEI_STATIC IFX_int32_t MEI_DriverMsgRead(
    Error:   negative value
       -e_MEI_ERR_RETURN_ARG:     cannot return arguments
       -e_MEI_ERR_DEV_NEG_RESP:   not successful functional operation code
-      -e_MEI_ERR_DEV_INVAL_RESP: invalid responce.
+      -e_MEI_ERR_DEV_INVAL_RESP: invalid response.
 
 */
 MEI_STATIC IFX_int32_t MEI_AtmOamMsgRead(
@@ -1888,7 +1888,7 @@ MEI_ATM_OAM_MSG_READ_ERR:
    Error:   negative value
       -e_MEI_ERR_RETURN_ARG:     cannot return arguments
       -e_MEI_ERR_DEV_NEG_RESP:   not successful functional operation code
-      -e_MEI_ERR_DEV_INVAL_RESP: invalid responce.
+      -e_MEI_ERR_DEV_INVAL_RESP: invalid response.
 
 */
 MEI_STATIC IFX_int32_t MEI_CEocMsgRead(
@@ -2026,7 +2026,7 @@ MEI_CEOC_MSG_READ_ERR:
    Error:   negative value
       -e_MEI_ERR_RETURN_ARG:     cannot return arguments
       -e_MEI_ERR_DEV_NEG_RESP:   not successful functional operation code
-      -e_MEI_ERR_DEV_INVAL_RESP: invalid responce.
+      -e_MEI_ERR_DEV_INVAL_RESP: invalid response.
 
 */
 MEI_STATIC IFX_int32_t MEI_ModemNfcRead(
@@ -2239,8 +2239,8 @@ IFX_boolean_t MEI_MailboxLoop( MEI_DEV_T *pMeiDev,
    pMeiDev  points to the current VRX device.
 
 \return
-   IFX_SUCCESS:   responce received.
-   IFX_ERROR:     no responce received - timeout
+   IFX_SUCCESS:   response received.
+   IFX_ERROR:     no response received - timeout
 */
 IFX_int32_t MEI_WaitForMailbox(MEI_DEV_T *pMeiDev)
 {
@@ -2468,6 +2468,9 @@ IFX_int32_t MEI_WriteMailbox( MEI_DYN_CNTRL_T    *pMeiDynCntrl,
    MEI_DBG_MSG_TRC_DUMP(pMeiDev, &pMBMsg->mbCmv.cmv);
    MEI_TRACE_CMV_MSG(pMeiDev, &pMBMsg->mbCmv.cmv, "CMD msg wr", MEI_DRV_PRN_LEVEL_LOW);
 
+   /* first - protect the access against other user and wait for response form modem */
+   MEI_DRV_GET_UNIQUE_DRIVER_ACCESS(pMeiDev);
+
    /* Prepare the message  - swap 32bit payload */
    if (CMV_MSGHDR_BIT_SIZE_GET(pMBMsg->mbCmv.cmv) == (unsigned short)CMV_MSG_BIT_SIZE_32BIT)
    {
@@ -2482,9 +2485,6 @@ IFX_int32_t MEI_WriteMailbox( MEI_DYN_CNTRL_T    *pMeiDynCntrl,
          return e_MEI_ERR_MSG_PARAM;
       }
    }
-
-   /* first - protect the access against other user and wait for responce form modem */
-   MEI_DRV_GET_UNIQUE_DRIVER_ACCESS(pMeiDev);
 
    /* check now if the mailbox is free */
    if (MEI_DRV_MAILBOX_STATE_GET(pMeiDev) != e_MEI_MB_FREE)
@@ -3480,7 +3480,7 @@ MEI_WRITE_MSG_ERROR:
    Error:
       -e_MEI_ERR_RETURN_ARG:     cannot return arguments
       -e_MEI_ERR_DEV_NEG_RESP:   negative acknowledge
-      -e_MEI_ERR_DEV_INVAL_RESP: invalid responce.
+      -e_MEI_ERR_DEV_INVAL_RESP: invalid response.
 */
 IFX_int32_t MEI_IoctlAckMsgRead(
                               MEI_DYN_CNTRL_T     *pMeiDynCntrl,
@@ -3664,6 +3664,18 @@ IFX_int32_t MEI_IoctlMsgSend(
    IFX_uint32_t sendStart = 0, sendEnd = 0;
 #endif
 
+   if ((MEI_DRV_STATE_GET(pMeiDynCntrl->pMeiDev) != e_MEI_DRV_STATE_DFE_READY) &&
+       (MEI_DRV_STATE_GET(pMeiDynCntrl->pMeiDev) != e_MEI_DRV_STATE_DFE_RESET))
+   {
+      /* invalid state */
+      PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+         ("MEI_DRV[%02d]: ERROR message send - invalid drv state %d" MEI_DRV_CRLF,
+          MEI_DRV_LINENUM_GET(pMeiDynCntrl->pMeiDev),
+          MEI_DRV_STATE_GET(pMeiDynCntrl->pMeiDev)));
+
+      return -e_MEI_ERR_INVAL_STATE;
+   }
+
    /* check and do pre-work before sending this message */
    MEI_MsgSendPreAction(pMeiDynCntrl, pUserMsgs, bInternCall);
 
@@ -3818,7 +3830,7 @@ IFX_int32_t MEI_IoctlMsgSend(
    Error:   negative value
       -e_MEI_ERR_RETURN_ARG:     cannot return arguments
       -e_MEI_ERR_DEV_NEG_RESP:   not successful functional operation code
-      -e_MEI_ERR_DEV_INVAL_RESP: invalid responce.
+      -e_MEI_ERR_DEV_INVAL_RESP: invalid response.
 
 */
 IFX_int32_t MEI_IoctlNfcMsgRead(
@@ -4010,7 +4022,7 @@ MEI_WRITE_MSG_ERROR:
    Error:
       -e_MEI_ERR_RETURN_ARG:     cannot return arguments
       -e_MEI_ERR_DEV_NEG_RESP:   negative acknowledge
-      -e_MEI_ERR_DEV_INVAL_RESP: invalid responce.
+      -e_MEI_ERR_DEV_INVAL_RESP: invalid response.
 
 */
 IFX_int32_t MEI_IoctlRawAckRead( MEI_DYN_CNTRL_T *pMeiDynCntrl,
@@ -4072,6 +4084,18 @@ IFX_int32_t MEI_IoctlRawMsgSend( MEI_DYN_CNTRL_T *pMeiDynCntrl,
    PRN_DBG_USR( MEI_DRV, MEI_DRV_PRN_LEVEL_LOW, MEI_DRV_DYN_LINENUM_GET(pMeiDynCntrl),
          ("MEI_DRV[%02d - %02d]: Send Msg (raw)" MEI_DRV_CRLF,
           MEI_DRV_DYN_LINENUM_GET(pMeiDynCntrl), pMeiDynCntrl->openInstance) );
+
+   if ((MEI_DRV_STATE_GET(pMeiDynCntrl->pMeiDev) != e_MEI_DRV_STATE_DFE_READY) &&
+       (MEI_DRV_STATE_GET(pMeiDynCntrl->pMeiDev) != e_MEI_DRV_STATE_DFE_RESET))
+   {
+      /* invalid state */
+      PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,
+         ("MEI_DRV[%02d]: ERROR message raw send - invalid drv state %d" MEI_DRV_CRLF,
+           MEI_DRV_LINENUM_GET(pMeiDynCntrl->pMeiDev),
+           MEI_DRV_STATE_GET(pMeiDynCntrl->pMeiDev)));
+
+      return -e_MEI_ERR_INVAL_STATE;
+   }
 
    /* Lock the the current instance */
    MEI_DRVOS_SemaphoreLock(&pMeiDynCntrl->pInstanceRWlock);

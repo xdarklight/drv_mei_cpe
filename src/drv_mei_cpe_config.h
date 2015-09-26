@@ -45,6 +45,14 @@
 #  endif
 #endif
 
+#ifndef MEI_SUPPORT_DEVICE_VR10_320
+#  define MEI_SUPPORT_DEVICE_VR10_320      0
+#else
+#  if (MEI_SUPPORT_DEVICE_VR10_320 != 1)
+#     define MEI_SUPPORT_DEVICE_VR10_320   0
+#  endif
+#endif
+
 #ifndef MEI_SUPPORT_DEVICE_AR9
 #  define MEI_SUPPORT_DEVICE_AR9       0
 #else
@@ -54,15 +62,19 @@
 #endif
 
 #if (MEI_SUPPORT_DEVICE_VR9 == 1)
-#  if (MEI_SUPPORT_DEVICE_VR10 == 1) || (MEI_SUPPORT_DEVICE_AR9 == 1)
+#  if (MEI_SUPPORT_DEVICE_VR10 == 1) || (MEI_SUPPORT_DEVICE_VR10_320 == 1) || (MEI_SUPPORT_DEVICE_AR9 == 1)
      #error "Only one device can be selected!"
 #  endif
 #elif (MEI_SUPPORT_DEVICE_VR10 == 1)
-#  if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_AR9 == 1)
+#  if (MEI_SUPPORT_DEVICE_VR10_320 == 1) || (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_AR9 == 1)
+     #error "Only one device can be selected!"
+#  endif
+#elif (MEI_SUPPORT_DEVICE_VR10_320 == 1)
+#  if (MEI_SUPPORT_DEVICE_VR10 == 1) || (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_AR9 == 1)
      #error "Only one device can be selected!"
 #  endif
 #elif (MEI_SUPPORT_DEVICE_AR9 == 1)
-#  if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1)
+#  if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1) || (MEI_SUPPORT_DEVICE_VR10_320 == 1)
      #error "Only one device can be selected!"
 #  endif
 #else
@@ -201,7 +213,7 @@
 # endif
 #endif
 
-#if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1)
+#if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1) || (MEI_SUPPORT_DEVICE_VR10_320 == 1)
    /** support Debug access (via General Purpose Access - msg's) */
    #ifndef MEI_SUPPORT_DFE_GPA_ACCESS
    #  define MEI_SUPPORT_DFE_GPA_ACCESS          1
@@ -213,7 +225,7 @@
 #else
    #undef MEI_SUPPORT_DFE_GPA_ACCESS
    #define MEI_SUPPORT_DFE_GPA_ACCESS            0
-#endif /* #if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1) */
+#endif /* #if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1) || (MEI_SUPPORT_DEVICE_VR10_320 == 1) */
 
 /* Protected DMA access - write, read back and compare */
 #ifndef MEI_PROTECTED_MEI_DMA_ACCESS
@@ -346,7 +358,7 @@
 #  endif
 #endif
 
-#if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1)
+#if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1)  || (MEI_SUPPORT_DEVICE_VR10_320 == 1)
    #define INCLUDE_VR9_EMULATION_WORKAROUNDS
 #endif
 
@@ -448,7 +460,7 @@
 
 /** get the number of of lines per device from extern */
 
-#if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1)
+#if (MEI_SUPPORT_DEVICE_VR9 == 1) || (MEI_SUPPORT_DEVICE_VR10 == 1) || (MEI_SUPPORT_DEVICE_VR10_320 == 1)
 #ifdef MEI_MAX_DFE_INSTANCE_PER_ENTITY
 #   if (MEI_MAX_DFE_INSTANCE_PER_ENTITY > 2)
 #      undef  MEI_MAX_DFE_INSTANCE_PER_ENTITY
@@ -521,6 +533,16 @@
 #     undef  MEI_SUPPORT_DSM
 #     define MEI_SUPPORT_DSM 1
 #     warning "switch on DSM vectoring support - invalid config"
+#  endif
+#endif
+
+#ifndef MEI_PREDEF_DBG_BAR
+#  define MEI_PREDEF_DBG_BAR    1
+#else
+#  if ( (MEI_PREDEF_DBG_BAR != 1) && (MEI_PREDEF_DBG_BAR != 0) )
+#     undef  MEI_PREDEF_DBG_BAR
+#     define MEI_PREDEF_DBG_BAR 1
+#     warning "switch on BAR debug user support - invalid config"
 #  endif
 #endif
 

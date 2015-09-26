@@ -1752,8 +1752,12 @@ typedef enum
    output in optimized DSL CPE API conform format. */
    e_MEI_DBGMOD_MEI_MSG_DUMP_API = 2,
    /**
+   To select the notification debug module "MEI_NOTIFICATIONS" that prints the
+   output for interaction with PP subsystem calls. */
+   e_MEI_DBGMOD_MEI_NOTIFICATIONS = 3,
+   /**
    Delimiter only! */
-   e_MEI_DBGMOD_LAST = 3
+   e_MEI_DBGMOD_LAST = 4
 } IOCTL_MEI_dbgModule_t;
 
 /** ioctl structure for set the driver debug level.
@@ -1822,9 +1826,9 @@ typedef struct
    unsigned int blockTimeout;
    /**  timeout [ms] for host modem communication - normal message handling */
    unsigned int waitModemMsg_ms;
-   /**  timeout [ms] for first modem responce after startup (download) */
+   /**  timeout [ms] for first modem response after startup (download) */
    unsigned int waitFirstResp_ms;
-   /**  timeout [ms] for the first ROM code responce (bootmode 8/9 only) */
+   /**  timeout [ms] for the first ROM code response (bootmode 8/9 only) */
    unsigned int bmWaitForDl_ms;
    /**  timeout [ms] for the download setup done (bootmode 8/9 only) */
    unsigned int bmWaitDlInit_ms;

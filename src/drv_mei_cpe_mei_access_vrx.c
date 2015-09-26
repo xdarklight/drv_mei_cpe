@@ -45,9 +45,14 @@ static inline volatile IFX_uint32_t MEI_RCU_get(MEI_MEI_DRV_CNTRL_T *pMeiDrvCntr
    {
       ret = (KSEG1 | 0x1F203000);
    }
-   else if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
+   else if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10) ||
+            MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10_320))
    {
+#if (MEI_SUPPORT_DEVICE_VR10_320 != 1)
       ret = (KSEG1 | MEI_DRV_PCIE_PHY_MEMBASE_GET(pMeiDrvCntrl) | MEI_RCU_OFFSET);
+#else
+      ret = (KSEG1 | MEI_DRV_PCIE_VIRT_MEMBASE_GET(pMeiDrvCntrl) | MEI_RCU_OFFSET);
+#endif
    }
    return ret;
 }
@@ -967,7 +972,11 @@ IFX_uint32_t MEI_WriteDma16Bit( MEI_MEI_DRV_CNTRL_T *pMeiDrvCntrl,
 
       while (count < dataCount - (dataCount % 2))
       {
+#if (MEI_DRV_OS_BYTE_ORDER == MEI_DRV_OS_BIG_ENDIAN)
          tmpRegValue = (((pTmpData[count] << 16) & 0xFFFF0000) | (pTmpData[count+1] & 0x0000FFFF));
+#else
+         tmpRegValue = (((pTmpData[count]) & 0x0000FFFF) | ((pTmpData[count+1] << 16) & 0xFFFF0000));
+#endif
 
          tmpRegValue = SWAP32_DMA_WIDTH_ORDER(tmpRegValue);
 
@@ -979,7 +988,11 @@ IFX_uint32_t MEI_WriteDma16Bit( MEI_MEI_DRV_CNTRL_T *pMeiDrvCntrl,
       /* write unaligned block - last */
       if (count < dataCount)
       {
+#if (MEI_DRV_OS_BYTE_ORDER == MEI_DRV_OS_BIG_ENDIAN)
          tmpRegValue = ((pTmpData[count++] << 16) & 0xFFFF0000);
+#else
+         tmpRegValue = ((pTmpData[count++]) & 0x0000FFFF);
+#endif
 
          tmpRegValue = SWAP32_DMA_WIDTH_ORDER(tmpRegValue);
 
@@ -1070,14 +1083,22 @@ IFX_uint32_t MEI_ReadDma16Bit(
 
       tmpRegValue = SWAP32_DMA_WIDTH_ORDER(tmpRegValue);
 
+#if (MEI_DRV_OS_BYTE_ORDER == MEI_DRV_OS_BIG_ENDIAN)
       pData[count] = (tmpRegValue & 0xFFFF0000) >> 16;
+#else
+      pData[count] = (tmpRegValue & 0x0000FFFF);
+#endif
 
       count++;
 
       /* high word */
       if (count < dataCount)
       {
+#if (MEI_DRV_OS_BYTE_ORDER == MEI_DRV_OS_BIG_ENDIAN)
          pData[count] = (tmpRegValue & 0x00000FFFF);
+#else
+         pData[count] = (tmpRegValue & 0xFFFF0000) >> 16;
+#endif
          count++;
       }
    }
@@ -1119,7 +1140,11 @@ IFX_uint32_t MEI_GetDma(
 
       tmpRegValue = SWAP32_DMA_WIDTH_ORDER(tmpRegValue);
 
+#if (MEI_DRV_OS_BYTE_ORDER == MEI_DRV_OS_BIG_ENDIAN)
       pData[count] = (tmpRegValue & 0xFFFF0000) >> 16;
+#else
+      pData[count] = (tmpRegValue & 0x0000FFFF);
+#endif
 
 #if (TRACE_MEI_MEI_REG_ACCESS == 1)
       PRN_DBG_USR_NL( MEI_REG, MEI_DRV_PRN_LEVEL_NORMAL,
@@ -1131,7 +1156,11 @@ IFX_uint32_t MEI_GetDma(
       /* high word */
       if (count < dataCount)
       {
+#if (MEI_DRV_OS_BYTE_ORDER == MEI_DRV_OS_BIG_ENDIAN)
          pData[count] = (tmpRegValue & 0x00000FFFF);
+#else
+         pData[count] = (tmpRegValue & 0xFFFF0000) >> 16;
+#endif
 
 #if (TRACE_MEI_MEI_REG_ACCESS == 1)
          PRN_DBG_USR_NL( MEI_REG, MEI_DRV_PRN_LEVEL_NORMAL,
@@ -1339,7 +1368,11 @@ IFX_uint16_t MEI_GetMailBoxCode(
    tmpRegVal = MEI_REG_ACCESS_ME_DX_DATA_GET(pMeiDrvCntrl);
 
    tmpRegVal = SWAP32_DMA_WIDTH_ORDER(tmpRegVal);
+#if (MEI_DRV_OS_BYTE_ORDER == MEI_DRV_OS_BIG_ENDIAN)
    mbCode    = (tmpRegVal & 0xFFFF0000) >> 16;
+#else
+   mbCode    = (tmpRegVal & 0x0000FFFF);
+#endif
 
    /* return the mailbox code */
    return mbCode;
@@ -1561,7 +1594,8 @@ IFX_int32_t MEI_InterfaceDetect(
             return IFX_SUCCESS;
          }
       }
-      else if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
+      else if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10) ||
+               MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10_320))
       {
          if (hwVers == 0x00000240)
          {
@@ -1576,6 +1610,7 @@ IFX_int32_t MEI_InterfaceDetect(
 IFX_int32_t MEI_BasicChipInit(IFX_void_t)
 {
    IFX_int32_t ret;
+
    if ((ret = MEI_PowerUp()) != IFX_SUCCESS)
    {
       return ret;
@@ -1587,6 +1622,7 @@ IFX_int32_t MEI_BasicChipInit(IFX_void_t)
 IFX_int32_t MEI_BasicChipExit(IFX_void_t)
 {
    IFX_int32_t ret;
+
    if ((ret = MEI_PowerDown()) != IFX_SUCCESS)
    {
       return ret;

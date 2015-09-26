@@ -905,7 +905,7 @@ IFX_int32_t MEI_ATMOAM_CMD_InsExtStatsGet(
    }
 
    /* ===============================================
-      Check the responce CMD_ATMINSERTEXTRACTSTATSGET
+      Check the response CMD_ATMINSERTEXTRACTSTATSGET
       =============================================== */
    if (pAtmOamStats)
    {
@@ -1006,7 +1006,7 @@ IFX_int32_t MEI_ATMOAM_CMD_InsStatusGet(
    }
 
    /* ===============================================
-      Check the responce CMD_AtmCellLineInsertStatusGet
+      Check the response CMD_AtmCellLineInsertStatusGet
       =============================================== */
    switch (pIfxAck->insertStatus)
    {
@@ -1582,12 +1582,12 @@ IFX_int32_t MEI_CEOC_CMD_ClearEOC_Configure(
 \param
    pCEocDevCntrl     points to the Clear EOC control struct.
 \param
-   pTxOpStatus       returns the new TX operation state out form the responce.
+   pTxOpStatus       returns the new TX operation state out form the response.
                      TX Op = idle     --> OP_NONE
                            = progress --> OP_IN_PROG
                      else             --> OP_ERR
 \param
-   pRxOpStatus      returns the new RX state out form the responce.
+   pRxOpStatus      returns the new RX state out form the response.
                      RX Op = idle     --> OP_NONE
                            = progress --> OP_IN_PROG
                            = done     --> OP_DONE

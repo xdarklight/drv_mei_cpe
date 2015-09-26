@@ -35,7 +35,11 @@
 #include <linux/version.h>
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0))
-   #include <asm/ifx/irq.h>
+   #if (MEI_SUPPORT_DEVICE_VR10_320 != 1)
+      #include <asm/ifx/irq.h>
+   #else
+      #include <linux/irq.h>
+   #endif
 #else
    #include <irq.h>
    #include <net/net_namespace.h>
@@ -58,6 +62,12 @@
 #endif
 
 #endif /* #if (MEI_DRV_IFXOS_ENABLE == 0)*/
+
+#include <linux/dma-mapping.h>
+#include <linux/dma-direction.h>
+#include <asm/dma-mapping.h>
+#include <linux/types.h>
+#include <linux/pci.h>
 
 /* ============================================================================
    typedefs interrupt wrapping (Linux)
@@ -87,6 +97,11 @@ typedef irqreturn_t (*usedIsrHandler_t)(int, void *);
 
 #ifndef KSEG1
    #define KSEG1   (0xa0000000)
+#endif
+
+#if  (MEI_SUPPORT_DEVICE_VR10_320 == 1)
+   #undef KSEG1
+   #define KSEG1   (0x00000000)
 #endif
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0))
@@ -405,7 +420,7 @@ IFX_int32_t MEI_DRVOS_ThreadInit(
 /**
    LINUX Kernel - Shutdown and terminate a given thread.
    Therefore the thread delete functions triggers the user thread function
-   to shutdown. In case of not responce (timeout) the thread will be canceled.
+   to shutdown. In case of not response (timeout) the thread will be canceled.
 
 \par Implementation
    - force a shutdown via the shutdown flag and wait.
@@ -605,6 +620,12 @@ IFX_time_t MEI_DRVOS_ElapsedTimeMSecGet(
 #endif /* #ifndef MEI_DRVOS_DEFAULT_STACK_SIZE*/
 
 #endif /* #if (MEI_DRV_IFXOS_ENABLE == 0)*/
+
+#define MEI_DRVOS_PCI_Malloc(size, ptr_phy) \
+               pci_alloc_consistent(NULL, (size), (ptr_phy))
+
+#define MEI_DRVOS_PCI_Free(size, ptr_virt, ptr_phy) \
+               pci_free_consistent(NULL, (size), (ptr_virt), (ptr_phy))
 
 #endif   /* LINUX */
 #endif   /* _DRV_MEI_CPE_LINUX_H */

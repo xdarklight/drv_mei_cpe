@@ -322,21 +322,30 @@ static IFX_uint8_t* MEI_VR9_PciSlavePciAddrGet(
 #endif /* #if (MEI_SUPPORT_PCI_SLAVE_FW_DOWNLOAD == 1)*/
 
 static IFX_uint8_t* MEI_VRX_TranslateMipsToArc(
-                                 IFX_uint8_t *pChunkMips)
+                                 IFX_uint8_t *pChunkMips, IFX_uint8_t *pChunkMips_phy)
 {
    IFX_uint8_t *pChunkArc = IFX_NULL;
 
    pChunkArc = pChunkMips;
-
-   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
+   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10_320))
    {
       /* Translate chunk addresses located in SDRAM to be accessible by fw in ARC */
 
-      /* Get chunk offset from absolute address by deleting 3 major bits */
-      pChunkArc = (IFX_uint8_t *)((IFX_uint32_t)(pChunkArc) & 0x1FFFFFFF);
+      /* Get chunk offset from absolute address */
+      pChunkArc = pChunkMips_phy;
 
       /* offset + MEI_OUTBOUND_ADDRESS_BASE */
-      pChunkArc = (IFX_uint8_t *)((IFX_uint32_t)(pChunkArc) | MEI_OUTBOUND_ADDRESS_BASE);
+      pChunkArc = (IFX_uint8_t *)((IFX_uint32_t)(pChunkArc) + MEI_OUTBOUND_ADDRESS_BASE);
+   }
+   else if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
+   {
+      /* Translate chunk addresses located in SDRAM to be accessible by fw in ARC */
+
+      /* Get chunk offset from absolute address */
+      pChunkArc = (IFX_uint8_t *)virt_to_phys(pChunkArc);
+
+      /* offset + MEI_OUTBOUND_ADDRESS_BASE */
+      pChunkArc = (IFX_uint8_t *)((IFX_uint32_t)(pChunkArc) + MEI_OUTBOUND_ADDRESS_BASE);
    }
 
    return pChunkArc;
@@ -349,6 +358,7 @@ static IFX_int32_t MEI_VRX_ImageChunkAlloc(
 {
    IFX_int32_t ret = 0;
    IFX_uint8_t *pImageChunk_allocated = NULL;
+   IFX_uint8_t *pImageChunk_phy = NULL;
    MEI_FW_IMAGE_CHUNK_CTRL_T *pImageChunkCtrl = pFwDlCtrl->imageChunkCtrl;
 
    if ( ((chunkSize_byte > MEI_FW_IMAGE_CHUNK_SIZE_BYTE) &&
@@ -382,7 +392,15 @@ static IFX_int32_t MEI_VRX_ImageChunkAlloc(
 #endif /* #if (MEI_SUPPORT_PCI_SLAVE_FW_DOWNLOAD == 1)*/
       {
          /* Allocate chunk memory with the specified chunk size*/
-         pImageChunk_allocated = MEI_DRVOS_Malloc(chunkSize_byte);
+         if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10_320))
+         {
+            pImageChunk_allocated =(IFX_uint8_t *)MEI_DRVOS_PCI_Malloc(
+                               chunkSize_byte, (dma_addr_t *)&pImageChunk_phy);
+         }
+         else
+         {
+            pImageChunk_allocated = MEI_DRVOS_Malloc(chunkSize_byte);
+         }
       }
 
       if (!pImageChunk_allocated)
@@ -403,11 +421,27 @@ static IFX_int32_t MEI_VRX_ImageChunkAlloc(
          )
       {
          /* Free current allocated chunk which is not aligned*/
-         MEI_DRVOS_Free(pImageChunk_allocated);
+         if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10_320))
+         {
+            MEI_DRVOS_PCI_Free(chunkSize_byte, pImageChunk_allocated, pImageChunk_phy);
+         }
+         else
+         {
+            MEI_DRVOS_Free(pImageChunk_allocated);
+         }
 
          /* Allocate chunk memory for further alignment*/
-         pImageChunk_allocated = MEI_DRVOS_Malloc(
-                              MEI_FW_IMAGE_CHUNK_ALIGNED_SIZE_BYTE(chunkSize_byte) );
+         if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10_320))
+         {
+            pImageChunk_allocated = (IFX_uint8_t *)MEI_DRVOS_PCI_Malloc(
+                        MEI_FW_IMAGE_CHUNK_ALIGNED_SIZE_BYTE(chunkSize_byte),
+                                             (dma_addr_t *)&pImageChunk_phy);
+         }
+         else
+         {
+            pImageChunk_allocated = MEI_DRVOS_Malloc(
+                                 MEI_FW_IMAGE_CHUNK_ALIGNED_SIZE_BYTE(chunkSize_byte) );
+         }
 
          if (!pImageChunk_allocated)
          {
@@ -429,6 +463,11 @@ static IFX_int32_t MEI_VRX_ImageChunkAlloc(
          pImageChunkCtrl[chunkIdx].pImageChunk_aligned = pImageChunk_allocated;
       }
 
+      if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10_320))
+      {
+         pImageChunkCtrl[chunkIdx].pImageChunk_phy = pImageChunk_phy;
+      }
+
 #if (MEI_SUPPORT_PCI_SLAVE_FW_DOWNLOAD == 1)
       if (pFwDlCtrl->bPciSlave)
       {
@@ -441,7 +480,8 @@ static IFX_int32_t MEI_VRX_ImageChunkAlloc(
       {
          /* Prepare chunk MIPS address for ARC format */
          pImageChunkCtrl[chunkIdx].pBARx =
-            MEI_VRX_TranslateMipsToArc(pImageChunkCtrl[chunkIdx].pImageChunk_aligned);
+            MEI_VRX_TranslateMipsToArc(pImageChunkCtrl[chunkIdx].pImageChunk_aligned,
+                                       pImageChunkCtrl[chunkIdx].pImageChunk_phy);
       }
 
       /* Assign chunk allocated address*/
@@ -495,7 +535,17 @@ static IFX_int32_t MEI_VRX_ImageChunkFree(
       else
 #endif /* #if (MEI_SUPPORT_PCI_SLAVE_FW_DOWNLOAD == 1)*/
       {
-         MEI_DRVOS_Free(pImageChunkCtrl[chunkIdx].pImageChunk_allocated);
+         if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10_320))
+         {
+            MEI_DRVOS_PCI_Free(pImageChunkCtrl[chunkIdx].imageChunkSize_byte,
+                               pImageChunkCtrl[chunkIdx].pImageChunk_aligned,
+                               pImageChunkCtrl[chunkIdx].pImageChunk_phy);
+            pImageChunkCtrl[chunkIdx].pImageChunk_phy = NULL;
+         }
+         else
+         {
+            MEI_DRVOS_Free(pImageChunkCtrl[chunkIdx].pImageChunk_allocated);
+         }
       }
       pImageChunkCtrl[chunkIdx].pImageChunk_allocated = NULL;
       pImageChunkCtrl[chunkIdx].pImageChunk_aligned   = NULL;
@@ -750,7 +800,8 @@ static IFX_int32_t MEI_VRX_PortModeControlStructureDefaultSet(
    fwPortModeCtrl.imageOffsetSRAM   = pMeiDev->fwDl.defaultPortModeCtrl.imageOffsetSRAM;
    fwPortModeCtrl.maxBgDuration     = pMeiDev->fwDl.defaultPortModeCtrl.maxBgDuration;
 
-   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
+   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10) ||
+       MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10_320))
    {
       P0_IN = *MEI_GPIO_U32REG(GPIO_P0_IN);
       /* LIF Det 0 - bit 0 of P0_IN
@@ -1480,7 +1531,8 @@ static IFX_int32_t MEI_VRX_FMLT2_BarRegistersUpdate(
                                 + !!(part_size % MEI_FW_IMAGE_CHUNK_SIZE_BYTE);
    }
 
-   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
+   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10) ||
+       MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10_320))
    {
       if (xDSL_cache_chunks > MEI_FW_IMAGE_MAX_CACHE_CHUNK_COUNT)
       {
@@ -1494,21 +1546,37 @@ static IFX_int32_t MEI_VRX_FMLT2_BarRegistersUpdate(
    PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL,
          (MEI_DRV_CRLF "================== BAR REGS INIT =================" MEI_DRV_CRLF));
 
-   /* Clear all BAR regs */
+   /* Clear all BAR regs (except debug)*/
    for (barIdx=0; barIdx<MEI_TOTAL_BAR_REGISTER_COUNT; barIdx++)
    {
-      /* Write unused BARx register with the BAR0 content*/
-      MEI_REG_ACCESS_ME_XMEM_BAR_SET(pMeiDrvCntrl, barIdx, pChunk[0].pBARx);
+#if (MEI_PREDEF_DBG_BAR == 1)
+      if (MEI_BAR_TYPE_GET(pMeiDev, barIdx) != eMEI_BAR_TYPE_USER)
+      {
+#endif /* (MEI_PREDEF_DBG_BAR == 1) */
+         /* Write unused BARx register with the BAR0 content*/
+         MEI_REG_ACCESS_ME_XMEM_BAR_SET(pMeiDrvCntrl, barIdx, pChunk[0].pBARx);
+         MEI_BAR_TYPE_SET(pMeiDev, barIdx, eMEI_BAR_TYPE_UNUSED);
+#if (MEI_PREDEF_DBG_BAR == 1)
+      }
+      else
+      {
+         /* reload dbg addr after reset */
+         MEI_REG_ACCESS_ME_XMEM_BAR_SET(pMeiDrvCntrl, barIdx,
+                        MEI_BAR_DBG_ADDR_GET(pMeiDev, barIdx));
+      }
+#endif /* (MEI_PREDEF_DBG_BAR == 1) */
    }
 
    /* init BAR->cache */
    for (chunkIdx=xDSL_cache_chunk_idx, barIdx=0, chunks=0;
                             chunks < xDSL_cache_chunks; chunkIdx++, barIdx++, chunks++)
    {
-      if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
+      if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10) ||
+          MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10_320))
       {
          /* BAR0, BAR1, BAR2 are points to PDBRAM */
          MEI_REG_ACCESS_ME_XMEM_BAR_SET(pMeiDrvCntrl, barIdx, ppPDBRAM);
+         MEI_BAR_TYPE_SET(pMeiDev, barIdx, eMEI_BAR_TYPE_PDBRAM);
          PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL,
             ("BAR[%02d] = 0x%08X (-> PDBRAM+0x%05X)" MEI_DRV_CRLF, barIdx,
             ppPDBRAM, barIdx*MEI_FW_IMAGE_CHUNK_SIZE_BYTE));
@@ -1522,6 +1590,7 @@ static IFX_int32_t MEI_VRX_FMLT2_BarRegistersUpdate(
 
       /* Write BARx register with the chunk address*/
       MEI_REG_ACCESS_ME_XMEM_BAR_SET(pMeiDrvCntrl, barIdx, pChunk[chunkIdx].pBARx);
+      MEI_BAR_TYPE_SET(pMeiDev, barIdx, eMEI_BAR_TYPE_CHUNK);
       PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL,
             ("BAR[%02d] = 0x%08X (-> chunk[%02d])" MEI_DRV_CRLF, barIdx,
             MEI_REG_ACCESS_ME_XMEM_BAR_GET(pMeiDrvCntrl, barIdx), chunkIdx));
@@ -1537,6 +1606,7 @@ static IFX_int32_t MEI_VRX_FMLT2_BarRegistersUpdate(
 
       /* Write BARx register with the chunk address*/
       MEI_REG_ACCESS_ME_XMEM_BAR_SET(pMeiDrvCntrl, barIdx, pChunk[chunkIdx].pBARx);
+      MEI_BAR_TYPE_SET(pMeiDev, barIdx, eMEI_BAR_TYPE_CHUNK);
       PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL,
             ("BAR[%02d] = 0x%08X (-> chunk[%02d])" MEI_DRV_CRLF, barIdx,
             MEI_REG_ACCESS_ME_XMEM_BAR_GET(pMeiDrvCntrl, barIdx), chunkIdx));
@@ -1557,7 +1627,9 @@ static IFX_int32_t MEI_VRX_FMLT2_BarRegistersUpdate(
 
    /* Update BAR register pointed to ERB block */
    MEI_REG_ACCESS_ME_XMEM_BAR_SET(pMeiDrvCntrl, barIdx,
-                          MEI_VRX_TranslateMipsToArc(pMeiDev->meiERBbuf.pERB));
+                          MEI_VRX_TranslateMipsToArc(pMeiDev->meiERBbuf.pERB_virt,
+                                                     pMeiDev->meiERBbuf.pERB_phy));
+   MEI_BAR_TYPE_SET(pMeiDev, barIdx, eMEI_BAR_TYPE_ERB);
    PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL,
       ("BAR[%02d] = 0x%08X (-> ERB block)"MEI_DRV_CRLF, barIdx,
       MEI_REG_ACCESS_ME_XMEM_BAR_GET(pMeiDrvCntrl, barIdx)));
@@ -1577,6 +1649,7 @@ static IFX_int32_t MEI_VRX_FMLT2_BarRegistersUpdate(
    else
    {
       MEI_REG_ACCESS_ME_XMEM_BAR_SET(pMeiDrvCntrl, barIdx, pChunk[chunkIdx].pBARx);
+      MEI_BAR_TYPE_SET(pMeiDev, barIdx, eMEI_BAR_TYPE_SPECIAL);
       PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL,
          ("BAR[%02d] = 0x%08X (-> chunk[%02d])" MEI_DRV_CRLF, barIdx,
          MEI_REG_ACCESS_ME_XMEM_BAR_GET(pMeiDrvCntrl, barIdx), chunkIdx));
@@ -1596,6 +1669,7 @@ static IFX_int32_t MEI_VRX_FMLT2_BarRegistersUpdate(
    if (pChunk[chunkIdx].eImageChunkType != eMEI_FW_IMAGE_CHUNK_UNDEFINED)
    {
       MEI_REG_ACCESS_ME_XMEM_BAR_SET(pMeiDrvCntrl, barIdx, pChunk[chunkIdx].pBARx);
+      MEI_BAR_TYPE_SET(pMeiDev, barIdx, eMEI_BAR_TYPE_SPECIAL);
       PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL,
          ("BAR[%02d] = 0x%08X (-> chunk[%02d])" MEI_DRV_CRLF, barIdx,
          MEI_REG_ACCESS_ME_XMEM_BAR_GET(pMeiDrvCntrl, barIdx), chunkIdx));
@@ -1632,12 +1706,14 @@ static IFX_int32_t MEI_VRX_FMLT0_BarRegistersUpdate(
 
    for (chunkIdx=0; chunkIdx<MEI_FW_IMAGE_MAX_CHUNK_COUNT; chunkIdx++)
    {
-      if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
+      if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10) ||
+          MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10_320))
       {
          /* BAR0, BAR1, BAR2 are points to PDBRAM */
          if (chunkIdx < MEI_FW_IMAGE_MAX_CACHE_CHUNK_COUNT)
          {
             MEI_REG_ACCESS_ME_XMEM_BAR_SET(pMeiDrvCntrl, chunkIdx, ppPDBRAM);
+            MEI_BAR_TYPE_SET(pMeiDev, chunkIdx, eMEI_BAR_TYPE_PDBRAM);
             PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL,
                ("BAR[%02d] = 0x%08X" MEI_DRV_CRLF, chunkIdx, ppPDBRAM));
             ppPDBRAM += MEI_FW_IMAGE_CHUNK_SIZE_BYTE;
@@ -1651,6 +1727,7 @@ static IFX_int32_t MEI_VRX_FMLT0_BarRegistersUpdate(
 
       /* Write BARx register with the chunk address*/
       MEI_REG_ACCESS_ME_XMEM_BAR_SET(pMeiDrvCntrl, chunkIdx, pChunk[chunkIdx].pBARx);
+      MEI_BAR_TYPE_SET(pMeiDev, chunkIdx, eMEI_BAR_TYPE_CHUNK);
 
       PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL,
             ("BAR[%02d] = 0x%08X" MEI_DRV_CRLF, chunkIdx,
@@ -1670,7 +1747,9 @@ static IFX_int32_t MEI_VRX_FMLT0_BarRegistersUpdate(
 
    /* Update BAR register pointed to ERB block */
    MEI_REG_ACCESS_ME_XMEM_BAR_SET(pMeiDrvCntrl, chunkIdx,
-                          MEI_VRX_TranslateMipsToArc(pMeiDev->meiERBbuf.pERB));
+                          MEI_VRX_TranslateMipsToArc(pMeiDev->meiERBbuf.pERB_virt,
+                                                     pMeiDev->meiERBbuf.pERB_phy));
+   MEI_BAR_TYPE_SET(pMeiDev, chunkIdx, eMEI_BAR_TYPE_ERB);
    PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL, ("BAR[%02d] = 0x%08X" MEI_DRV_CRLF,
             chunkIdx, MEI_REG_ACCESS_ME_XMEM_BAR_GET(pMeiDrvCntrl, chunkIdx)));
 
@@ -1681,8 +1760,24 @@ static IFX_int32_t MEI_VRX_FMLT0_BarRegistersUpdate(
    {
       /* Fill unused chunks*/
       if (pChunk[chunkIdx].eImageChunkType == eMEI_FW_IMAGE_CHUNK_UNDEFINED)
-         /* Write unused BARx register with the BAR0 content*/
-         MEI_REG_ACCESS_ME_XMEM_BAR_SET(pMeiDrvCntrl, chunkIdx, pChunk[0].pBARx);
+      {
+#if (MEI_PREDEF_DBG_BAR == 1)
+         if (MEI_BAR_TYPE_GET(pMeiDev, chunkIdx) != eMEI_BAR_TYPE_USER)
+         {
+#endif /* (MEI_PREDEF_DBG_BAR == 1) */
+            /* Write unused BARx register with the BAR0 content*/
+            MEI_REG_ACCESS_ME_XMEM_BAR_SET(pMeiDrvCntrl, chunkIdx, pChunk[0].pBARx);
+            MEI_BAR_TYPE_SET(pMeiDev, chunkIdx, eMEI_BAR_TYPE_UNUSED);
+#if (MEI_PREDEF_DBG_BAR == 1)
+         }
+         else
+         {
+            /* reload dbg addr after reset */
+            MEI_REG_ACCESS_ME_XMEM_BAR_SET(pMeiDrvCntrl, chunkIdx,
+                           MEI_BAR_DBG_ADDR_GET(pMeiDev, chunkIdx));
+         }
+#endif /* (MEI_PREDEF_DBG_BAR == 1) */
+      }
    }
 
 
@@ -1698,6 +1793,7 @@ static IFX_int32_t MEI_VRX_FMLT0_BarRegistersUpdate(
       /* Write Shadow register with the DATA chunk address*/
       MEI_REG_ACCESS_ME_XDATA_BASE_SH_SET(pMeiDrvCntrl,
          pChunk[MEI_FW_IMAGE_DATA_CHUNK_INDEX].pBARx);
+      MEI_BAR_TYPE_SET(pMeiDev, MEI_FW_IMAGE_DATA_CHUNK_INDEX, eMEI_BAR_TYPE_SPECIAL);
 
       PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL,
             ("XDATA_BASE_SH = 0x%08X" MEI_DRV_CRLF,
@@ -1767,7 +1863,8 @@ static IFX_int32_t MEI_VRX_BootLoaderSizeGet(
       ("MEI_DRV: read bootloader size %d bytes"
       MEI_DRV_CRLF, *pVal));
 
-   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
+   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10) ||
+       MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10_320))
    {
       if (*pVal == 0)
       {
@@ -1932,7 +2029,8 @@ static IFX_int32_t MEI_VRX_FinishFwDownload(
       }
    }
 
-   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
+   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10) ||
+       MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10_320))
    {
       /* Clear FORCE_LINK_DOWN flag for PPE */
       *MEI_PPE_U32REG(PPE_FORCE_LINK_DOWN) &= ~0x1;
@@ -2101,7 +2199,8 @@ static IFX_int32_t MEI_VRX_StartFwDownload(
    /* Read bootloader size for VR9/VR10, but use only for VR10 */
    ret = MEI_VRX_BootLoaderSizeGet(pMeiDev, &bootloader_size);
 
-   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
+   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10) ||
+       MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10_320))
    {
       if (ret != IFX_SUCCESS )
       {
@@ -2114,7 +2213,8 @@ static IFX_int32_t MEI_VRX_StartFwDownload(
       }
    }
 
-   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
+   if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10) ||
+       MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10_320))
    {
       /* Get access to PDBRAM shared with PPE driver */
       if ((ret = MEI_VR10_PDBRAM_AccessGet(pMeiDev)) != IFX_SUCCESS)
@@ -2523,7 +2623,8 @@ static IFX_int32_t MEI_DEV_FirmwareImageHeaderGet(
    PRN_DBG_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_NORMAL,
          ("=================================================" MEI_DRV_CRLF));
 
-      if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10))
+      if (MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10) ||
+          MEI_DEVICE_CFG_IS_PLATFORM(e_MEI_DEV_PLATFORM_CONFIG_VR10_320))
       {
          if ((pFwDlCtrl->meiPartitions.bootloader_size + pFwDlCtrl->meiPartitions.vDSL_cache_size
                                  > MEI_FW_IMAGE_MAX_PDBRAM_CACHE_SIZE_BYTE) ||
@@ -3085,6 +3186,7 @@ IFX_int32_t MEI_IoctlFwModeCtrlSet(
 
    /* Get current FW Port Mode Control Structure*/
    ret = MEI_VRX_PortModeControlStructureCurrentGet(pMeiDev, &fwPortModeCtrl);
+
    if (ret != IFX_SUCCESS)
    {
       PRN_ERR_USR_NL( MEI_DRV, MEI_DRV_PRN_LEVEL_ERR,

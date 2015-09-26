@@ -45,7 +45,7 @@ extern IFX_int32_t MEI_InternalXtmSwhowtimeExitSignal(
 extern int ppa_callback_set(e_ltq_mei_cb_type type, void *func);
 extern void* ppa_callback_get(e_ltq_mei_cb_type type);
 
-int ltq_mei_atm_showtime_check (
+int ltq_mei_atm_showtime_check(
                               const unsigned char line_idx,
                               int *is_showtime,
                               struct port_cell_info *port_cell,
